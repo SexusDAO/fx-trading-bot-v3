@@ -393,6 +393,8 @@ class SignalWatcher:
         score_original_expire: float = 0.0,
         is_reorder:            bool  = False,
         reorder_count:         int   = 0,
+        # [v3.87 STEP5-8] replace=True：允许覆盖同标的已有的未触发条目（价格位移重挂用，先注册新单再撤旧单）
+        replace:               bool  = False,
     ) -> None:
         """注册信号监控。"""
         symbol = signal.get("symbol", "")
@@ -401,7 +403,7 @@ class SignalWatcher:
 
         async with self._lock:
             existing = self._watched.get(symbol)
-            if existing and not existing.triggered and not existing.is_expired():
+            if existing and not replace and not existing.triggered and not existing.is_expired():
                 logger.info(
                     f"[signal_watcher] {symbol} 已在监控队列，跳过重复注册 (mode={existing.mode})"
                 )
@@ -1315,8 +1317,7 @@ class SignalWatcher:
                             _new_sig['pre_entry_price'] = _new_params['entry_price']
                             from shared.signal_watcher import compute_entry_range as _cer
                             _el, _eh, _ep = _cer(_new_sig, mark_mp, liq_long=_liq_long, liq_short=_liq_short)
-                            # 撤旧单重挂：按 mode 使用对应有效期
-                            await self._cancel_and_remove(sym, entry, '价格位移重算入场参数')
+                            # 按 mode 使用对应有效期
                             try:
                                 from config import ORDER_EXPIRE_BREAKOUT_MIN as _exp_bo, ORDER_EXPIRE_PULLBACK_MIN as _exp_pb
                             except Exception:
@@ -1327,18 +1328,26 @@ class SignalWatcher:
                                 _exp_min = int(_exp_pb * 1.5)  # 360 分钟
                             else:
                                 _exp_min = _exp_pb           # 240 分钟
-                            await self.add_signal(
-                                _new_sig,
+                            # [v3.87 STEP5-8] 参数与清算区位移重挂对齐：补 on_trigger 和触发快照字段，去掉不存在的 loop；
+                            #   先注册新单、成功后才撤旧单（见 _reorder_replace）。
+                            await self._reorder_replace(
+                                sym, entry, _new_sig,
                                 entry_low=_el, entry_high=_eh, entry_price=_ep,
                                 expire_ts=time.time() + _exp_min * 60,
-                                loop=loop,
+                                on_trigger=entry.on_trigger,
+                                trigger_price=mark_mp,
+                                trigger_rsi_1h=rsi_v,
+                                breakout_ref=entry.breakout_ref,
+                                ema20_at_trigger=ema20,
+                                atr_at_trigger=atr_v,
                                 is_reorder=True,
+                                reorder_count=entry.reorder_count + 1,
                                 score_created_at=entry.score_created_at,
                                 score_original_expire=entry.score_original_expire,
                             )
                             return  # 重挂完成，本次 recheck 结束
                     except Exception as _pe_sw:
-                        logger.debug(f'[recheck] {sym} 价格位移重挂失败（保留原挂单）: {_pe_sw}')
+                        logger.warning(f'[recheck] {sym} 价格位移重挂失败，保留原挂单: {_pe_sw}')  # [v3.87 STEP5-8] debug→warning，失败不再被淹没
         except Exception as _pse:
             logger.debug(f'[recheck] {sym} 价格位移检查异常: {_pse}')
 
@@ -1420,6 +1429,21 @@ class SignalWatcher:
                         score_original_expire=entry.score_original_expire,
                     )
                     logger.info(f'[recheck] {sym} 新挂单已注册 entry={e_p:.5f}')
+
+    async def _reorder_replace(self, sym: str, old_entry: WatchEntry, new_sig: dict, **add_kwargs) -> None:
+        """
+        [v3.87 STEP5-8] 价格位移重挂：先注册新单（覆盖同标的旧条目），成功后再撤旧单的交易所限价单。
+        原写法先 _cancel_and_remove 再 add_signal，且 add_signal 调用参数有误（多了不存在的 loop、缺必需的 on_trigger）
+        会抛 TypeError，被外层吞掉后旧单已撤，信号静默丢失，日志却写「保留原挂单」。
+        本方法在 add_signal 抛异常时不触碰旧单（异常向上抛，由调用方记 warning 并保留原挂单）。
+        注意：新条目已覆盖 _watched[sym]，因此不能再调用 _cancel_and_remove（会误删新条目），只撤旧的交易所订单。
+        """
+        await self.add_signal(new_sig, replace=True, **add_kwargs)
+        if old_entry.limit_order_id:
+            try:
+                await self._cancel_order(sym, old_entry.limit_order_id)
+            except Exception as ce:
+                logger.warning(f'[recheck] 价格位移重挂：旧单撤销失败 {sym} id={old_entry.limit_order_id}: {ce}')
 
     async def _cancel_and_remove(self, sym: str, entry: WatchEntry, reason: str) -> None:
         """撤销 entry 的限价单并从监控队列移除。"""

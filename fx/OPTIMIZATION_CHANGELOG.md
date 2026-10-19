@@ -252,6 +252,12 @@
 - funding_arb 不进入挂单监控（市价立即入场），BTC 守护不会撤它。
 - OPT-13 关闭时 `compute_entry_range` 突破分支与原逻辑一致（读代码确认，无单测）。
 
-## 发现但未改（待决策）
+## 追加修复（STEP5-8，🔴）
 
-- **价格位移重挂（`_recheck_one` B1 段）疑似会丢单：** 重挂时先 `_cancel_and_remove` 撤掉旧单，再调用 `add_signal(..., loop=loop, is_reorder=True, ...)`；但 `add_signal` 没有 `loop` 参数，且必需参数 `on_trigger` 未传，会抛 TypeError。异常被外层 `except` 以 debug 级别吞掉并记为「保留原挂单」，实际旧单已被撤。涉及 `SIGNAL_PRICE_SHIFT_REORDER_TYPES=("reversal","breakout")`，价格偏离原入场价超过 1 ATR 时触发。
+| 编号 | 在哪里 | 改了什么 | 为什么改 | 开关 |
+|---|---|---|---|---|
+| STEP5-8 | `signal_watcher._recheck_one` B1 段（价格位移重挂）、`add_signal`、新增 `_reorder_replace` | ① 重挂调用补齐 `on_trigger` 和全部触发快照字段，去掉不存在的 `loop` 参数；② 改为先注册新单（`add_signal` 新增 `replace=True`，覆盖同标的旧条目），成功后才撤旧单的交易所限价单；③ 失败日志由 debug 改为 warning「重挂失败，保留原挂单」 | 原写法先撤旧单再调用参数错误的 `add_signal`（多 `loop`、缺必需的 `on_trigger`），必抛 TypeError 并被吞掉，旧单已撤，信号静默丢失，日志却写「保留原挂单」。**价格位移重挂自上线以来从未真正工作过** | 无（bug 修复；行为会真正生效，需观察） |
+
+新增 `tests/test_opt_v387_step5.py`（3 个用例）：撤旧单发生时队列里已是新条目、注册失败时旧单保留且不撤单、不带 replace 时重复注册仍被跳过。
+
+**合并后请观察：** 日志中「价格位移」「重算入场参数并重挂」出现的频率，以及「价格位移重挂失败，保留原挂单」的 warning 是否出现。只对 reversal / breakout 生效，价格偏离原入场价超过 1 ATR 才触发。
