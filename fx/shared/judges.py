@@ -336,7 +336,7 @@ def _judge_pullback_impl(k1h, k4h, k15, ind, chg24, funding):
 
         # 条件二:价格在回踩区间(硬性)
         # 回踩区间从 config 读取(PULLBACK_LOWER_LIMIT_LOW/MID),与参数中心一致
-        sl_mult = _PB_LOW if tier == "low" else _PB_MID
+        # [v3.87 STEP3] 删除未使用的 sl_mult（下边界已固定为 1.0 ATR，与止损系数解耦）
         # v3.6: 回踩区间下边界固定 1.0 ATR，与止损系数解耦
         # sl_mult 用于止损计算，回踩区间若也用 sl_mult（mid=2.0），会把破位的标的也放进来
         _zone_lower_mult = 1.0  # 固定下边界，不随 tier 变化
@@ -1041,8 +1041,7 @@ def _check_15m_confirm(k15: list, direction: str, breakout_price: float, atr: fl
     c  = float(confirm_k[4])
     o  = float(confirm_k[1])
     h  = float(confirm_k[2])
-    lo = float(confirm_k[3])
-    v  = float(confirm_k[5])
+    # [v3.87 STEP3] 删除未使用的 lo / v（成交量检查已由条件二对突破K线本身完成）
 
     # 成交量检查:条件二已对突破K线本身验证量能(vol_ratio>=2.0且是近3根最大)
     # 确认K线的职责是验证价格站稳,正常回踩时量能自然回落,0.8倍均量会误杀有效信号
@@ -1133,8 +1132,11 @@ def _judge_reversal_impl(k1h, k4h, k15, ind, chg24, funding):
     #                                    rsi_1h > 75 且 chg24 >= 5  → SHORT
     #           放宽幅度门槛(-5% vs -8%),专门接住分类层路由进来的小跌幅极端信号。
     # v3.46: 根据波动率档位动态决定 reversal chg24 触发门槛
-    from config import ATR_TIER_MID_REVERSAL_CHG24, ATR_TIER_MID_MIN
+    # [v3.87 STEP3] 删除重复导入 ATR_TIER_MID_MIN（下方 1343 行附近同函数内再次导入，值相同）
+    from config import ATR_TIER_MID_REVERSAL_CHG24
     _rev_chg24_long  = -ATR_TIER_MID_REVERSAL_CHG24 if ind.get("_vol_tier") == "mid_vol" else -8.0
+    # [v3.87 STEP3 DOC] _rev_chg24_short 是遗留死变量：v3.64 起做空主通道有意放宽并写死为 chg24 >= +5.0（见下方方向路由），
+    #   不再读取本变量，因此中波动档的做空涨幅门槛配置不生效。做多仍使用 _rev_chg24_long，多空门槛不对称是有意的。保留不删。
     _rev_chg24_short =  ATR_TIER_MID_REVERSAL_CHG24 if ind.get("_vol_tier") == "mid_vol" else  8.0
 
     # v3.64: Reversal SHORT 门槛修复
@@ -1357,6 +1359,8 @@ def _judge_reversal_impl(k1h, k4h, k15, ind, chg24, funding):
         return False, out
     # 做多资金费率门槛:允许小正费率(市场轻度多头),超过 +0.1% 才认为多头拥挤
     fr_long_thresh   = 0.0015 if tier == "high" else 0.0010
+    # [v3.87 STEP3 DOC] fr_short_thresh 是有意不接入的变量：做空只用下方硬编码的 funding < -0.002 拒绝（v3.6 放宽，
+    #   熊市资金费率常偏负，若用 0.25%/0.35% 作硬门槛会拦死做空）。做多的 fr_long_thresh 则作为硬门槛使用，两侧不对称是有意的。保留不删。
     fr_short_thresh  = 0.0035 if tier == "high" else 0.0025
 
     # ── 做多条件 ──────────────────────────────────────────────────────────────
@@ -2041,9 +2045,9 @@ def judge_funding_arb(symbol: str, funding: float, funding_hist: list,
     """
     try:
         from config import (
-            FUNDING_ARB_MIN_RATE_SHORT, FUNDING_ARB_STRONG_RATE_SHORT,
+            FUNDING_ARB_MIN_RATE_SHORT,   # [v3.87 STEP3] STRONG_RATE_* 在后面强度分级处导入，此处重复且未使用，已移除
             FUNDING_ARB_RATE_HIST_MIN_SHORT,
-            FUNDING_ARB_MIN_RATE_LONG,  FUNDING_ARB_STRONG_RATE_LONG,
+            FUNDING_ARB_MIN_RATE_LONG,
             FUNDING_ARB_RATE_HIST_MIN_LONG,
             FUNDING_ARB_RSI4H_SHORT_MIN, FUNDING_ARB_RSI4H_SHORT_MAX,
             FUNDING_ARB_RSI4H_LONG_MIN,  FUNDING_ARB_RSI4H_LONG_MAX,
@@ -2057,8 +2061,7 @@ def judge_funding_arb(symbol: str, funding: float, funding_hist: list,
     import time as _t
     rsi_4h   = ind.get("rsi_4h", 50)
     atr      = ind.get("atr_1h", 0)
-    price    = ind.get("price", 0)
-    oi_now   = ind.get("oi_now", 0)
+    oi_now   = ind.get("oi_now", 0)   # [v3.87 STEP3] 删除未使用的 price
 
     out = {
         "mode":              "funding_arb",
@@ -2653,7 +2656,7 @@ def _judge_stop_hunt_impl(k1h, k4h, k15, ind, chg24, funding):
         bar = window[wi]
         bar_low   = float(bar[3])
         bar_high  = float(bar[2])
-        bar_close = float(bar[4])
+        # [v3.87 STEP3] 删除未使用的 bar_close
         bar_vol   = float(bar[5])
         vol_ratio = bar_vol / vol_ma_15m
 
