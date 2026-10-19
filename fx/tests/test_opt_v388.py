@@ -143,3 +143,68 @@ class TestSingleZoneFlag(unittest.TestCase):
         r = liq_metrics(z, [z, z], 1e7, 0)        # OI 缺失
         self.assertIsNone(r["rel_oi"])
         self.assertEqual(r["rel_vol24"], 0.1)
+
+
+class TestGates(unittest.TestCase):
+    """[v3.88 OPT-14f/g] 分歧度门控与数据降级回退。"""
+    def test_degraded_forces_base(self):
+        from shared.opt_v388 import liq_weight_gated
+        self.assertEqual(liq_weight_gated(0.5, 0.1, 0.5, 3.0, 100, 100, 1, degraded=True), 2.0)
+
+    def test_divergence_caps(self):
+        from shared.opt_v388 import liq_weight_gated
+        # 强度很高本应到 3.0；偏离 2 ATR > 1.5 → 压到 2.0
+        self.assertEqual(liq_weight_gated(0.5, 0.1, 0.5, 3.0, 102, 100, 1), 2.0)
+
+    def test_no_trigger_keeps_clamp(self):
+        from shared.opt_v388 import liq_weight_gated
+        self.assertEqual(liq_weight_gated(0.5, 0.1, 0.5, 3.0, 100.5, 100, 1), 3.0)
+        self.assertEqual(liq_weight_gated(0.01, 0.1, 0.5, 3.0, 100.5, 100, 1), 0.5)
+
+    def test_low_weight_not_raised_by_gate(self):
+        from shared.opt_v388 import liq_weight_gated
+        self.assertEqual(liq_weight_gated(0.01, 0.1, 0.5, 3.0, 110, 100, 1), 0.5)
+
+    def test_missing_rel_or_atr(self):
+        from shared.opt_v388 import liq_weight_gated
+        self.assertEqual(liq_weight_gated(None, 0.1, 0.5, 3.0, 110, 100, 1), 2.0)
+        self.assertEqual(liq_weight_gated(0.5, 0.1, 0.5, 3.0, 110, 100, 0), 3.0)
+
+    def test_src_level(self):
+        from shared import liq_cache as lc
+        lc._CACHE["XTEST:3d"] = {"src_level": 1}
+        lc._CACHE["XTEST:7d"] = {"src_level": 3}
+        self.assertEqual(lc.get_liq_src_level("XTEST"), 3)
+        self.assertEqual(lc.get_liq_src_level("NOPE"), 0)
+        lc._CACHE.pop("XTEST:3d"); lc._CACHE.pop("XTEST:7d")
+
+
+class TestOidAllBull(unittest.TestCase):
+    """[v3.88 OPT-15] oi_divergence 近5根全同向拒绝。"""
+    def _k(self, bull=True, n=8):
+        out = []
+        for i in range(n):
+            o = 100 + i; c = o + 0.5 if bull else o - 0.5
+            out.append([0, o, o + 1, o - 1, c, 1000])
+        return out
+
+    def _sig(self, d):
+        return {"symbol": "TESTUSDT", "direction": d, "mode": "oi_divergence", "volatility_tier": "mid", "ind": {}}
+
+    def test_short_all_bull_rejected(self):
+        r = cst.calc_sl_tp(self._sig("SHORT"), 108.0, 1.0, {}, self._k(True), 105.0)
+        self.assertIn("error", r)
+
+    def test_long_all_bear_rejected(self):
+        r = cst.calc_sl_tp(self._sig("LONG"), 108.0, 1.0, {}, self._k(False), 105.0)
+        self.assertIn("error", r)
+
+    def test_flag_off_restores_fallback(self):
+        import config
+        orig = config.OPT_OID_REJECT_ALL_BULL
+        config.OPT_OID_REJECT_ALL_BULL = False
+        try:
+            r = cst.calc_sl_tp(self._sig("SHORT"), 108.0, 1.0, {}, self._k(True), 105.0)
+            self.assertFalse(r.get("error", "").startswith("oi_divergence SHORT 近5根"))
+        finally:
+            config.OPT_OID_REJECT_ALL_BULL = orig

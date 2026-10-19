@@ -90,3 +90,20 @@ def liq_metrics(zone: dict | None, zones: list, vol24_usd: float, oi_usd: float)
         # [v3.88 OPT-14d] 单区时 concentration 恒为 1.0，没有区分度；显式标记，分析时应剔除这类样本
         "concentration_valid": len(zones or []) >= 2,
     }
+
+
+def liq_weight_gated(rel, ref_ratio, w_min, w_max, liq_edge, ema20, atr,
+                     gate_atr=1.5, gate_cap=2.0, degraded=False, base=2.0):
+    """[v3.88 OPT-14f/g] 在相对强度权重之上叠加两道门控：
+    - 数据降级（清算图来自二级/三级数据源）：无论强度多少，权重强制回到 base（固定 2）；
+    - 分歧度门控：清算区锚点与 EMA20 偏离超过 gate_atr × ATR 时，权重上限压制到 gate_cap。
+    只会让权重更保守（不高于未门控的结果）；atr/ema20 缺失时不触发分歧度门控。"""
+    if degraded:
+        return base
+    cap = w_max
+    try:
+        if atr and atr > 0 and ema20 and liq_edge and abs(float(liq_edge) - float(ema20)) > gate_atr * float(atr):
+            cap = min(w_max, gate_cap)
+    except (TypeError, ValueError):
+        pass
+    return liq_weight(rel, ref_ratio, w_min, cap, base)

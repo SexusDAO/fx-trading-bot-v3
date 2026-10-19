@@ -75,7 +75,7 @@ def _fetch_from_bykaranteli(symbol: str, current_price: float) -> dict:
         short_zones = get_liq_zones(symbol, "SHORT", current_price)
         if long_zones or short_zones:
             logger.info(f"[liq_cache] {symbol} BYK liqmap: long={len(long_zones)} short={len(short_zones)} zones")
-            return {"LONG": long_zones, "SHORT": short_zones, "ts": time.time()}
+            return {"LONG": long_zones, "SHORT": short_zones, "ts": time.time(), "src_level": 2}
     except Exception as e:
         logger.debug(f"[liq_cache] {symbol} BYK 失败: {e}")
     return {}
@@ -107,7 +107,7 @@ def _fetch_from_clawby(symbol: str, current_price: float,
                     short_zones.append(zone)
             if long_zones or short_zones:
                 logger.info(f"[liq_cache] {symbol} CG heatmap: long={len(long_zones)} short={len(short_zones)} zones")
-                return {"LONG": long_zones, "SHORT": short_zones, "ts": time.time()}
+                return {"LONG": long_zones, "SHORT": short_zones, "ts": time.time(), "src_level": 1}
     except Exception as e:
         logger.debug(f"[liq_cache] {symbol} CG heatmap 失败: {e}")
 
@@ -125,7 +125,7 @@ def _fetch_from_clawby(symbol: str, current_price: float,
             long_zones  = _liq_orders_to_zones(raw, "LONG",  current_price)
             short_zones = _liq_orders_to_zones(raw, "SHORT", current_price)
             logger.debug(f"[liq_cache] {symbol} 降级到 CG liq_orders")
-            return {"LONG": long_zones, "SHORT": short_zones, "ts": time.time()}
+            return {"LONG": long_zones, "SHORT": short_zones, "ts": time.time(), "src_level": 3}
     except Exception as e:
         logger.debug(f"[liq_cache] {symbol} CG liq_orders 失败: {e}")
 
@@ -265,3 +265,18 @@ def start_bg_refresh(symbols_fn) -> None:
     t = threading.Thread(target=_loop, name="liq-cache-bg", daemon=True)
     t.start()
     logger.info("[liq_cache] 后台刷新线程已启动（间隔15分钟）")
+
+
+def get_liq_src_level(symbol: str) -> int:
+    """[v3.88 OPT-14g] 返回该标的当前缓存中清算图的最差数据来源级别：
+    1=Coinglass heatmap（主路径） / 2=ByKaranteli（二级降级） / 3=Coinglass liq_orders（三级降级）。
+    无缓存或未记录来源时返回 0（视为未知，不触发降级回退）。只读，不触发网络请求。"""
+    lvl = 0
+    try:
+        with _CACHE_LOCK:
+            for k, v in _CACHE.items():
+                if k.startswith(f"{symbol}:"):
+                    lvl = max(lvl, int((v or {}).get("src_level", 0) or 0))
+    except Exception:
+        return 0
+    return lvl

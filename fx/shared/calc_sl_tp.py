@@ -229,6 +229,15 @@ def _collect_liq_metrics(entry: float, atr: float, direction: str,
         return {}
 
 
+def _oid_reject_all_one_side() -> bool:
+    """[v3.88 OPT-15] OPT_OID_REJECT_ALL_BULL：oi_divergence 近5根全同向时是否拒绝（默认 True）。读取失败按 True。"""
+    try:
+        import config as _c
+        return bool(getattr(_c, "OPT_OID_REJECT_ALL_BULL", True))
+    except Exception:
+        return True
+
+
 def _liq_rel_cfg():
     """[v3.88 OPT-14] 读取清算区相对强度相关配置；开关关闭或读取失败时返回 None（走原逻辑）。"""
     try:
@@ -238,6 +247,8 @@ def _liq_rel_cfg():
         return {
             "strong": _c.LIQ_RELATIVE_STRONG, "mid": _c.LIQ_RELATIVE_MID,
             "ref": _c.LIQ_WEIGHT_REF_RATIO, "w_min": _c.LIQ_WEIGHT_MIN, "w_max": _c.LIQ_WEIGHT_MAX,
+            "gate_atr": getattr(_c, "OPT_DIVERGENCE_GATE_ATR", 1.5),
+            "gate_cap": getattr(_c, "OPT_DIVERGENCE_GATE_WEIGHT_CAP", 2.0),
             "b_strong": _c.TP1_LIQ_BUFFER_STRONG, "b_mid": _c.TP1_LIQ_BUFFER_MID, "b_weak": _c.TP1_LIQ_BUFFER_WEAK,
         }
     except Exception:
@@ -309,10 +320,13 @@ def _entry_pullback(mark: float, atr: float, ema20: float,
             _w = 2.0
             _rcfg = _liq_rel_cfg()
             if _rcfg:
-                from shared.opt_v388 import liq_weight as _lw
+                from shared.opt_v388 import liq_weight_gated as _lwg
                 _ctx_e = liq_ctx or {"vol24_usd": vol24_usd}
-                _w = _lw(_liq_rel(z, liq_long if direction == "LONG" else liq_short, _ctx_e),
-                         _rcfg["ref"], _rcfg["w_min"], _rcfg["w_max"])
+                # [v3.88 OPT-14f/g] 叠加两道门控：数据降级（二/三级来源）→ 权重回到 2；
+                #   清算区锚点与 EMA20 偏离 > OPT_DIVERGENCE_GATE_ATR×ATR → 权重上限压到 OPT_DIVERGENCE_GATE_WEIGHT_CAP。
+                _w = _lwg(_liq_rel(z, liq_long if direction == "LONG" else liq_short, _ctx_e),
+                          _rcfg["ref"], _rcfg["w_min"], _rcfg["w_max"], liq_edge, ema20, atr,
+                          _rcfg["gate_atr"], _rcfg["gate_cap"], bool(_ctx_e.get("liq_degraded")))
             weighted = (liq_edge * _w + ema20 * 1 + vol_mid * 1) / (_w + 2)
             entry = weighted
         else:
@@ -359,10 +373,13 @@ def _entry_pullback(mark: float, atr: float, ema20: float,
             _w = 2.0
             _rcfg = _liq_rel_cfg()
             if _rcfg:
-                from shared.opt_v388 import liq_weight as _lw
+                from shared.opt_v388 import liq_weight_gated as _lwg
                 _ctx_e = liq_ctx or {"vol24_usd": vol24_usd}
-                _w = _lw(_liq_rel(z, liq_long if direction == "LONG" else liq_short, _ctx_e),
-                         _rcfg["ref"], _rcfg["w_min"], _rcfg["w_max"])
+                # [v3.88 OPT-14f/g] 叠加两道门控：数据降级（二/三级来源）→ 权重回到 2；
+                #   清算区锚点与 EMA20 偏离 > OPT_DIVERGENCE_GATE_ATR×ATR → 权重上限压到 OPT_DIVERGENCE_GATE_WEIGHT_CAP。
+                _w = _lwg(_liq_rel(z, liq_long if direction == "LONG" else liq_short, _ctx_e),
+                          _rcfg["ref"], _rcfg["w_min"], _rcfg["w_max"], liq_edge, ema20, atr,
+                          _rcfg["gate_atr"], _rcfg["gate_cap"], bool(_ctx_e.get("liq_degraded")))
             weighted = (liq_edge * _w + ema20 * 1 + vol_mid * 1) / (_w + 2)
             entry = weighted
         else:
@@ -940,6 +957,12 @@ def calc_sl_tp(
         "vol24_usd": float(_ind_ctx.get("vol24_usd", 0) or 0),
         "oi_usd":    _oi_qty * float(mark_price or 0),
     }
+    # [v3.88 OPT-14g] 清算图数据来源级别：>=2 表示已降级到二/三级数据源（只读缓存，不触发网络请求）
+    try:
+        from shared.liq_cache import get_liq_src_level as _gsl
+        _liq_ctx["liq_degraded"] = _gsl(signal.get("symbol", "")) >= 2
+    except Exception:
+        _liq_ctx["liq_degraded"] = False
     if signal.get("tp1_buffer_locked") is not None:
         _liq_ctx["tp1_buffer_locked"] = float(signal["tp1_buffer_locked"])
 
@@ -1015,6 +1038,11 @@ def calc_sl_tp(
                          if float(_kk[4]) < float(_kk[1])),
                         None
                     )
+                    # [v3.88 OPT-15] 近5根全阳（无收阴K）：直接拒绝，不再用 mark*0.992 人造下限。
+                    #   原兜底得到的入场价低于市价，空单限价单会立刻成交（变市价追空），且与清算图锚点无关。
+                    #   开关 OPT_OID_REJECT_ALL_BULL（默认开启）；关闭时保持原兜底。
+                    if _bearish_close is None and _oid_reject_all_one_side():
+                        return {"error": "oi_divergence SHORT 近5根全为阳线（无收阴K），拒绝信号（v3.88 OPT-15）"}
                     _floor = _bearish_close if _bearish_close is not None else mark_price * 0.992
                     _entry_candidate = max(_entry_candidate, _floor)
 
@@ -1033,6 +1061,9 @@ def calc_sl_tp(
                          if float(_kk[4]) > float(_kk[1])),
                         None
                     )
+                    # [v3.88 OPT-15] 近5根全阴（无收阳K）：LONG 同理直接拒绝。
+                    if _bullish_close is None and _oid_reject_all_one_side():
+                        return {"error": "oi_divergence LONG 近5根全为阴线（无收阳K），拒绝信号（v3.88 OPT-15）"}
                     _ceil = _bullish_close if _bullish_close is not None else mark_price * 1.008
                     _entry_candidate = min(_entry_candidate, _ceil)
 

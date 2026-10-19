@@ -925,3 +925,11 @@ TP1_LIQ_BUFFER_WEAK   = 0.50
 #   三种分母的数值都会写进 params / 持仓 / trade_log 的 liq_metrics 字段，积累数据后再决定用哪个、阈值定多少。
 #   注意 concentration 在只有一个清算区时恒为 1.0，且随清算图拉取范围变化。
 LIQ_REL_DENOM = "vol24"
+
+# [v3.88 OPT-14f] 分歧度门控（受 OPT_LIQ_RELATIVE_STRENGTH 控制，不单独开关）：
+#   清算区锚点与 EMA20 偏离超过 OPT_DIVERGENCE_GATE_ATR × ATR 时，动态权重上限压制到 OPT_DIVERGENCE_GATE_WEIGHT_CAP。
+OPT_DIVERGENCE_GATE_ATR = 1.5
+OPT_DIVERGENCE_GATE_WEIGHT_CAP = 2.0
+# [v3.88 OPT-15] oi_divergence 近5根全阳（SHORT）/全阴（LONG）时直接拒绝信号；默认开启（与其他 OPT_* 不同）。
+#   关闭则恢复 mark*0.992 / mark*1.008 兜底。
+OPT_OID_REJECT_ALL_BULL = True

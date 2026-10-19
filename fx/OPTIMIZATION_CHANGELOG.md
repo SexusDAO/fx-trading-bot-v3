@@ -371,3 +371,19 @@
 
 验证：pyflakes 无新增问题；`tests/test_opt_v388.py` 16 项通过；全量 pytest 仅剩已知 9 个过期旧测试失败。未回测、未实盘。
 合并时机：等拿到 2~4 周 `liq_metrics` 数据、确定分母与阈值之后再合并 main。
+
+## 第 14 轮（v3.88 续：分歧度门控 + 数据降级回退 + OI 背离全阳拒绝，分支 opt/liq-relative-v388）
+
+| 编号 | 在哪里 | 改了什么 | 为什么改 | 开关状态 |
+|---|---|---|---|---|
+| OPT-14f | `shared/opt_v388.liq_weight_gated`；`calc_sl_tp._entry_pullback`（LONG / SHORT 两处） | 动态权重叠加分歧度门控：清算区锚点（LONG 取区间上沿，SHORT 取下沿）与 EMA20 的偏离 > `OPT_DIVERGENCE_GATE_ATR`（1.5）× ATR 时，权重上限从 3.0 压到 `OPT_DIVERGENCE_GATE_WEIGHT_CAP`（2.0）；未触发时仍是原 clamp(0.5, 3.0)。门控只会压低权重，不会抬高；ATR 或 EMA20 缺失时不触发 | 外部多模型意见（A2）：高集中度在极端行情里可能是陷阱而不是锚点，清算区与趋势/成交密集区严重分歧时，不应让清算区主导入场价 | 受 `OPT_LIQ_RELATIVE_STRENGTH` 控制（默认 False），不新增总开关 |
+| OPT-14g | `shared/liq_cache`（新增 `src_level` 标记与只读函数 `get_liq_src_level`）；`calc_sl_tp.calc_sl_tp`；`_entry_pullback` | 清算图来源为二级（ByKaranteli）或三级（Coinglass liq_orders）降级时，动态权重强制回到固定值 2。**说明：原代码并没有"降级级别"标记**（只有三级全失败时的 `sl_degraded`），所以在缓存字典里新增了 `src_level`（1=主路径，2、3=降级），多个 range 取最差级别；缓存无记录时按 0（未知）处理，不触发回退。新增字段不改变任何已有读取方（他们只按方向取区） | 外部意见（A2）：权重表达的是信心，等于信号强度 × 数据可信度；降级数据不应还能把权重拉到 3.0 | 受 `OPT_LIQ_RELATIVE_STRENGTH` 控制（默认 False） |
+| OPT-15 | `calc_sl_tp.calc_sl_tp` oi_divergence 入场价分支 | SHORT：近 5 根无收阴 K 时直接返回 `{"error": ...}` 拒绝信号，不再用 `mark×0.992` 兜底；LONG：近 5 根无收阳 K 时同理拒绝，不再用 `mark×1.008` | 原兜底得到的入场价低于市价，空单限价单会立刻成交（等于市价追空），且与清算图锚点无关；多个外部模型一致否定该兜底 | `OPT_OID_REJECT_ALL_BULL`，**默认 True（唯一默认开启、改变现有行为的项）**；设为 False 恢复原兜底 |
+
+本轮明确不改（写入记录，避免重复讨论）：
+- TP1 缓冲分档（0.2/0.35/0.5）：继续只记录，开关保持关闭。
+- 分母选择（vol24 / OI / concentration）：三种继续都记录，不选边。
+- ⑧ OI 背离止损外移的固定金额门槛（30 万 U）：永久保留固定值，不改。
+- 其余固定金额门槛：等影子运行数据，不改。
+
+验证：pyflakes 无新增问题；`tests/test_opt_v388.py` 25 项通过（本轮新增 9 项）；全量 pytest 仅剩已知 9 个过期旧测试失败。未回测、未实盘。
