@@ -166,7 +166,26 @@ def compute_entry_range(
 
         buf_ref = 0.005   # 突破位回踩窗口 ± 0.5%
 
-        if direction == "LONG" and ref_high > 0:
+        # [v3.87 OPT-13] 突破延续入场。原逻辑价格在突破位上方时一律只等回踩（有效期 30 分钟），真突破不回踩就整单错过。
+        #   judge_breakout 已要求放量 + 15M 确认K线，信号本身已确认；价格距突破位 ≤ 0.5ATR 时回踩空间很小，等回踩的收益
+        #   低于错过的概率，直接在现价附近入场（止损离突破位也近，失效判断清晰）。
+        #   离突破位 > 0.5ATR（已走远）仍等回踩，避免追高。开关 OPT_BREAKOUT_MOMENTUM_ENTRY。
+        try:
+            from config import OPT_BREAKOUT_MOMENTUM_ENTRY as _OPT_BME
+        except Exception:
+            _OPT_BME = False
+        _near_ref = False
+        if _OPT_BME and atr_sig > 0:
+            if direction == "LONG" and ref_high > 0 and 0 < mark_price - ref_high <= 0.5 * atr_sig:
+                _near_ref = True
+            elif direction == "SHORT" and ref_low > 0 and 0 < ref_low - mark_price <= 0.5 * atr_sig:
+                _near_ref = True
+        if _near_ref:
+            entry_p = mark_price
+            low     = mark_price * (1 - buf_ref)
+            high    = mark_price * (1 + buf_ref)
+            logger.info(f"[signal_watcher] breakout {direction} 紧贴突破位(≤0.5ATR)，延续入场 entry={entry_p:.6g}")
+        elif direction == "LONG" and ref_high > 0:
             if mark_price > ref_high:
                 # 价格仍在突破位上方 → 等回踩
                 entry_p = ref_high + atr_sig * 0.1   # 略高于突破位，maker 吃单

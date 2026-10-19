@@ -958,6 +958,18 @@ def _judge_breakout_impl(k1h, k4h, k15, ind, chg24, funding):
         return False, out
 
     # 条件四:RSI
+    # [v3.87 OPT-12] 放宽强势突破的 RSI 上限。真正的放量突破 RSI1H 常在 65~75，固定 65 会把最强的一类突破全部挡掉。
+    #   仅当量比 ≥ 强量阈值（low 2.5 / 其它 3.0，与下方 vol_strong 一致）时，上限放宽到 BREAKOUT_RSI_MAX_LONG_STRONG(75)，
+    #   做空下限放宽到 BREAKOUT_RSI_MIN_SHORT_STRONG(25)。量能不够强仍用原限制。开关 OPT_BREAKOUT_RSI_STRONG_RELAX。
+    try:
+        from config import (OPT_BREAKOUT_RSI_STRONG_RELAX as _OPT_BRR,
+                            BREAKOUT_RSI_MAX_LONG_STRONG as _RSI_L_STR,
+                            BREAKOUT_RSI_MIN_SHORT_STRONG as _RSI_S_STR)
+    except Exception:
+        _OPT_BRR = False
+    if _OPT_BRR and vol_ratio >= (2.5 if tier == "low" else 3.0):
+        rsi_limit   = max(rsi_limit, _RSI_L_STR)
+        rsi_limit_s = min(rsi_limit_s, _RSI_S_STR)
     if direction == "LONG" and rsi_1h > rsi_limit:
         out["reject_reason"] = f"RSI1H={rsi_1h:.1f} > {rsi_limit},超买追多"
         return False, out

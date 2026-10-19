@@ -902,3 +902,9 @@ OPT_PULLBACK_ENTRY_AT_CONFIRM = True   # OPT-8 回踩在确认处入场（mark�
 OPT_INVALIDATION_SL           = True   # OPT-9 回踩/EMA趋势/反转用失效位止损（1H 结构点外 0.3ATR，1~3ATR）
 OPT_OI_DIV_EXHAUSTION_CONFIRM = True   # OPT-10 OI 背离需不创新低(高) + 主动买卖比确认
 OPT_EMA_TREND_TRIGGER_BAR     = True   # OPT-11 EMA 趋势需 1H/15M 触发 K 线
+
+# v3.87 第二批
+OPT_BREAKOUT_RSI_STRONG_RELAX = True   # OPT-12 放量(量比≥强量阈值)突破放宽 RSI 限制
+BREAKOUT_RSI_MAX_LONG_STRONG  = 75     # 强量突破做多 RSI1H 上限
+BREAKOUT_RSI_MIN_SHORT_STRONG = 25     # 强量突破做空 RSI1H 下限
+OPT_BREAKOUT_MOMENTUM_ENTRY   = True   # OPT-13 距突破位≤0.5ATR 时延续入场，不再强制等回踩
