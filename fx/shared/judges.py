@@ -796,6 +796,21 @@ def _judge_breakout_impl(k1h, k4h, k15, ind, chg24, funding):
 
     # 注意:k1h 末尾已去除未闭合 K 线(调用者保证)
     # 突破 K 线 = k1h[-1],近10根基准 = k1h[-11:-1](不含突破K线)
+    # [v3.85 OPT-5] 只用已闭合 K 线判断突破。原注释写「已完全闭合，扫描周期保证」，
+    #   但 scanner 拉到的 1H K 线最后一根通常是正在形成的那根（calc_indicators 自己也会剔除 k[:-1]）。
+    #   用未闭合 K 线会：盘中触发、随后被重绘成假突破；成交量只算了一部分，量比失真。
+    #   这里按收盘时间 k[6] 判断，未闭合就去掉最后一根。开关 OPT_BREAKOUT_CLOSED_BAR。
+    try:
+        from config import OPT_BREAKOUT_CLOSED_BAR as _OPT_BC
+    except Exception:
+        _OPT_BC = False
+    if _OPT_BC and k1h:
+        import time as _t_bc
+        try:
+            if float(k1h[-1][6]) > _t_bc.time() * 1000:
+                k1h = k1h[:-1]
+        except (IndexError, TypeError, ValueError):
+            pass
     if len(k1h) < 12:
         return False, {"reject_reason": "K线数量不足"}
 
@@ -821,8 +836,12 @@ def _judge_breakout_impl(k1h, k4h, k15, ind, chg24, funding):
         return False, {"reject_reason": f"收盘价{breakout_close:.4g}未突破近10根区间[{ref_low:.4g},{ref_high:.4g}]"}
 
     vol_mult_req = 2.5 if tier == "high" else 2.0
-    rsi_limit    = 65  if tier == "high" else 65  # v3.6: 低中层 70→65，减少超买边缘追多
-    rsi_limit_s  = 35  if tier == "high" else 35  # v3.6: 低中层 25→35，与 LONG 门槛对称
+    # [v3.85 FIX-1] 原写法 `65 if tier=="high" else 65` 两个分支相同，分层是假的，且没有读取配置
+    #   （config 里 BREAKOUT_RSI_* 从未被引用）。改为读取配置；配置值已同步为原实际生效值，行为不变。
+    from config import (BREAKOUT_RSI_MAX_LONG, BREAKOUT_RSI_MAX_LONG_HIGH,
+                        BREAKOUT_RSI_MIN_SHORT, BREAKOUT_RSI_MIN_SHORT_HIGH)
+    rsi_limit    = BREAKOUT_RSI_MAX_LONG_HIGH if tier == "high" else BREAKOUT_RSI_MAX_LONG
+    rsi_limit_s  = BREAKOUT_RSI_MIN_SHORT_HIGH if tier == "high" else BREAKOUT_RSI_MIN_SHORT
     margin_mult  = 0.2 if tier == "high" else 0.15
     oi_req_pct   = 5.0 if tier == "high" else 3.0
 

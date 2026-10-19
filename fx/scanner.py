@@ -654,6 +654,33 @@ def _in_funding_window(funding_abs: float) -> tuple[bool, str]:
             return True, f"资金费率结算前窗口 {prev_h:02d}:{60-pre_min:02d}~{settle_h:02d}:00"
     return False, ""
 
+def _in_symbol_funding_window(symbol: str, mp: dict, funding_abs: float) -> tuple[bool, str]:
+    """
+    [v3.85 OPT-6] 逐标的资金费结算窗口。
+    原逻辑只按 UTC 0/8/16 整点 + BTC 费率判断，并整轮跳过扫描；但大量合约是 1H/4H 结算，
+    它们在 4/12/20 点等结算时刻完全没被保护，而 8H 标的又因 BTC 一个值被整体停扫。
+    新逻辑：用该标的 premiumIndex 的 nextFundingTime + 自身结算周期判断；拿不到时回退到旧的整点逻辑。
+    """
+    import time as _t
+    from shared.opt_v385 import symbol_funding_window
+    if funding_abs >= FUNDING_EXTREME_THRESH:
+        pre_s, post_s = FUNDING_WINDOW_EXTREME_BEFORE, FUNDING_WINDOW_EXTREME_AFTER
+    else:
+        pre_s, post_s = FUNDING_WINDOW_NORMAL_BEFORE, FUNDING_WINDOW_NORMAL_AFTER
+    try:
+        nft = int(mp.get("nextFundingTime") or 0) / 1000.0
+    except Exception:
+        nft = 0.0
+    if nft <= 0:
+        return _in_funding_window(funding_abs)   # 回退：与原行为一致
+    try:
+        from shared.binance_api import get_funding_interval
+        ih = get_funding_interval(symbol) or 8
+    except Exception:
+        ih = 8
+    return symbol_funding_window(_t.time(), nft, ih, pre_s, post_s)
+
+
 # ── OI 背离检查 ───────────────────────────────────────────────────────────────
 def _oi_divergence(symbol: str, price: float, chg24: float,
                    high_24h: float, oi_now: float = 0) -> tuple[bool, str]:
@@ -790,6 +817,17 @@ def analyze_symbol(symbol: str, ticker: dict,
 
         mp      = api.get_mark_price(symbol)
         funding = float(mp.get("lastFundingRate", 0))
+
+        # [v3.85 OPT-6] 逐标的资金费结算窗口（替代全局 BTC 整点判断），开关 OPT_FUNDING_WINDOW_PER_SYMBOL
+        try:
+            from config import OPT_FUNDING_WINDOW_PER_SYMBOL as _OPT_FW
+        except Exception:
+            _OPT_FW = False
+        if _OPT_FW:
+            _fw_blk, _fw_why = _in_symbol_funding_window(symbol, mp, abs(funding))
+            if _fw_blk:
+                logger.debug(f"[scanner] {symbol} 资金费结算窗口内跳过: {_fw_why}")
+                return None
 
         # ── B. 先用 k4h=[] 计算 1H/15M 指标，用于分类 ────────────────────────
         ind = calc_indicators(k15, k1h, [])
@@ -1495,6 +1533,14 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     btc_mp   = api.get_mark_price("BTCUSDT")
     btc_fr   = abs(float(btc_mp.get("lastFundingRate", 0)))
     in_win, win_reason = _in_funding_window(btc_fr)
+    # [v3.85 OPT-6] 启用逐标的窗口后，不再因 BTC 一个值整轮停扫；8H 标的仍会在 analyze_symbol 里被逐个拦截
+    try:
+        from config import OPT_FUNDING_WINDOW_PER_SYMBOL as _OPT_FW_G
+    except Exception:
+        _OPT_FW_G = False
+    if in_win and _OPT_FW_G:
+        logger.info(f"[scanner] {win_reason}：已启用逐标的窗口，不整轮跳过")
+        in_win = False
     if in_win:
         logger.info(f"[scanner] {win_reason}，跳过扫描")
         return result

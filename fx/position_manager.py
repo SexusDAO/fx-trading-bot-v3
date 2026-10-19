@@ -1022,7 +1022,9 @@ class PositionManager:
                 await self._force_close(pos, "soft_sl_fallback")
                 return
 
-        # 硬上限：reversal 用 16H，其他 12H（reversal 需要更多时间启动）
+        # 硬上限：所有类型统一 PM_HARD_MAX_HOLD_HOURS（当前 16H）。
+        # [v3.85 DOC-1] 原注释写「reversal 16H、其他 12H」，与实现不符，已更正。
+        # 注意：上方 v3.47「TP1 已成交且仍盈利」分支会先 return，这类持仓实际上限是 72H，不受此处 16H 约束。
         _hard_limit = PM_HARD_MAX_HOLD_HOURS * 60
         if hold_min >= _hard_limit:
             logger.info(f"[pm] {symbol} 时间止损（硬上限{_hard_limit//60:.0f}H）")
@@ -2287,7 +2289,15 @@ async def _maybe_pyramid(pos: dict) -> None:
                 logger.debug(f"[pm] {symbol} 加仓跳过: RSI1H={_rsi1h:.0f} < {PYRAMID_RSI_SHORT_MIN}（超卖）")
                 return
         except Exception:
-            pass  # RSI 查不到时不阻断，保守允许加仓
+            # [v3.85 FIX-2] 原注释写「保守允许加仓」，但数据缺失时继续加仓恰恰是不保守的。
+            #   改为：RSI 拿不到就本轮不加仓（下一轮巡检会再试），开关 OPT_PYRAMID_FAIL_CLOSED。
+            try:
+                from config import OPT_PYRAMID_FAIL_CLOSED as _OPT_PFC
+            except Exception:
+                _OPT_PFC = False
+            if _OPT_PFC:
+                logger.debug(f"[pm] {symbol} 加仓跳过：RSI 数据获取失败（OPT_PYRAMID_FAIL_CLOSED）")
+                return
 
         # 持仓槽位检查
         all_pos = get_all_positions()
