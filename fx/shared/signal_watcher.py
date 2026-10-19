@@ -637,7 +637,9 @@ class SignalWatcher:
                                         )
                                         # 只发通知，不自动平仓——等 patrol 确认
                                         try:
-                                            from shared.notify import notify as _ntf
+                                            # [v3.86 FIX-3] 原代码导入 shared.notify，但该模块不存在（实际是 shared.notifier）。
+                                            #   ImportError 被下方 except 吞掉，「止损踩空」告警从未发出过。
+                                            from shared.notifier import notify as _ntf
                                             import asyncio as _asio3
                                             await _asio3.get_event_loop().run_in_executor(
                                                 None, lambda: _ntf(

@@ -66,3 +66,27 @@
 
 1. OPT-5：突破信号会晚出现约一根 K 线内的时间，但假突破应减少；对比突破单的 TP1 触发率。
 2. OPT-6：资金费窗口内仍会扫描并对非结算标的开仓，扫描次数会增加，注意内存和接口限频；`get_funding_interval` 每 6 小时全量刷新一次缓存。
+
+
+---
+
+# 第三轮（v3.86）— 分支 `opt/third-pass-v386`（基于 `opt/second-pass-v385`）
+
+> 验证：全量测试由改动前的「51 个报错 + 2 个文件无法导入」变为「151 通过 / 9 失败」；剩余 9 个失败在 main 上单独运行同样失败（`test_judge.py` 8 个、`test_risk.py` 1 个），属于测试本身过时，非本轮引入。未回测、未跑模拟盘。
+
+| 编号 | 在哪里 | 改了什么 | 为什么改 | 开关（config.py） |
+|---|---|---|---|---|
+| FIX-3 | `shared/signal_watcher.py` BTC 剧烈波动后的「止损踩空」检查 | `from shared.notify` 改为 `from shared.notifier` | 原模块名不存在，ImportError 被 except 吞掉，止损踩空告警从未发出过 | 无（bug 修复） |
+| OPT-7 | `shared/judges.py` `_judge_reversal_impl` 做空条件二 | 做空 RSI4H 门槛取 `max(65, rsi_short_thresh)`，即高波动层 70、其余 65 | 原代码已按波动层算出 `rsi_short_thresh` 却从未使用；高波动币 RSI 更容易冲高，65 不算超买，易在加速段过早做空 | `OPT_REVERSAL_SHORT_TIER_RSI` |
+| TEST-1 | `tests/test_exit_signal_and_direction.py` | 桩模块只在本文件测试运行期间临时装入（fixture），收集结束即恢复真实模块 | 原实现永久覆盖 `sys.modules` 中的 `shared.*`，导致其他测试文件导入到空桩，出现「无法导入」和 51 个 AttributeError，测试失去保护作用 | 无（仅测试） |
+
+## 本轮评估后决定不改
+
+- `fr_short_thresh`（反转做空资金费门槛 0.25%/0.35%）：作为硬门槛会大幅减少做空信号，与 v3.6 有意放宽冲突，仅在代码中注释说明。
+- TP1 可达性检查（`signal_watcher.py` 读取了 `_tp12` 未使用）：需要先定义"不可达"的标准（例如 TP1 距现价超过 N 倍 ATR），留待你定。
+- 剩余 9 个过时测试：需要按当前判定逻辑重写测试数据，工作量较大，单独一轮处理更清楚。
+
+## 本轮合并后请观察
+
+- OPT-7：高波动币的反转做空信号会减少，对比这类单的胜率。
+- FIX-3：BTC 剧烈波动时会开始收到「止损踩空」告警，若过于频繁可再调节流。

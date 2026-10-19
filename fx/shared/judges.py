@@ -1470,6 +1470,16 @@ def _judge_reversal_impl(k1h, k4h, k15, ind, chg24, funding):
         # 原门槛 rsi_short_thresh=65(mid层),但配合 chg24>=20% 门槛,实际上极难同时满足
         # 新规:4H RSI >= 60 + 15M止涨形态即可开空
         rsi_short_thresh_new = 65  # v3.6: 60→65，50中性各距15点，做空须真正超买
+        # [v3.86 OPT-7] 上方早已按波动层算好 rsi_short_thresh（高波动 70 / 其余 65），但从未被使用，
+        #   高波动币和普通币用同一个 65。高波动币 RSI 更容易冲高，65 对它算不上超买，容易在加速段过早做空。
+        #   启用后高波动层用 70，其余层仍是 65（行为不变）。开关 OPT_REVERSAL_SHORT_TIER_RSI。
+        #   注：同处的 fr_short_thresh（0.25%/0.35%）若作为硬门槛会显著减少做空信号，与 v3.6 放宽意图冲突，暂不接入。
+        try:
+            from config import OPT_REVERSAL_SHORT_TIER_RSI as _OPT_RST
+        except Exception:
+            _OPT_RST = False
+        if _OPT_RST:
+            rsi_short_thresh_new = max(rsi_short_thresh_new, rsi_short_thresh)
         if rsi_4h < rsi_short_thresh_new:
             out["reject_reason"] = f"RSI4H={rsi_4h:.1f} < {rsi_short_thresh_new},超买力度不足"
             return False, out

@@ -891,3 +891,6 @@ PULLBACK_MAX_DIST_ATR = 2.0
 OPT_BREAKOUT_CLOSED_BAR       = True   # OPT-5 突破只用已闭合 1H K 线
 OPT_FUNDING_WINDOW_PER_SYMBOL = True   # OPT-6 资金费窗口按标的自身结算时间，不再整轮停扫
 OPT_PYRAMID_FAIL_CLOSED       = True   # FIX-2 加仓所需 RSI 拿不到时本轮不加仓
+
+# v3.86 第三轮开关——False 即回到原行为
+OPT_REVERSAL_SHORT_TIER_RSI = True   # OPT-7 反转做空的 RSI4H 门槛按波动层区分（高波动 70）

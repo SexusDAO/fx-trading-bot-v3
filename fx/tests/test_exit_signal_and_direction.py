@@ -15,10 +15,27 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT.parent))
 
 # ─── 桩模块 ───────────────────────────────────────────────────────────────────
+# [v3.86 TEST-1] 原实现直接覆盖 sys.modules 中的 shared.* 且从不恢复，
+#   pytest 先收集本文件、再收集 test_judge.py / test_pulse_candle.py 时，它们拿到的是空桩模块，
+#   导致「cannot import name ...」和大量 AttributeError。这里记录原模块，在导入被测模块后立即恢复。
+_ORIG_MODULES = {}
+_STUBS = {}
+
 def _make_stub(name):
+    if name not in _ORIG_MODULES:
+        _ORIG_MODULES[name] = sys.modules.get(name)
     m = types.ModuleType(name)
     sys.modules[name] = m
+    _STUBS[name] = m
     return m
+
+
+def _restore_modules():
+    for _n, _m in _ORIG_MODULES.items():
+        if _m is None:
+            sys.modules.pop(_n, None)
+        else:
+            sys.modules[_n] = _m
 
 for mod in [
     "binance_futures_connector",
@@ -55,6 +72,18 @@ import config
 # ═══════════════════════════════════════════════════════════════════════════════
 
 from position_manager import PositionManager, _last_price
+_restore_modules()   # [v3.86 TEST-1] 收集阶段结束即恢复真实模块，其他测试文件导入时拿到真实实现
+
+
+import pytest as _pytest_iso
+
+
+@_pytest_iso.fixture(autouse=True)
+def _reinstall_stubs(monkeypatch):
+    """[v3.86 TEST-1] 仅在本文件的测试运行期间临时装回桩模块（函数内的延迟导入依赖它们），结束后自动还原。"""
+    for _n, _m in _STUBS.items():
+        monkeypatch.setitem(sys.modules, _n, _m)
+    yield
 
 def _make_pm():
     pm = object.__new__(PositionManager)
