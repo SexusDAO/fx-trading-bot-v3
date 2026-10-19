@@ -3115,6 +3115,27 @@ def _judge_oi_divergence_impl(k1h, k4h, k15, ind, chg24, funding):
             )
             return False, out
 
+    # [v3.87 OPT-10] OI 背离必须看到「衰竭」确认。原逻辑把「价格在 24H 低点附近 + OI 1H 增 10%」当作空头被困、做多，
+    #   但这同样是空头在顺势加仓的典型形态，更常见的是继续下跌。真正的「被困」需要价格不再创新低、主动买入回升。
+    #   新增两条（做空对称）：① 最后一根已闭合 1H 未创近 3 根新低（新高）② 当前主动买入占比高于（低于）近 20 根均值。
+    #   开关 OPT_OI_DIV_EXHAUSTION_CONFIRM。
+    try:
+        from config import OPT_OI_DIV_EXHAUSTION_CONFIRM as _OPT_OIE
+    except Exception:
+        _OPT_OIE = False
+    if _OPT_OIE:
+        from shared.opt_v387 import no_new_extreme as _nne
+        _k1h_c = k1h[:-1] if len(k1h) > 1 else k1h
+        if not _nne(_k1h_c, direction):
+            out["reject_reason"] = f"OI背离未见衰竭: 最后一根1H仍在创{'新低' if direction == 'LONG' else '新高'}"
+            return False, out
+        if direction == "LONG" and taker_now <= taker_ma:
+            out["reject_reason"] = f"OI背离未见衰竭: 主动买入占比{taker_now:.3f}未高于均值{taker_ma:.3f}"
+            return False, out
+        if direction == "SHORT" and taker_now >= taker_ma:
+            out["reject_reason"] = f"OI背离未见衰竭: 主动买入占比{taker_now:.3f}未低于均值{taker_ma:.3f}"
+            return False, out
+
     # ── 5. 资金费率方向检查（与逆向布局方向一致性） ────────────────────────
     # LONG：资金费率越负越好（空头付费，说明空头拥挤）
     # SHORT：资金费率越正越好（多头付费，说明多头拥挤）
@@ -3699,6 +3720,23 @@ def _judge_ema_trend_impl(k1h, k4h, k15, ind, chg24, funding):
             f"回踩无量可能继续跌破 EMA"
         )
         return False, out
+
+    # [v3.87 OPT-11] EMA 趋势需要触发 K 线。原逻辑只要价格回到 4H EMA20 附近就以现价立即入场，
+    #   等于「到了区域就买」，回踩可能还在进行中。新：要求 1H 或 15M 出现止跌(做多)/止涨(做空)形态才通过。
+    #   开关 OPT_EMA_TREND_TRIGGER_BAR。
+    try:
+        from config import OPT_EMA_TREND_TRIGGER_BAR as _OPT_ETT
+    except Exception:
+        _OPT_ETT = False
+    if _OPT_ETT:
+        _et_dir = _ema_direction.upper()
+        _k1h_c2 = k1h[:-1] if len(k1h) > 1 else k1h
+        _k15_c2 = k15[:-1] if len(k15) > 1 else k15
+        _trig = _reversal_signal_1h(_k1h_c2, _et_dir) or _reversal_signal_15m(_k15_c2, _et_dir)
+        if not _trig:
+            out["reject_reason"] = f"EMA趋势未见触发K线: 1H/15M 无{'止跌' if _et_dir == 'LONG' else '止涨'}形态"
+            return False, out
+        out["trigger_bar"] = _trig
 
     # ── 7. 资金费率不能极端负（空头挤压环境不适合做多趋势跟随） ───────────
     if funding < -0.0005:

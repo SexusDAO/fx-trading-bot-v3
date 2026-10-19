@@ -72,7 +72,7 @@ class TestPullbackMode:
         # TP2 在清算区稀少时可为 None（tp2_price=None 是合法降级）
         if r["tp2_price"] is not None:
             assert r["tp2_price"] > r["entry_price"]
-        assert r["entry_mode"] in ("immediate", "pending_order", "weighted")
+        assert r["entry_mode"] in ("immediate", "pending_order", "weighted", "at_confirm")  # [v3.87] at_confirm=OPT-8 在确认处入场
 
     def test_pullback_short_normal(self):
         """正常做空回踩：入场价高于 mark，止损高于入场，TP1 低于入场"""

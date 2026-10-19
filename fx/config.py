@@ -894,3 +894,11 @@ OPT_PYRAMID_FAIL_CLOSED       = True   # FIX-2 加仓所需 RSI 拿不到时本�
 
 # v3.86 第三轮开关——False 即回到原行为
 OPT_REVERSAL_SHORT_TIER_RSI = True   # OPT-7 反转做空的 RSI4H 门槛按波动层区分（高波动 70）
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# v3.87 开仓场景重构（第一批）——False 即回到原行为
+# ═══════════════════════════════════════════════════════════════════════════════
+OPT_PULLBACK_ENTRY_AT_CONFIRM = True   # OPT-8 回踩在确认处入场（mark∓0.1ATR）
+OPT_INVALIDATION_SL           = True   # OPT-9 回踩/EMA趋势/反转用失效位止损（1H 结构点外 0.3ATR，1~3ATR）
+OPT_OI_DIV_EXHAUSTION_CONFIRM = True   # OPT-10 OI 背离需不创新低(高) + 主动买卖比确认
+OPT_EMA_TREND_TRIGGER_BAR     = True   # OPT-11 EMA 趋势需 1H/15M 触发 K 线

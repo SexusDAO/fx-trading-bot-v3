@@ -200,6 +200,19 @@ def _entry_pullback(mark: float, atr: float, ema20: float,
         _OPT_PB, _PB_DEG, _PB_MIN, _PB_MAX = False, 0.5, 0.3, 2.0
     from shared.opt_v384 import pullback_entry_params as _pb_params
     _pp = _pb_params(_OPT_PB, _PB_DEG, _PB_MIN, _PB_MAX)
+
+    # [v3.87 OPT-8] 在确认处入场。回踩判定已要求「价格位于回踩区 + 15M/1H 止跌(止涨)信号」，
+    #   原逻辑却在确认之后再把限价挂到更深的位置（清算区加权或 mark∓0.3~0.8ATR）：
+    #   只有价格继续朝不利方向走才会成交，而这恰恰说明刚确认的止跌信号失效了——成交的天然偏向坏单（逆向选择）。
+    #   新：限价挂在 mark∓0.1ATR（只留一点 maker 空间），确认在哪里就在哪里入场。开关 OPT_PULLBACK_ENTRY_AT_CONFIRM。
+    try:
+        from config import OPT_PULLBACK_ENTRY_AT_CONFIRM as _OPT_PBC
+    except Exception:
+        _OPT_PBC = False
+    if _OPT_PBC and atr > 0:
+        if direction == "LONG":
+            return mark - atr * 0.1, "at_confirm"
+        return mark + atr * 0.1, "at_confirm"
     vol_mid = _vol_mid(k1h)
 
     if direction == "LONG":
@@ -951,6 +964,33 @@ def calc_sl_tp(
                 )
         except Exception as _sl_liq_err:
             logger.debug(f"[calc_sl_tp] oi_div SL清算检查异常（跳过）: {_sl_liq_err}")
+
+    # [v3.87 OPT-9] 失效位止损（回踩 / EMA 趋势 / 反转）。
+    #   原止损由清算图（非币安官方数据，经常缺失→降级）或固定 ATR/百分比决定，与开仓理由无关：
+    #   太近会被正常波动扫掉，太远又在结构失效后多亏一段。
+    #   新：止损放在最近 8 根已闭合 1H 的结构低点(高点)外 0.3ATR，距入场限制在 1.0~3.0ATR；
+    #   结构太远时保留原止损。只用币安官方 K 线。开关 OPT_INVALIDATION_SL。
+    #   注意：止损距离变化会通过 RISK_PER_TRADE 影响名义仓位（止损更近→仓位更大，仍受单仓上限约束）。
+    try:
+        from config import OPT_INVALIDATION_SL as _OPT_ISL
+    except Exception:
+        _OPT_ISL = False
+    if _OPT_ISL and mode in ("pullback", "ema_trend", "reversal") and k1h:
+        from shared.opt_v387 import invalidation_sl as _inv_sl
+        _k1h_closed = k1h[:-1] if len(k1h) > 1 else k1h
+        _isl = _inv_sl(entry, atr, direction, _k1h_closed)
+        if _isl is not None and _isl > 0:
+            # 仍遵守原有「按波动层的最小止损距离」（low 2.5% / mid 3% / high 5%），失效位更近时取最小距离，
+            #   避免把止损放进正常噪声区间；只有结构位更远时才采用结构位。
+            _min_pct = {"low": 0.025, "mid": 0.03, "high": 0.05}.get(tier, 0.025)
+            if direction == "LONG":
+                _isl = min(_isl, entry * (1 - _min_pct))
+            else:
+                _isl = max(_isl, entry * (1 + _min_pct))
+            logger.info(f"[calc_sl_tp] {mode} {direction} 失效位止损: {sl:.6g} → {_isl:.6g}（OPT-9）")
+            sl = _isl
+            # 不改 sl_degraded：executor 用它决定是否降仓/拒单，保持原语义，避免静默改变仓位。
+            signal["_sl_source"] = "invalidation"
 
     # v3.62: VP 止损增强——sl_degraded 时（无清算图）用 VP val/vah 作为结构位候选
     # LONG：val（价值区下沿）在入场价下方时，SL 取 val - 0.3ATR（但不超过 ATR 止损）
