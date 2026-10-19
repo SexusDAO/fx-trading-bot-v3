@@ -48,3 +48,4 @@ PANEL_QUESTIONS_DIR = Path(os.environ.get("PANEL_QUESTIONS_DIR", _HERE / "questi
 PANEL_REQUEST_TIMEOUT = 120   # 单次请求秒数
 PANEL_MAX_RETRIES = 2         # 失败最多重试次数
 PANEL_RETRY_DELAY = 3         # 重试间隔秒数
+PANEL_MAX_CONCURRENCY = 5     # 同时在途的请求数上限，避免中转站限速（429）

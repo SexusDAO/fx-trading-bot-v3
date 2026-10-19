@@ -131,3 +131,87 @@ class TestAnalyzer(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTransportsAgainstLocalServer(unittest.TestCase):
+    """用本地假服务器真实走一遍网络层（httpx 与标准库两条路径），不依赖外网。"""
+    @classmethod
+    def setUpClass(cls):
+        import http.server, json, threading
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                n = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(n))
+                if body.get("model") == "slow":
+                    import time; time.sleep(3)
+                code = 402 if body.get("model") == "noquota" else 200
+                out = {"error": "quota"} if code == 402 else {
+                    "choices": [{"message": {"content": "ok" * 150}, "finish_reason": "stop"}],
+                    "usage": {"prompt_tokens": 5, "completion_tokens": 300}}
+                data = json.dumps(out).encode()
+                self.send_response(code); self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data)
+
+            def log_message(self, *a):
+                pass
+        cls.srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
+        cls.url = f"http://127.0.0.1:{cls.srv.server_address[1]}"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.srv.shutdown()
+
+    def setUp(self):
+        os.environ["PANEL_API_KEY"] = "k"
+        self._old = config.PANEL_BASE_URL
+        config.PANEL_BASE_URL = self.url
+
+    def tearDown(self):
+        config.PANEL_BASE_URL = self._old
+
+    def _run(self, name, **kw):
+        return asyncio.run(runner.call_model({"name": name}, "s", "q", retries=0, delay=0, **kw))
+
+    def test_default_transport_success_and_402(self):
+        r = self._run("good")
+        self.assertEqual(r["finish_reason"], "stop")
+        self.assertEqual(r["output_tokens"], 300)
+        self.assertIn("402", self._run("noquota")["error"])
+
+    def test_timeout_total(self):
+        r = self._run("slow", timeout=1)
+        self.assertEqual(r["answer"], "")
+        self.assertIsNotNone(r["error"])
+
+    def test_concurrency_limit(self):
+        import threading
+        active = {"n": 0, "max": 0}
+        lock = threading.Lock()
+
+        async def post(url, headers, payload, timeout):
+            with lock:
+                active["n"] += 1; active["max"] = max(active["max"], active["n"])
+            await asyncio.sleep(0.05)
+            with lock:
+                active["n"] -= 1
+            return _ok()
+        old = config.PANEL_MAX_CONCURRENCY
+        config.PANEL_MAX_CONCURRENCY = 2
+        try:
+            models = [{"name": f"m{i}"} for i in range(6)]
+            res = asyncio.run(runner.run_question("q", models, "s", post=post))
+        finally:
+            config.PANEL_MAX_CONCURRENCY = old
+        self.assertEqual(len(res), 6)
+        self.assertLessEqual(active["max"], 2)
+
+
+class TestContentParsing(unittest.TestCase):
+    def test_list_content_blocks(self):
+        d = {"choices": [{"message": {"content": [{"type": "text", "text": "甲"}, {"type": "text", "text": "乙"}]},
+                          "finish_reason": "stop"}], "usage": {}}
+        r = runner._parse_success(d, 1.0)
+        self.assertEqual(r["answer"], "甲乙")
+        self.assertEqual(r["message_keys"], ["content"])

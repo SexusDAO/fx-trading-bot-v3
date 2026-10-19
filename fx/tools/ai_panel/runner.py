@@ -44,8 +44,9 @@ async def default_post(url: str, headers: dict, payload: dict, timeout: float):
     except ImportError:
         httpx = None
     if httpx is not None:
+        # 超时：httpx 的 timeout 是“每个阶段”的时限，这里同时用 asyncio.wait_for 兜住总时限，与 urllib 路径行为一致
         async with httpx.AsyncClient(timeout=timeout) as c:
-            r = await c.post(url, headers=headers, json=payload)
+            r = await asyncio.wait_for(c.post(url, headers=headers, json=payload), timeout=timeout)
             try:
                 return r.status_code, r.json()
             except Exception:
@@ -65,17 +66,27 @@ async def default_post(url: str, headers: dict, payload: dict, timeout: float):
     return await asyncio.to_thread(_sync)
 
 
+def _content_text(content) -> str:
+    """content 可能是字符串，也可能是内容块列表（[{"type":"text","text":...}]），统一成字符串。"""
+    if isinstance(content, list):
+        content = "".join(b.get("text", "") for b in content if isinstance(b, dict))
+    return (content or "").strip()
+
+
 def _parse_success(data: dict, latency: float) -> dict:
     choice = (data.get("choices") or [{}])[0]
     usage = data.get("usage") or {}
     return {
-        "answer": ((choice.get("message") or {}).get("content") or "").strip(),
+        "answer": _content_text((choice.get("message") or {}).get("content")),
         "input_tokens": usage.get("prompt_tokens", 0),
         "output_tokens": usage.get("completion_tokens", 0),
         "reasoning_tokens": (usage.get("completion_tokens_details") or {}).get("reasoning_tokens"),
         "latency_sec": round(latency, 2),
         "finish_reason": choice.get("finish_reason"),
         "error": None,
+        # 排查空回答用：记录 message 里有哪些字段，以及思考内容的长度（有的模型把内容放在 reasoning_content）
+        "message_keys": sorted((choice.get("message") or {}).keys()),
+        "reasoning_chars": len(str((choice.get("message") or {}).get("reasoning_content") or "")),
     }
 
 
@@ -113,5 +124,11 @@ async def call_model(model_cfg: dict, system_prompt: str, question: str, *, post
 
 async def run_question(question_text: str, models: list, system_prompt: str, *, post=None, **kw) -> dict:
     """同一道题并发发给多个模型，返回 {模型名: 结果}。"""
-    results = await asyncio.gather(*[call_model(m, system_prompt, question_text, post=post, **kw) for m in models])
+    # 并发上限：同时在途请求不超过 PANEL_MAX_CONCURRENCY，避免触发中转站限速
+    sem = asyncio.Semaphore(max(1, int(config.PANEL_MAX_CONCURRENCY)))
+
+    async def _one(m):
+        async with sem:
+            return await call_model(m, system_prompt, question_text, post=post, **kw)
+    results = await asyncio.gather(*[_one(m) for m in models])
     return {m["name"]: r for m, r in zip(models, results)}
