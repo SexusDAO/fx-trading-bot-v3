@@ -3706,7 +3706,7 @@ def _judge_ema_trend_impl(k1h, k4h, k15, ind, chg24, funding):
     })
 
     logger.info(
-        f"[judge_ema_trend] {symbol} LONG {strength} "
+        f"[judge_ema_trend] {symbol} {_ema_direction.upper()} {strength} "
         f"ema_gap={ema_gap_pct*100:.2f}% pb={pb_ratio*100:.2f}% "
         f"rsi1h={rsi_1h:.1f} rsi4h={rsi_4h:.1f} vol={vol_ratio:.2f} "
         f"ma99_ok={ma99_ok} strong_count={strong_count}"

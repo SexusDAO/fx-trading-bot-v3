@@ -115,7 +115,10 @@ def _calc_route_quality(route: str, reason: dict, ind: dict, direction: str) -> 
         ("range_bounce", "bear"): 8,
         ("range_bounce", "range"): 22,
     }
-    _mkt_score = _TYPE_MKT.get((route, _mkt), 15)
+    _mkt_for_type = _mkt
+    if route == "ema_trend" and direction == "SHORT" and _mkt in ("bull", "bear"):
+        _mkt_for_type = "bear" if _mkt == "bull" else "bull"   # v3.83：空头趋势跟随顺势环境互换
+    _mkt_score = _TYPE_MKT.get((route, _mkt_for_type), 15)
 
     # ── ③ 方向与 BTC 趋势一致性 ───────────────────────────────────────────────────
     _btc = ind.get("btc_trend", "neutral")
@@ -487,34 +490,30 @@ def _is_stop_hunt(k1h: list, k15: list, ind: dict) -> bool:
 
 def _is_ema_trend(ind: dict, chg24: float) -> bool:
     """
-    EMA 趋势跟随策略粗筛（v3.61）。
-    只做多。宽松条件快速过滤，第二层精筛在 judge_ema_trend 内完成。
-    粗筛条件（比 judge 宽松约 20%，防止过早拦截）：
-      - 4H EMA20 > EMA50（任意差距，judge 要求 >= 0.5%）
-      - 1H RSI 45~70（judge 要求 48~68）
-      - CHG24 在 -8%~+12% 范围内
-      - 价格在 EMA20 的 -2.5%~+3% 区间（judge 要求 -1.5%~+2%）
+    EMA 趋势跟随策略粗筛（v3.61；v3.83 起支持空头排列）。
+    宽松条件快速过滤，第二层精筛在 judge_ema_trend 内完成。
+    多头：4H EMA20 > EMA50，1H RSI 45~70，价格在 EMA20 的 -2.5%~+3%。
+    空头：4H EMA20 < EMA50，1H RSI 45~72，价格在 EMA20 的 -3%~+2.5%（反弹到阻力附近）。
+    CHG24 在 -8%~+12% 范围内（两个方向相同，与 judge 一致）。
+    v3.83 修复：judge 在 v3.64 已加入 SHORT 分支，但粗筛只放行多头排列，SHORT 分支永远走不到。
     """
     ema20_4h = ind.get("ema20_4h", 0.0)
     ema50_4h = ind.get("ema50_4h", 0.0)
-    if ema20_4h <= 0 or ema50_4h <= 0:
+    if ema20_4h <= 0 or ema50_4h <= 0 or ema20_4h == ema50_4h:
         return False
-    # EMA 多头排列（粗阳闸：任意正差距）
-    if ema20_4h <= ema50_4h:
-        return False
-    # RSI1H 在 45~70 粗阳闸
+    is_long = ema20_4h > ema50_4h
     rsi_1h = ind.get("rsi_1h", 50)
-    if not (45 <= rsi_1h <= 70):
+    if not (45 <= rsi_1h <= (70 if is_long else 72)):
         return False
-    # CHG24 范围预检
     if chg24 > 12.0 or chg24 < -8.0:
         return False
-    # 价格在 EMA20 附近（-2.5% ~ +3%）粗阳闸
     price = ind.get("price", 0.0)
     if price <= 0:
         return False
     pb = (price - ema20_4h) / (ema20_4h + 1e-9)
-    return -0.025 <= pb <= 0.03
+    if is_long:
+        return -0.025 <= pb <= 0.03
+    return -0.03 <= pb <= 0.025
 
 
 def _is_oi_divergence(ind: dict) -> bool:
@@ -771,14 +770,12 @@ def analyze_symbol(symbol: str, ticker: dict,
                 return None  # v3.46: 周末振幅代理 < 0.8%，预筛拒绝（降低以允许中波动档进入）
 
     chg24_rough = float(ticker.get("priceChangePercent", 0))
-    # 方向粗筛（保守：只过滤大涨/大跌且方向完全不符的）
-    if allowed_directions == {"SHORT"} and chg24_rough > 5:
-        return None   # 24H 大涨，大概率是 LONG 信号，不拉 K 线
-    if allowed_directions == {"LONG"} and chg24_rough < -5:
-        return None   # 24H 大跌，大概率是 SHORT 信号，不拉 K 线
-    # 熊市禁多 reversal 粗筛：跌幅 >=8% 在熊市下必走 reversal LONG → 提前跳过
-    if btc_trend == "down" and chg24_rough <= -8:
-        return None
+    # v3.83 修复：原「方向粗筛」会在只允许单边时丢弃大涨/大跌标的，
+    # 但大涨恰是 reversal SHORT、大跌恰是 reversal LONG 的触发条件，属于方向判断反了。
+    # 方向约束已在 judge 通过后统一检查（见下方「方向约束检查」），此处不再预筛。
+    # v3.83 修复：原「熊市禁多」预筛直接 return None，会连带屏蔽该标的的
+    # oi_divergence / stop_hunt / range_bounce 等所有路径。改为只在 reversal LONG 判定后拒绝。
+    _bear_block_rev_long = (btc_trend == "down" and chg24_rough <= -8)
 
     try:
         # ── A. 拉取数据（4H 懒加载：pullback 不拉 4H，减少约 1/3 HTTP 请求）──
@@ -919,10 +916,16 @@ def analyze_symbol(symbol: str, ticker: dict,
                 _dir = _reason.get("direction", "long").upper()
             elif _route == "ema_trend":
                 _ok, _reason = judge_ema_trend(k1h, k4h, k15, ind, chg24, funding)
-                _dir = "LONG"
+                _dir = (_reason.get("direction") or "long").upper() if isinstance(_reason, dict) else "LONG"
             else:  # pullback
                 _ok, _reason = judge_pullback(k1h, k4h, k15, ind, chg24, funding)
                 _dir = "LONG" if ind["ema_bull_1h"] else "SHORT"
+
+            # v3.83：熊市禁止 reversal LONG（由原预筛下沉到此，仅影响该路径）
+            if _ok and _route == "reversal" and _dir == "LONG" and _bear_block_rev_long:
+                _ok = False
+                _reason = dict(_reason) if isinstance(_reason, dict) else {}
+                _reason["reject_reason"] = "熊市禁止 reversal LONG（BTC 下跌且 24H 跌幅>=8%）"
 
             if not _ok:
                 # 写每条失败路径的拒绝记录（对照组分析用）
@@ -2152,12 +2155,12 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
             from config import EMA_TREND_BASE_STRONG, EMA_TREND_BASE_MEDIUM
             _et_strength = (sig.get("reason") or {}).get("signal_strength", "medium")
             base_score = EMA_TREND_BASE_STRONG if _et_strength == "strong" else EMA_TREND_BASE_MEDIUM
-            # ema_trend 只做多，btc_adj 方向一致，完整保留
-            # strategy_adj 市场环境
+            # strategy_adj 市场环境（v3.83：按方向区分，做空在熊市顺势、牛市逆势）
+            _et_is_short = str(sig.get("direction", "")).upper() == "SHORT"
             if _mkt_mode == "bull":
-                strategy_adj = +8   # 牛市顺势跟随，最佳环境
+                strategy_adj = -15 if _et_is_short else +8
             elif _mkt_mode == "bear":
-                strategy_adj = -15  # 熊市做多趋势跟随风险极高
+                strategy_adj = +8 if _et_is_short else -15
             elif _mkt_mode == "range":
                 strategy_adj = -5   # 震荡市 EMA 排列容易失效
             logger.info(
