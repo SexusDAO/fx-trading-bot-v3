@@ -1,0 +1,875 @@
+"""
+coinglass_api.py — Coinglass 清算 + 衍生品数据模块
+数据源：CoinData 代理（全部走代理，不再依赖 Binance fapi）
+
+V3 接口（/api/restapi/api/...）：
+  - 清算热力图: /api/futures/liquidation/heatmap
+
+V4 接口（/api/restapi/v4/api/...）：
+  - 多空比:     /v4/api/futures/top-long-short-account-ratio/history
+  - 大单流向:   /v4/api/futures/taker-buy-sell-volume/history
+  - OI历史:     /v4/api/futures/open-interest/history
+  - 资金费率:   /v4/api/futures/funding-rate/history
+  - 爆仓历史:   /v4/api/futures/liquidation/history
+
+速率限制：30 req/min → 间隔 2.1s（文件锁跨进程控制）
+缓存 TTL：15 分钟
+"""
+
+import requests
+import time
+import fcntl
+import threading
+
+# ── 配置 ──────────────────────────────────────────────────────────────────────
+BASE_URL        = "https://coinglass-standard.quant-store.com/api/restapi"
+CG_API_KEY      = "cd_47d6de1b-95b7-452b-a96b-af704a5b9f7c"
+RATE_LIMIT_S    = 2.1          # 30 req/min → 2.1s 间隔（留 10% 余量）
+CACHE_TTL       = 15 * 60      # 15 分钟缓存
+CG_HEADERS      = {"X-Api-Key": CG_API_KEY}
+_RATE_LOCK_FILE = "/tmp/coinglass_rate.lock"
+# SOCKS5 代理
+_PROXY_URL = "socks5://REDACTED_PROXY_CREDENTIALS"
+_PROXIES   = {"http": _PROXY_URL, "https": _PROXY_URL}
+
+_cache:      dict[str, dict] = {}
+_cache_lock: threading.Lock  = threading.Lock()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 内部工具
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _wait_rate_limit(timeout_s: float = 10.0):
+    """基于文件锁的跨进程速率控制，超过 timeout_s 秒放弃等待直接返回"""
+    import select
+    lock_f = open(_RATE_LOCK_FILE, 'a+')
+    try:
+        # 非阻塞尝试加锁，失败则轮询直到超时
+        deadline = time.time() + timeout_s
+        while True:
+            try:
+                fcntl.flock(lock_f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.time() >= deadline:
+                    lock_f.close()
+                    return   # 超时放弃，不阻塞主流程
+                time.sleep(0.2)
+        lock_f.seek(0)
+        last_ts = float(lock_f.read().strip() or '0')
+        elapsed = time.time() - last_ts
+        if elapsed < RATE_LIMIT_S:
+            time.sleep(RATE_LIMIT_S - elapsed)
+        lock_f.seek(0); lock_f.truncate()
+        lock_f.write(str(time.time())); lock_f.flush()
+    finally:
+        try:
+            fcntl.flock(lock_f, fcntl.LOCK_UN)
+            lock_f.close()
+        except Exception:
+            pass
+
+
+def _get(path: str, params: dict = None, v4: bool = False, timeout: int = 15,
+         _max_retries: int = 3):
+    """
+    统一 GET。
+    v4=False → /api/restapi/api/...  (V3 默认)
+    v4=True  → /api/restapi/v4/api/... (V4)
+    遇到 429 时按 Retry-After 动态等待，最多重试 _max_retries 次。
+    """
+    prefix = "/v4" if v4 else ""
+    url = f"{BASE_URL}{prefix}{path}"
+    for attempt in range(_max_retries + 1):
+        _wait_rate_limit()
+        r = requests.get(url, headers=CG_HEADERS, params=params or {}, timeout=timeout, proxies=_PROXIES)
+        if r.status_code == 429:
+            retry_after = float(r.headers.get("Retry-After", 10))
+            wait = min(retry_after, 60)  # 最多等 60s
+            if attempt < _max_retries:
+                time.sleep(wait)
+                continue
+            r.raise_for_status()  # 超过重试次数，抛异常
+        r.raise_for_status()
+        d = r.json()
+        if not isinstance(d, dict):
+            return None
+        code = str(d.get("code", "0"))
+        if code not in ("0", "200"):
+            raise RuntimeError(
+                f"CG error code={code} msg={d.get('msg', d.get('message', ''))}")
+        return d.get("data")
+
+
+def _cache_get(key: str):
+    with _cache_lock:
+        c = _cache.get(key)
+        if c and (time.time() - c["ts"]) < CACHE_TTL:
+            return c["data"]
+    return None
+
+
+def _cache_set(key: str, data):
+    with _cache_lock:
+        _cache[key] = {"ts": time.time(), "data": data}
+
+
+def _sym_full(symbol: str) -> str:
+    """确保返回带 USDT 的完整格式，如 ONDOUSDT"""
+    s = symbol.upper()
+    return s if s.endswith("USDT") else f"{s}USDT"
+
+
+def _sym_base(symbol: str) -> str:
+    return symbol.upper().replace("USDT", "")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 清算热力图（V3）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_liq_heatmap(symbol: str, exchange: str = "Binance",
+                    range_: str = "3d") -> dict | None:
+    """清算热力图原始数据（V3，需完整 USDT 格式）"""
+    sym = _sym_full(symbol)
+    key = f"heatmap:{sym}:{range_}"
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+    try:
+        data = _get("/api/futures/liquidation/heatmap",
+                    {"symbol": sym, "exchange": exchange, "range": range_})
+        if data:
+            _cache_set(key, data)
+        return data
+    except Exception as e:
+        raise RuntimeError(f"get_liq_heatmap({sym}) 失败: {e}")
+
+
+def get_liq_density(symbol: str, exchange: str = "Binance",
+                    range_: str = "3d") -> dict:
+    """各价位清算密度汇总。{price_float: density_float}"""
+    data = get_liq_heatmap(symbol, exchange, range_)
+    if not data:
+        return {}
+    prices_y = data.get("y", [])
+    density: dict[float, float] = {}
+    for entry in data.get("liq", []):
+        if len(entry) < 3:
+            continue
+        p_idx = int(entry[1])
+        val   = float(entry[2])
+        if 0 <= p_idx < len(prices_y):
+            price = float(prices_y[p_idx])
+            density[price] = density.get(price, 0.0) + val
+    return density
+
+
+def get_liq_zones(symbol: str, current_price: float,
+                  exchange: str = "Binance", range_: str = "3d",
+                  top_n: int = 5) -> dict:
+    """上下方清算密集区分析"""
+    density = get_liq_density(symbol, exchange, range_)
+    if not density:
+        return {"above": [], "below": [], "above_total": 0,
+                "below_total": 0, "ratio": 1.0, "bias": "neutral", "score_adjust": 0}
+
+    above = {p: v for p, v in density.items() if p > current_price}
+    below = {p: v for p, v in density.items() if p < current_price}
+    above_total = sum(above.values())
+    below_total = sum(below.values())
+    ratio = below_total / (above_total + 1e-9)
+
+    bias = "short" if ratio > 1.3 else ("long" if ratio < 0.77 else "neutral")
+    score_adjust = -20 if bias == "short" else (10 if bias == "long" else 0)
+
+    above_sorted = sorted(above.items(), key=lambda x: -x[1])[:top_n]
+    below_sorted = sorted(below.items(), key=lambda x: -x[1])[:top_n]
+    above_sorted.sort(key=lambda x: x[0])
+    below_sorted.sort(key=lambda x: -x[0])
+
+    return {
+        "above": above_sorted, "below": below_sorted,
+        "above_total": round(above_total, 2),
+        "below_total": round(below_total, 2),
+        "ratio": round(ratio, 3),
+        "bias": bias, "score_adjust": score_adjust,
+    }
+
+
+def get_liquidation_zone(
+    symbol: str,
+    price: float,
+    direction: str,       # 'LONG' | 'SHORT'
+    search_range_pct: float = 5.0,  # 动态搜索范围（%），来自 market_filter.calc_dynamic_range
+    min_volume: float = 500_000,    # Q3要求: 清算量>50万U才采用
+) -> dict:
+    """
+    Q3: 标准化清算区查询接口，供 scanner 写入 details 字段。
+
+    返回：
+    {
+      "has_liq_zone": bool,
+      "liq_zone_price": float,   # 清算区代表价格（最大清算量的那档）
+      "liq_zone_volume": float,  # 清算量 (USDT)
+      "liq_zone_side": str,      # 'below' | 'above'
+    }
+    """
+    empty = {"has_liq_zone": False, "liq_zone_price": 0.0,
+             "liq_zone_volume": 0.0, "liq_zone_side": ""}
+    if price <= 0:
+        return empty
+    try:
+        liq = get_liq_zones(symbol, price)
+        # 做多找下方清算区，做空找上方清算区
+        side_key = "below" if direction == "LONG" else "above"
+        zones = liq.get(side_key, [])
+        if not zones:
+            return empty
+
+        range_lo = price * (1 - search_range_pct / 100)
+        range_hi = price * (1 + search_range_pct / 100)
+
+        # 过滤：在动态搜索范围内 + 清算量 >= min_volume
+        valid = []
+        for z in zones:
+            zp, zv = float(z[0]), float(z[1])
+            if zv < min_volume:
+                continue
+            if direction == "LONG"  and range_lo <= zp < price:
+                valid.append((zp, zv))
+            elif direction == "SHORT" and price < zp <= range_hi:
+                valid.append((zp, zv))
+
+        if not valid:
+            return empty
+
+        # 取清算量最大的那档
+        best = max(valid, key=lambda x: x[1])
+        return {
+            "has_liq_zone":    True,
+            "liq_zone_price":  best[0],
+            "liq_zone_volume": best[1],
+            "liq_zone_side":   side_key,
+        }
+    except Exception:
+        return empty
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 衍生品数据（V4 接口，全部走 CoinData 代理）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Binance fapi 公开接口（无速率限制，替代 CG V4）─────────────────────────
+FAPI_BASE = "https://fapi.binance.com"
+
+
+def _bn_get(path: str, params: dict = None, timeout: int = 8):
+    """Binance fapi 公开接口 GET（无需签名，无速率限制）"""
+    r = requests.get(f"{FAPI_BASE}{path}", params=params or {}, timeout=timeout)
+    r.raise_for_status()
+    return r.json()
+
+
+def _get_top_lsr(sym_full: str, exchange: str = "Binance",
+                 interval: str = "1h", limit: int = 6) -> list:
+    """全球多空账户比 → Binance fapi（无速率限制）"""
+    key = f"top_lsr:{sym_full}:{interval}"
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+    try:
+        data = _bn_get("/futures/data/globalLongShortAccountRatio",
+                       {"symbol": sym_full, "period": interval, "limit": limit})
+        if isinstance(data, list):
+            # 字段映射：统一为 top_account_long_percent / top_account_short_percent
+            mapped = [{"top_account_long_percent":  float(d.get("longAccount", 0.5)) * 100,
+                       "top_account_short_percent": float(d.get("shortAccount", 0.5)) * 100,
+                       "timestamp": d.get("timestamp")} for d in data]
+            _cache_set(key, mapped)
+            return mapped
+    except Exception:
+        pass
+    return []
+
+
+def _get_taker(sym_full: str, exchange: str = "Binance",
+               interval: str = "1h", limit: int = 6) -> list:
+    """大单主买/主卖量比 → Binance fapi（无速率限制）"""
+    key = f"taker:{sym_full}:{interval}"
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+    try:
+        data = _bn_get("/futures/data/takerlongshortRatio",
+                       {"symbol": sym_full, "period": interval, "limit": limit})
+        if isinstance(data, list):
+            # 字段映射：buyVol / sellVol（以USD计）
+            mapped = [{"taker_buy_volume_usd":  float(d.get("buyVol",  0)),
+                       "taker_sell_volume_usd": float(d.get("sellVol", 0)),
+                       "timestamp": d.get("timestamp")} for d in data]
+            _cache_set(key, mapped)
+            return mapped
+    except Exception:
+        pass
+    return []
+
+
+def _get_oi_history(sym_full: str, exchange: str = "Binance",
+                    interval: str = "1h", limit: int = 6) -> list:
+    """OI 历史 → Binance fapi（无速率限制）"""
+    key = f"oi:{sym_full}:{interval}"
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+    try:
+        data = _bn_get("/futures/data/openInterestHist",
+                       {"symbol": sym_full, "period": interval, "limit": limit})
+        if isinstance(data, list):
+            # 字段映射：close = sumOpenInterestValue
+            mapped = [{"close": float(d.get("sumOpenInterestValue", 0)),
+                       "timestamp": d.get("timestamp")} for d in data]
+            _cache_set(key, mapped)
+            return mapped
+    except Exception:
+        pass
+    return []
+
+
+def _get_funding_rate(sym_full: str, exchange: str = "Binance",
+                      interval: str = "8h", limit: int = 6) -> list:
+    """资金费率历史 → Binance fapi（无速率限制）"""
+    key = f"fr:{sym_full}"
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+    try:
+        data = _bn_get("/fapi/v1/fundingRate",
+                       {"symbol": sym_full, "limit": limit})
+        if isinstance(data, list):
+            # 字段映射：close = fundingRate
+            mapped = [{"close": float(d.get("fundingRate", 0)),
+                       "timestamp": d.get("fundingTime")} for d in data]
+            _cache_set(key, mapped)
+            return mapped
+    except Exception:
+        pass
+    return []
+
+
+def _get_liq_history(sym_full: str, exchange: str = "Binance",
+                     interval: str = "1h", limit: int = 6) -> list:
+    """
+    爆仓历史 → 仍走 CG V4（Binance fapi 爆仓单需要签名，CG是唯一免认证来源）
+    """
+    key = f"liq1h:{sym_full}"
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+    try:
+        data = _get("/api/futures/liquidation/history",
+                    {"symbol": sym_full, "exchange": exchange,
+                     "interval": interval, "limit": limit}, v4=True)
+        if isinstance(data, list):
+            _cache_set(key, data)
+            return data
+    except Exception:
+        pass
+    return []
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# KOL / 巨鲸信号（CoinData 平台本地 API，独立限速，不走 CG 代理）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_KOL_BASE = "https://coinglass-standard.quant-store.com/api"
+_KOL_CACHE_TTL = 5 * 60   # KOL 数据 5 分钟缓存（更新较快）
+
+
+def _kol_get(path: str, params: dict = None) -> dict:
+    """KOL API GET，走代理，无独立限速（平台说 KOL 独立限速，白天可用）"""
+    key = f"kol:{path}:{str(params)}"
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+    try:
+        r = requests.get(
+            f"{_KOL_BASE}/{path.lstrip('/')}",
+            headers={"X-Api-Key": CG_API_KEY},
+            params=params or {},
+            proxies=_PROXIES,
+            timeout=10,
+        )
+        r.raise_for_status()
+        data = r.json()
+        _cache_set(key, data)
+        return data
+    except Exception as e:
+        return {"_error": str(e)}
+
+
+def get_whale_signals(symbol: str = None) -> dict:
+    """
+    Hyperliquid 巨鲸多空聚合信号。
+    返回 {
+        coin, long_count, short_count,
+        net_bias: 'long'|'short'|'neutral',
+        bias_score,          # 0-100，越高越偏向 net_bias
+        total_pnl,           # 当前浮盈（正=赚钱方向赢）
+        whale_direction: 'LONG'|'SHORT'|None,  # 盈利方向
+        confidence: 'high'|'medium'|'low',
+    }
+    symbol=None 时返回全市场聚合列表中第一个匹配项。
+    """
+    data = _kol_get("kol/whale/signals")
+    if "_error" in data:
+        return {"_error": data["_error"]}
+
+    aggs = data.get("aggregations", [])
+    if not aggs:
+        return {}
+
+    if symbol:
+        coin = _sym_base(symbol).upper()
+        aggs = [a for a in aggs if a.get("coin", "").upper() == coin]
+        if not aggs:
+            return {}
+
+    row = aggs[0]
+    long_val  = float(row.get("long_value",  0))
+    short_val = float(row.get("short_value", 0))
+    total_pnl = float(row.get("total_pnl",  0))
+    net_bias  = row.get("net_bias", "neutral")
+    bias_score = float(row.get("bias_score", 0))
+
+    # 判断「哪个方向的巨鲸在赚钱」
+    # 分别算多头 / 空头的平均 PnL
+    all_pos = _kol_get("kol/whales").get("positions", [])
+    coin_pos = [p for p in all_pos if p.get("coin", "").upper() == (symbol and _sym_base(symbol).upper() or "")] \
+               if symbol else all_pos
+
+    long_pnl  = sum(p["unrealized_pnl"] for p in coin_pos if p.get("side") == "long")
+    short_pnl = sum(p["unrealized_pnl"] for p in coin_pos if p.get("side") == "short")
+
+    if long_pnl > 0 and long_pnl > abs(short_pnl) * 1.5:
+        whale_direction = "LONG"
+        confidence = "high" if bias_score > 20 else "medium"
+    elif short_pnl > 0 and short_pnl > abs(long_pnl) * 1.5:
+        whale_direction = "SHORT"
+        confidence = "high" if bias_score > 20 else "medium"
+    elif long_pnl > 0 and short_pnl < 0:
+        whale_direction = "LONG"
+        confidence = "medium"
+    elif short_pnl > 0 and long_pnl < 0:
+        whale_direction = "SHORT"
+        confidence = "medium"
+    else:
+        whale_direction = None
+        confidence = "low"
+
+    return {
+        "coin":            row.get("coin", ""),
+        "long_count":      row.get("long_count", 0),
+        "short_count":     row.get("short_count", 0),
+        "net_bias":        net_bias,
+        "bias_score":      round(bias_score, 1),
+        "total_pnl":       round(total_pnl, 0),
+        "long_pnl":        round(long_pnl, 0),
+        "short_pnl":       round(short_pnl, 0),
+        "whale_direction": whale_direction,
+        "confidence":      confidence,
+    }
+
+
+def get_kol_signals(symbol: str = None, exchange: str = "okx") -> dict:
+    """
+    KOL（OKX/Bitget 顶级交易员）多空共识信号。
+    返回 {
+        symbol, exchange,
+        long_count, short_count,
+        net_bias, bias_score,
+        total_pnl,
+        kol_direction: 'LONG'|'SHORT'|None,
+        confidence: 'high'|'medium'|'low',
+    }
+    """
+    data = _kol_get(f"kol/signals/{exchange.lower()}")
+    if "_error" in data:
+        return {"_error": data["_error"]}
+
+    sigs = data.get("signals", [])
+    if not sigs:
+        return {}
+
+    if symbol:
+        coin = _sym_base(symbol).upper()
+        sigs = [s for s in sigs if s.get("symbol", "").upper() == coin]
+        if not sigs:
+            return {}
+
+    row = sigs[0]
+    net_bias   = row.get("net_bias", "neutral")
+    bias_score = float(row.get("bias_score", 0))
+    total_pnl  = float(row.get("total_pnl", 0))
+
+    if net_bias == "long" and bias_score > 10:
+        kol_direction = "LONG"
+        confidence = "high" if total_pnl > 0 else "medium"
+    elif net_bias == "short" and bias_score > 10:
+        kol_direction = "SHORT"
+        confidence = "high" if total_pnl > 0 else "medium"
+    else:
+        kol_direction = None
+        confidence = "low"
+
+    return {
+        "symbol":        row.get("symbol", ""),
+        "exchange":      exchange,
+        "long_count":    row.get("long_count", 0),
+        "short_count":   row.get("short_count", 0),
+        "net_bias":      net_bias,
+        "bias_score":    round(bias_score, 1),
+        "total_pnl":     round(total_pnl, 0),
+        "kol_direction": kol_direction,
+        "confidence":    confidence,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 综合信号分析
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_derivatives_signals(symbol: str, current_price: float = None,
+                             exchange: str = "Binance") -> dict:
+    """
+    获取全量衍生品信号。
+    多空比/大单/OI/资金费率 → Binance fapi 并行拉取（无速率限制，~0.2s）
+    爆仓                   → CG V4
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    sym = _sym_full(symbol)
+    key = f"deriv:{sym}"
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+
+    result = {
+        "long_pct": None, "short_pct": None, "lsr_signal": "neutral",
+        "buy_vol_pct": None, "taker_signal": "neutral",
+        "oi_change_pct": None, "oi_signal": "neutral",
+        "fr_latest": None, "fr_trend": "neutral",
+        "long_liq_1h": 0.0, "short_liq_1h": 0.0, "liq_signal": "neutral",
+        "_raw": {}
+    }
+
+    # ── 前4个接口并行（Binance fapi，无限速）────────────────────────────────
+    with ThreadPoolExecutor(max_workers=4) as _ex:
+        _f_lsr = _ex.submit(_get_top_lsr,      sym, exchange)
+        _f_tkr = _ex.submit(_get_taker,        sym, exchange)
+        _f_oi  = _ex.submit(_get_oi_history,   sym, exchange)
+        _f_fr  = _ex.submit(_get_funding_rate, sym, exchange)
+
+    lsr      = _f_lsr.result()
+    taker_d  = _f_tkr.result()
+    oi_hist  = _f_oi.result()
+    fr_list  = _f_fr.result()
+
+    # ── 1. 多空比 ────────────────────────────────────────────────────────────
+    lsr = lsr
+    if lsr:
+        latest   = lsr[-1]
+        long_pct  = float(latest.get("top_account_long_percent", 50)) / 100
+        short_pct = float(latest.get("top_account_short_percent", 50)) / 100
+        result["long_pct"]  = round(long_pct, 4)
+        result["short_pct"] = round(short_pct, 4)
+        if short_pct > 0.65:
+            result["lsr_signal"] = "long_friendly"
+        elif long_pct > 0.75:
+            result["lsr_signal"] = "short_friendly"
+        result["_raw"]["lsr"] = latest
+
+    # ── 2. 大单流向（Taker，已并行拿到）──────────────────────────────────────
+    taker = taker_d
+    if taker:
+        latest   = taker[-1]
+        buy_vol  = float(latest.get("taker_buy_volume_usd",  0))
+        sell_vol = float(latest.get("taker_sell_volume_usd", 0))
+        total    = buy_vol + sell_vol
+        buy_pct  = buy_vol / total if total > 0 else 0.5
+        result["buy_vol_pct"] = round(buy_pct, 4)
+        if buy_pct > 0.60:
+            result["taker_signal"] = "strong_buy"
+        elif buy_pct < 0.40:
+            result["taker_signal"] = "strong_sell"
+        result["_raw"]["taker"] = latest
+
+    # ── 3. OI 变化（已并行拿到）──────────────────────────────────────────────
+    oi_hist = oi_hist
+    if len(oi_hist) >= 2:
+        # V4 返回 OHLC 格式：close 是当期值
+        oi_old = float(oi_hist[-2].get("close", 0))
+        oi_new = float(oi_hist[-1].get("close", 0))
+        oi_chg = (oi_new - oi_old) / (oi_old + 1e-9)
+        result["oi_change_pct"] = round(oi_chg, 4)
+        if oi_chg > 0.005:
+            result["oi_signal"] = "accumulate"
+        elif oi_chg < -0.005:
+            result["oi_signal"] = "deleverage"
+        result["_raw"]["oi"] = oi_hist[-2:]
+
+    # ── 4. 资金费率（已并行拿到）──────────────────────────────────────────────
+    fr_list = fr_list
+    if fr_list:
+        # V4 返回 OHLC 格式：取 close
+        rates = [float(f.get("close", 0)) for f in fr_list]
+        result["fr_latest"] = round(rates[-1], 6)
+        if len(rates) >= 3:
+            recent = rates[-3:]
+            if recent[-1] > recent[0] + 0.0001:
+                result["fr_trend"] = "rising"
+            elif recent[-1] < recent[0] - 0.0001:
+                result["fr_trend"] = "falling"
+        result["_raw"]["fr"] = rates[-3:]
+
+    # ── 5. 爆仓（最新1根1h K线）─────────────────────────────────────────────
+    liq_hist = _get_liq_history(sym, exchange)
+    if liq_hist:
+        latest = liq_hist[-1]
+        long_liq  = float(latest.get("long_liquidation_usd",  0))
+        short_liq = float(latest.get("short_liquidation_usd", 0))
+        result["long_liq_1h"]  = round(long_liq,  2)
+        result["short_liq_1h"] = round(short_liq, 2)
+        total_liq = long_liq + short_liq
+        if total_liq > 10_000:
+            if long_liq > short_liq * 2:
+                result["liq_signal"] = "heavy_long_liq"
+            elif short_liq > long_liq * 2:
+                result["liq_signal"] = "heavy_short_liq"
+        result["_raw"]["liq"] = latest
+
+    _cache_set(key, result)
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 评分计算
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _calc_deriv_score(direction: str, sig: dict, whale_sig: dict = None, kol_sig: dict = None) -> tuple[int, list[str]]:
+    """衍生品维度评分 + 巨鲸/KOL 方向修正（严格按用户方案）"""
+    delta   = 0
+    reasons = []
+
+    fr        = sig.get("fr_latest")
+    fr_trend  = sig.get("fr_trend", "neutral")
+    lsr_sig   = sig.get("lsr_signal", "neutral")
+    taker     = sig.get("taker_signal", "neutral")
+    oi_sig    = sig.get("oi_signal", "neutral")
+    liq_sig   = sig.get("liq_signal", "neutral")
+
+    # ── 巨鲸方向信号（最高 ±3 分，confidence=high 时 ±5）────────────────────
+    if whale_sig and not whale_sig.get("_error"):
+        wd  = whale_sig.get("whale_direction")
+        wc  = whale_sig.get("confidence", "low")
+        w_pts = 5 if wc == "high" else 3
+        if wd == direction:
+            delta += w_pts
+            reasons.append(f"巨鲸{wd}方向盈利({wc}):{+w_pts}")
+        elif wd and wd != direction:
+            delta -= w_pts
+            reasons.append(f"巨鲸逆向{wd}({wc}):{-w_pts}")
+
+    # ── KOL 方向信号（最高 ±2 分）──────────────────────────────────────────
+    if kol_sig and not kol_sig.get("_error"):
+        kd = kol_sig.get("kol_direction")
+        kc = kol_sig.get("confidence", "low")
+        if kd == direction and kc != "low":
+            delta += 2; reasons.append(f"KOL{kd}共识({kc}):+2")
+        elif kd and kd != direction and kc != "low":
+            delta -= 2; reasons.append(f"KOL逆向{kd}({kc}):-2")
+
+    if direction == "LONG":
+        if lsr_sig == "long_friendly":
+            delta += 5; reasons.append(f"空头占比>{sig.get('short_pct',0):.0%}:+5")
+        if liq_sig == "heavy_long_liq":
+            delta += 3; reasons.append("多头爆仓超卖反弹:+3")
+        if oi_sig == "deleverage":
+            delta += 4; reasons.append("OI降去杠杆超跌:+4")
+        if taker == "strong_buy":
+            delta += 5; reasons.append(f"大单主买{sig.get('buy_vol_pct',0):.0%}:+5")
+        if fr_trend == "falling":
+            delta += 3; reasons.append("资金率持续下行:+3")
+        if lsr_sig == "short_friendly":
+            delta -= 5; reasons.append(f"多头拥挤{sig.get('long_pct',0):.0%}:-5")
+        if fr_trend == "rising":
+            delta -= 3; reasons.append("资金率上行成本高:-3")
+        if taker == "strong_sell":
+            delta -= 3; reasons.append(f"大单主卖{1-sig.get('buy_vol_pct',0.5):.0%}:-3")
+
+    elif direction == "SHORT":
+        if lsr_sig == "short_friendly":
+            delta += 5; reasons.append(f"多头拥挤{sig.get('long_pct',0):.0%}:+5")
+        if liq_sig == "heavy_short_liq":
+            delta += 3; reasons.append("空头爆仓超涨回落:+3")
+        if oi_sig == "accumulate":
+            delta += 4; reasons.append("OI升多头超买:+4")
+        if taker == "strong_sell":
+            delta += 5; reasons.append(f"大单主卖{1-sig.get('buy_vol_pct',0.5):.0%}:+5")
+        if fr_trend == "rising":
+            delta += 4; reasons.append("资金率上行空头收益:+4")
+        if lsr_sig == "long_friendly":
+            delta -= 5; reasons.append(f"空头拥挤{sig.get('short_pct',0):.0%}:-5")
+        if fr is not None and fr < -0.003:
+            delta -= 8; reasons.append(f"资金率极度负{fr:.4%}禁空:-8")
+        if taker == "strong_buy":
+            delta -= 5; reasons.append(f"大单主买强势{sig.get('buy_vol_pct',0):.0%}:-5")
+        if oi_sig == "deleverage":
+            delta -= 4; reasons.append("OI降空头平仓推涨:-4")
+
+    return delta, reasons
+
+
+def get_signal_for_open(symbol: str, direction: str,
+                        current_price: float = None,
+                        exchange: str = "Binance") -> dict:
+    """
+    综合开仓信号：热力图 + 衍生品五维评分。
+    返回: {score_adjust, heatmap_score, deriv_score, bias, reason,
+           tp1, tp2, sl, zones, deriv_sig, resist}
+    """
+    try:
+        if current_price is None or current_price <= 0:
+            sym = _sym_full(symbol)
+            r = requests.get("https://fapi.binance.com/fapi/v1/ticker/price",
+                             params={"symbol": sym}, timeout=5).json()
+            current_price = float(r.get("price", 0))
+
+        zones        = get_liq_zones(symbol, current_price, exchange)
+        heatmap_bias = zones["bias"]
+
+        if direction == "LONG":
+            if heatmap_bias == "long":
+                heatmap_score = 10
+                h_reason = "✅ 热力图顺势（上方空头密集）:+10"
+            elif heatmap_bias == "short":
+                heatmap_score = -20
+                h_reason = f"⚠️ 热力图逆势（下方多头密集 {zones['ratio']:.2f}）:-20"
+            else:
+                heatmap_score = 0
+                h_reason = "热力图中性:0"
+        else:  # SHORT
+            if heatmap_bias == "short":
+                heatmap_score = 10
+                h_reason = "✅ 热力图顺势（下方多头密集）:+10"
+            elif heatmap_bias == "long":
+                heatmap_score = -15
+                h_reason = f"⚠️ 热力图逆势（上方空头密集 {zones['ratio']:.2f}）:-15"
+            else:
+                heatmap_score = 0
+                h_reason = "热力图中性:0"
+
+        deriv_sig              = get_derivatives_signals(symbol, current_price, exchange)
+        # 巨鲸 + KOL 信号（用缓存，不额外调用次数）
+        try:
+            whale_sig = get_whale_signals(symbol)
+        except Exception:
+            whale_sig = {}
+        try:
+            kol_sig = get_kol_signals(symbol, exchange="okx")
+        except Exception:
+            kol_sig = {}
+        deriv_delta, d_reasons = _calc_deriv_score(direction, deriv_sig, whale_sig, kol_sig)
+        total_adjust           = heatmap_score + deriv_delta
+
+        all_reasons = [h_reason] + d_reasons
+        reason      = " | ".join(all_reasons)
+
+        if direction == "LONG":
+            tp1 = zones["above"][0][0] if zones["above"] else None
+            tp2 = zones["above"][1][0] if len(zones["above"]) > 1 else None
+            sl  = zones["below"][0][0] if zones["below"] else None
+        else:
+            tp1 = zones["below"][0][0] if zones["below"] else None
+            tp2 = zones["below"][1][0] if len(zones["below"]) > 1 else None
+            sl  = zones["above"][0][0] if zones["above"] else None
+
+        return {
+            "score_adjust":  total_adjust,
+            "heatmap_score": heatmap_score,
+            "deriv_score":   deriv_delta,
+            "bias":          heatmap_bias,
+            "reason":        reason,
+            "tp1": tp1, "tp2": tp2, "sl": sl,
+            "zones":         zones,
+            "deriv_sig":     deriv_sig,
+            "resist":        zones["above"][0][0] if zones["above"] else None,
+        }
+
+    except Exception as e:
+        return {
+            "score_adjust": 0, "heatmap_score": 0, "deriv_score": 0,
+            "bias": "neutral", "reason": f"信号API异常({e})，跳过",
+            "tp1": None, "tp2": None, "sl": None,
+            "zones": {}, "deriv_sig": {}, "resist": None,
+        }
+
+
+def score_symbol_cg_bonus(symbol: str, direction: str,
+                          current_price: float, details: dict) -> int:
+    """scanner.py 调用入口"""
+    result = get_signal_for_open(symbol, direction, current_price)
+    details["cg_bonus"]     = result["score_adjust"]
+    details["cg_heatmap"]   = result["heatmap_score"]
+    details["cg_deriv"]     = result["deriv_score"]
+    details["cg_zones"]     = result.get("zones", {})
+    details["cg_bias"]      = result.get("bias", "neutral")
+    details["cg_reason"]    = result.get("reason", "")
+    details["cg_deriv_sig"] = result.get("deriv_sig", {})
+    return result["score_adjust"]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 命令行调试
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def print_analysis(symbol: str, current_price: float = None,
+                   exchange: str = "Binance", range_: str = "3d"):
+    sym = _sym_full(symbol)
+    if not current_price:
+        r = requests.get("https://fapi.binance.com/fapi/v1/ticker/price",
+                         params={"symbol": sym}, timeout=5).json()
+        current_price = float(r.get("price", 0))
+
+    long_sig  = get_signal_for_open(symbol, "LONG",  current_price, exchange)
+    time.sleep(2.2)
+    short_sig = get_signal_for_open(symbol, "SHORT", current_price, exchange)
+
+    print(f"\n{'='*55}")
+    print(f"  {sym} 综合信号 | 现价={current_price}")
+    print(f"{'='*55}")
+
+    z = long_sig["zones"]
+    print(f"热力图: {z.get('bias','?').upper()}  比率={z.get('ratio','?')}")
+    print(f"  上方Top3: {z.get('above',[])[:3]}")
+    print(f"  下方Top3: {z.get('below',[])[:3]}")
+
+    d = long_sig.get("deriv_sig", {})
+    print(f"\n衍生品 (全走代理 V4):")
+    print(f"  多空比:  多头={d.get('long_pct') or 0:.2%} 空头={d.get('short_pct') or 0:.2%} → {d.get('lsr_signal')}")
+    print(f"  大单:    主买占={d.get('buy_vol_pct') or 0:.2%} → {d.get('taker_signal')}")
+    print(f"  OI变化:  {d.get('oi_change_pct') or 0:.2%} → {d.get('oi_signal')}")
+    print(f"  资金费率: {d.get('fr_latest') or 0:.4%} 趋势={d.get('fr_trend')}")
+    print(f"  爆仓1h:  多={d.get('long_liq_1h',0)/1000:.1f}K 空={d.get('short_liq_1h',0)/1000:.1f}K → {d.get('liq_signal')}")
+
+    print(f"\n做多: 热={long_sig['heatmap_score']:+d} 衍={long_sig['deriv_score']:+d} 合={long_sig['score_adjust']:+d}")
+    print(f"做空: 热={short_sig['heatmap_score']:+d} 衍={short_sig['deriv_score']:+d} 合={short_sig['score_adjust']:+d}")
+    print(f"\n{long_sig['reason']}")
+    print(f"\nTP1={long_sig['tp1']}  TP2={long_sig['tp2']}  SL={long_sig['sl']}")
+
+
+if __name__ == "__main__":
+    import sys
+    sym = sys.argv[1] if len(sys.argv) > 1 else "ONDO"
+    print_analysis(sym)

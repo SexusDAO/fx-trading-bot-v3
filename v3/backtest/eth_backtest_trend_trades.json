@@ -1,0 +1,110 @@
+{
+  "trades": [
+    {
+      "direction": "SHORT",
+      "entry": 2226.62875,
+      "exit": 2278.52,
+      "pnl": -24.267348115396405,
+      "reason": "SL",
+      "close_time": 1706284800000,
+      "second_score": 74,
+      "position_size_usd": 250,
+      "scene": "E_rally_short"
+    },
+    {
+      "direction": "LONG",
+      "entry": 2259.753,
+      "exit": 2257.8,
+      "pnl": -15.747296275301302,
+      "reason": "SL",
+      "close_time": 1706338800000,
+      "second_score": 100,
+      "position_size_usd": 1000,
+      "scene": "A_pullback"
+    },
+    {
+      "direction": "LONG",
+      "entry": 2260.590875,
+      "exit": 2272.0,
+      "pnl": 12.26150662932314,
+      "reason": "TP",
+      "close_time": 1706382000000,
+      "second_score": 77,
+      "position_size_usd": 400,
+      "scene": "A_pullback"
+    },
+    {
+      "direction": "SHORT",
+      "entry": 2267.079875,
+      "exit": 2298.85,
+      "pnl": -14.220826692310803,
+      "reason": "SL",
+      "close_time": 1706544000000,
+      "second_score": 77,
+      "position_size_usd": 400,
+      "scene": "E_rally_short"
+    },
+    {
+      "direction": "LONG",
+      "entry": 2358.63775,
+      "exit": 2452.52,
+      "pnl": 47.152349910451626,
+      "reason": "TP",
+      "close_time": 1707404400000,
+      "second_score": 74,
+      "position_size_usd": 250,
+      "scene": "A_pullback"
+    },
+    {
+      "direction": "LONG",
+      "entry": 2421.31525,
+      "exit": 2456.19,
+      "pnl": 17.16254729738302,
+      "reason": "TP",
+      "close_time": 1707444000000,
+      "second_score": 71,
+      "position_size_usd": 250,
+      "scene": "A_pullback"
+    },
+    {
+      "direction": "LONG",
+      "entry": 2479.847,
+      "exit": 2505.16,
+      "pnl": 13.081956265850259,
+      "reason": "TP",
+      "close_time": 1707595200000,
+      "second_score": 71,
+      "position_size_usd": 250,
+      "scene": "A_pullback"
+    }
+  ],
+  "scene_stats": {
+    "E_rally_short": 7,
+    "A_pullback": 12
+  },
+  "logs": [
+    "📋 挂单 SHORT E_rally_short | 打分=74 仓位=$250",
+    "✅ 成交 SHORT @ 2226.63",
+    "❌ 平仓 SL @ 2278.52 | PnL=$-24.27",
+    "📋 挂单 LONG A_pullback | 打分=100 仓位=$1000",
+    "✅ 成交 LONG @ 2259.75",
+    "❌ 平仓 SL @ 2257.80 | PnL=$-15.75",
+    "📋 挂单 LONG A_pullback | 打分=77 仓位=$400",
+    "✅ 成交 LONG @ 2260.59",
+    "✅ 平仓 TP @ 2272.00 | PnL=$12.26",
+    "📋 挂单 SHORT E_rally_short | 打分=77 仓位=$400",
+    "✅ 成交 SHORT @ 2267.08",
+    "❌ 平仓 SL @ 2298.85 | PnL=$-14.22",
+    "📋 挂单 LONG A_pullback | 打分=74 仓位=$250",
+    "✅ 成交 LONG @ 2358.64",
+    "✅ 平仓 TP @ 2452.52 | PnL=$47.15",
+    "📋 挂单 LONG A_pullback | 打分=71 仓位=$250",
+    "✅ 成交 LONG @ 2421.32",
+    "✅ 平仓 TP @ 2456.19 | PnL=$17.16",
+    "📋 挂单 LONG A_pullback | 打分=71 仓位=$250",
+    "📋 挂单 LONG A_pullback | 打分=71 仓位=$250",
+    "✅ 成交 LONG @ 2479.97",
+    "✅ 成交 LONG @ 2479.85",
+    "✅ 平仓 TP @ 2505.16 | PnL=$13.08"
+  ]
+}

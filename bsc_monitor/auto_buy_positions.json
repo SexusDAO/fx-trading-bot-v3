@@ -1,0 +1,24 @@
+{
+  "0xf98f6b1204cc742b259100395ebd30bfbeac7777": {
+    "buy_time": 1791372737.6451652,
+    "symbol": "\u5976\u86d9",
+    "usd": 5,
+    "bnb": 0.0064,
+    "signal_source": "binance_smart_money",
+    "trigger_info": "\u806a\u660e\u94b1\u4fe1\u53f7|5\u4e2a\u806a\u660e\u94b1|$5445",
+    "buy_tx": "",
+    "transfer_tx": "0xaa426b7b84ff5f439bb21dae5262010be0b800fa9d3c4e106afe58ec001296b6",
+    "user_wallet": "0xFb4fC5BCAb0D5d2e731a8FD94933b2894e113D37"
+  },
+  "0xb936cab857514bb917431cc8e2b7f1da5caa7777": {
+    "buy_time": 1791372810.360015,
+    "symbol": "Nailoong",
+    "usd": 5,
+    "bnb": 0.0064,
+    "signal_source": "binance_smart_money",
+    "trigger_info": "\u806a\u660e\u94b1\u4fe1\u53f7|7\u4e2a\u806a\u660e\u94b1|$11996",
+    "buy_tx": "",
+    "transfer_tx": "0xcd39c84f5257c6ba7901aedf9acd73e1ca86c73d644951c3f3358200841162a7",
+    "user_wallet": "0xFb4fC5BCAb0D5d2e731a8FD94933b2894e113D37"
+  }
+}

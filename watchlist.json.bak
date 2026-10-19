@@ -1,0 +1,16 @@
+{
+  "candidates": [
+    {
+      "symbol": "NEARUSDT",
+      "direction": "SHORT",
+      "score": 65,
+      "prev_score": 75,
+      "added_at": 1784711109,
+      "last_reviewed": 1784745790,
+      "next_review": 1784746690,
+      "current_price": 1.86,
+      "reason": "价格下行4%已至1.86，旧挂单@1.919已撤；空头趋势仍在(MA7<MA25)，等反弹至1.90~1.92区间重新评估挂空"
+    }
+  ],
+  "last_updated": 1784745790
+}

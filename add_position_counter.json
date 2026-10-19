@@ -1,0 +1,22 @@
+{
+  "HOMEUSDT_LONG": {
+    "count": 1,
+    "last_add_at": "2026-07-20T18:25:35Z",
+    "add_price": 0.00744,
+    "add_qty": 6735,
+    "new_avg_entry": 0.0076108
+  },
+  "ONDOUSDT": 1,
+  "SOLUSDT": 1,
+  "UNIUSDT": 1,
+  "PRLUSDT": 1,
+  "ALLOUSDT": 1,
+  "BULLAUSDT": 1,
+  "1000RATSUSDT": 1,
+  "BANKUSDT": 1,
+  "AKEUSDT": 2,
+  "LINKUSDT": 1,
+  "AAVEUSDT": 1,
+  "SKHYUSDT": 1,
+  "BEATUSDT": 1
+}

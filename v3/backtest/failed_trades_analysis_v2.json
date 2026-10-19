@@ -1,0 +1,58 @@
+{
+  "summary": {
+    "total_trades": 4,
+    "sl_trades": 3,
+    "tp_trades": 1,
+    "avg_candles_to_sl": 18.333333333333332,
+    "candles_distribution": {
+      "quick": 0,
+      "normal": 0,
+      "slow": 3
+    },
+    "direction_after_sl": {
+      "继续不利": 3,
+      "立即反转": 0,
+      "震荡后止损": 0
+    },
+    "entry_source": {
+      "liq_zone": 0,
+      "structure": 0,
+      "unknown": 3
+    }
+  },
+  "sl_trades": [
+    {
+      "direction": "SHORT",
+      "entry": 1838.0222,
+      "exit": 1842.88,
+      "pnl": -8.00235165821166,
+      "reason": "SL",
+      "close_time": 1784307600000,
+      "second_score": 70,
+      "position_size_usd": 250,
+      "tp_source": "unknown"
+    },
+    {
+      "direction": "SHORT",
+      "entry": 1844.7163,
+      "exit": 1856.7,
+      "pnl": -20.38492314509267,
+      "reason": "SL",
+      "close_time": 1784397600000,
+      "second_score": 77,
+      "position_size_usd": 400,
+      "tp_source": "unknown"
+    },
+    {
+      "direction": "SHORT",
+      "entry": 1890.51925,
+      "exit": 1913.75,
+      "pnl": -27.18750417378706,
+      "reason": "SL",
+      "close_time": 1785078000000,
+      "second_score": 83,
+      "position_size_usd": 400,
+      "tp_source": "unknown"
+    }
+  ]
+}

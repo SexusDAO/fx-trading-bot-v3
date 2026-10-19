@@ -1,0 +1,57 @@
+{
+  "period1": {
+    "period": "时间段 1: 2024-01 上涨趋势",
+    "symbols": [
+      "BTCUSDT",
+      "ETHUSDT"
+    ],
+    "trades": [],
+    "scene_stats": {
+      "A_pullback": 0,
+      "B_breakout": 0,
+      "C_first_pull": 0,
+      "E_short": 0,
+      "F_breakdown": 0,
+      "G_first_rally": 0
+    },
+    "position_limits_hit": {
+      "long": 44,
+      "short": 11
+    }
+  },
+  "period2": {
+    "symbol": "1000PEPEUSDT",
+    "period": "时间段 2: 2024-07 下跌",
+    "trades": [],
+    "scene_stats": {
+      "A_pullback": 23,
+      "B_breakout": 0,
+      "C_first_pull": 0,
+      "E_short": 4,
+      "F_breakdown": 0,
+      "G_first_rally": 0
+    }
+  },
+  "period3": {
+    "period": "时间段 3: 2026-07 多币种并行",
+    "symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "1000PEPEUSDT",
+      "SOLUSDT"
+    ],
+    "trades": [],
+    "scene_stats": {
+      "A_pullback": 0,
+      "B_breakout": 0,
+      "C_first_pull": 0,
+      "E_short": 0,
+      "F_breakdown": 0,
+      "G_first_rally": 0
+    },
+    "position_limits_hit": {
+      "long": 90,
+      "short": 23
+    }
+  }
+}

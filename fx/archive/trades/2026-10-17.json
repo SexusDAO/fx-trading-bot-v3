@@ -1,0 +1,61 @@
+{
+  "date": "2026-10-17",
+  "generated_at": "2026-10-18T02:01:13Z",
+  "summary": {
+    "total_trades": 1,
+    "win": 1,
+    "loss": 0,
+    "win_rate": 1.0,
+    "total_pnl_usdt": 3.83,
+    "by_mode": {
+      "pullback": {
+        "count": 1,
+        "win": 1,
+        "pnl": 3.83
+      }
+    },
+    "by_signal_strength": {
+      "medium": {
+        "count": 1,
+        "win": 1,
+        "pnl": 3.83
+      }
+    }
+  },
+  "trades": [
+    {
+      "trade_id": "1792191177560_STBLUSDT",
+      "symbol": "STBLUSDT",
+      "direction": "long",
+      "mode": "pullback",
+      "signal_strength": "medium",
+      "volatility_tier": "mid",
+      "entry_price": 0.02338709,
+      "exit_price": 0.02361,
+      "sl_price": null,
+      "tp1_price": null,
+      "tp2_price": null,
+      "sl_dist_pct": null,
+      "rr_tp1": null,
+      "quantity": 17172.0,
+      "leverage": 50,
+      "pnl_usdt": 3.8278,
+      "pnl_pct": 0.9531,
+      "holding_minutes": 361.2,
+      "open_time": 1792169502940,
+      "close_time": 1792191177560,
+      "close_reason": "early_stagnation",
+      "tp1_filled": false,
+      "tp2_filled": false,
+      "sl_degraded": true,
+      "liq_data_available": true,
+      "vol_ratio_at_entry": 0.6137,
+      "momentum_coeff": null,
+      "consistency_score": null,
+      "judge_detail": {
+        "vol_ratio": 0.6136757247763481
+      }
+    }
+  ],
+  "open_positions_snapshot": []
+}

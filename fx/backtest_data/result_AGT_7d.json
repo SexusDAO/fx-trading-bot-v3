@@ -1,0 +1,40 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-10-14 16:30",
+      "close_ts": "2026-10-15 02:30",
+      "symbol": "AGTUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.016887,
+      "exit_price": 0.01637473,
+      "close_reason": "sl",
+      "pnl": -3.2335,
+      "hold_min": 600.0,
+      "signal_score": 65
+    }
+  ],
+  "stats": {
+    "symbol": "AGTUSDT",
+    "days": 7,
+    "total_trades": 1,
+    "win_trades": 0,
+    "loss_trades": 1,
+    "win_rate_pct": 0.0,
+    "total_pnl_u": -3.23,
+    "total_win_u": 0,
+    "total_loss_u": -3.23,
+    "profit_factor": 0.0,
+    "max_drawdown_u": 3.23,
+    "max_single_loss": -3.23,
+    "avg_hold_min": 600.0,
+    "by_mode": {
+      "pullback": {
+        "n": 1,
+        "win": 0,
+        "pnl": -3.23,
+        "win_rate": 0.0
+      }
+    }
+  }
+}

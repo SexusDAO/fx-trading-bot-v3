@@ -1,0 +1,1206 @@
+# ============================================================
+# position_manager.py — 持仓状态管理 + 止盈止损逻辑
+# ============================================================
+import json, time, os
+from config import (
+    STATE_FILE, MAX_POSITIONS, POSITION_LIMIT_THRESHOLD_USD,
+    LOW_MC_THRESHOLD, LOW_MC_EXITS,
+    LOW_MC_TP_NORMAL, LOW_MC_TP_CONSENSUS,
+    COOLDOWN_NORMAL_STOP_LOSS, COOLDOWN_LIQUIDITY_CRASH, COOLDOWN_TAKE_PROFIT,
+    MID_MC_THRESHOLD,
+    MID_MC_DOUBLE_SELL, MID_MC_STOP_LOSS,
+    HIGH_MC_DOUBLE_SELL, HIGH_MC_FINAL_MC, HIGH_MC_STOP_LOSS,
+    VERY_HIGH_MC_THRESHOLD, VERY_HIGH_MC_STOP_LOSS,
+    TRAILING_ACTIVATE_PCT, TRAILING_DRAWDOWN_PCT,
+    EARLY_STOP_PCT, EARLY_STOP_MINUTES,
+    EARLY_STOP_CONFIRM_MINUTES, EARLY_STOP_CONFIRM_MAX_MC,
+    KOL_SELL_STRICT_COUNT, KOL_SELL_WHALE_THRESHOLD_USD,
+    KOL_SELL_COOLDOWN_MIN, KOL_SELL_WINDOW_MIN, KOL_SELL_SCORE_PENALTY,
+    VOL_CLIFF_COOLDOWN_MIN, TRAILING_STOP_COOLDOWN_MIN, HARD_STOP_COOLDOWN_MIN,
+    ALLOW_POSITION_STACK, MAX_POSITION_SIZE_USD,
+    CONSENSUS_MIN_SIGNALS, CONSENSUS_WINDOW_MIN, CONSENSUS_MIN_PNL,
+    CONSENSUS_TRAILING_DRAWDOWN, CONSENSUS_TRAILING_ACTIVATE,
+    CONSENSUS_TIMEOUT_H, CONSENSUS_WHALE_USD, CONSENSUS_CANCEL_DOUBLE_OUT,
+    CONSENSUS_EXIT_SIGNAL_SCORE,
+    ENTRY_PROTECT_MIN_RPC, ENTRY_PROTECT_MIN_FOMO,
+    WHALE_SIGNAL_CONFIRM_SCORE, WHALE_SIGNAL_CONFIRM_MAX_PNL,
+    DCA_ENABLED, DCA_SIZE_USD, DCA_MAX_TIMES,
+    DCA_SKIP_1H_DROP, DCA_SKIP_VOL_RATIO, DCA_SKIP_LOW_MC_6H,
+    KOL_BUY_SCORE, KOL_SELL_SCORE, WHALE_BUY_SCORE, WHALE_SELL_SCORE,
+    SIGNAL_SCORE_HOLD, SIGNAL_SCORE_TRIM, SIGNAL_SCORE_REDUCE,
+    S_CONSENSUS_INIT_SCORE, S_CONSENSUS_HOLD_LINE,
+    S_EXIT_TIER_1, S_EXIT_TIER_2, S_EXIT_TIER_3, S_EXIT_TIER_4,
+    S_SCORE_KOL_BUY_A, S_SCORE_KOL_BUY_B, S_SCORE_KOL_BUY_C,
+    S_SCORE_WHALE_BUY, S_SCORE_KOL_SELL_SMALL,
+    S_HARD_STOP_KOL_RESONANCE, S_HARD_STOP_WHALE_SELL, S_HARD_STOP_VOL_CLIFF,
+)
+
+
+_RECENTLY_CLOSED: dict = {}   # 兼容旧引用，不再直接写入（由 _COOLDOWN_MAP 接管）
+_COOLDOWN_MAP:    dict = {}   # token_addr_lower → expire_timestamp
+
+# 每日享损黑名单：{token_addr_lower: total_realized_loss_usd}
+# 当天内已实现亏损超过 DAILY_LOSS_BLACKLIST_USD 时，当日不再开仓
+_DAILY_LOSS: dict = {}      # addr_lower -> total_loss_usd (负数)
+_DAILY_LOSS_DATE: str = ""  # 日期字符串，用于日切换重置
+DAILY_LOSS_BLACKLIST_USD = 30.0   # 当日单 token 实现亏损超过此値就拉黑名
+
+# 全局日产损熱断：当天所有已实现亏损总和超过阈値时断开新仓
+DAILY_LOSS_LIMIT_USD: float = 150.0   # 当日总亏损超过 $150 自动停止买入
+
+
+def get_daily_total_loss() -> float:
+    """返回当天已实现亏损总金额（正小数，即赋値绝对値）"""
+    global _DAILY_LOSS_DATE
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    if _DAILY_LOSS_DATE != today:
+        _DAILY_LOSS.clear()
+        _DAILY_LOSS_DATE = today
+    return abs(sum(v for v in _DAILY_LOSS.values() if v < 0))
+
+
+def is_global_circuit_broken() -> bool:
+    """全局日产损熱断检查：当日总亏损超过 DAILY_LOSS_LIMIT_USD 时返回 True"""
+    total = get_daily_total_loss()
+    if total >= DAILY_LOSS_LIMIT_USD:
+        return True
+    return False
+
+def _load() -> dict:
+    # 启动时检测上次未完成写入（.tmp 残留）
+    tmp_path = STATE_FILE + ".tmp"
+    if os.path.exists(tmp_path):
+        # .tmp 存在说明上次 os.replace 没执行完，用 .bak 恢复
+        bak_path = STATE_FILE + ".bak"
+        if os.path.exists(bak_path) and not os.path.exists(STATE_FILE):
+            import shutil
+            shutil.copy2(bak_path, STATE_FILE)
+            _log(f"[STATE] 检测到 .tmp 残留，已从 .bak 恢复 state.json")
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+    if os.path.exists(STATE_FILE):
+        try:
+            with open(STATE_FILE) as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            # state.json 损坏，尝试用 .bak
+            bak_path = STATE_FILE + ".bak"
+            if os.path.exists(bak_path):
+                _log("[STATE] state.json 损坏，从 .bak 恢复")
+                with open(bak_path) as f:
+                    return json.load(f)
+    return {"positions": {}, "kol_sells": {}}
+
+
+def _save(state: dict):
+    """
+    写入 state.json。
+    采用「先写临时文件再原子替换」策略：
+      1. 写入 state.json.tmp
+      2. os.replace() 原子替换（POSIX 上是将务操作）
+    这样即使进程在写入中崩溃，也不会导致 state.json 内容损广或半写。
+    """
+    tmp_path = STATE_FILE + ".tmp"
+    bak_path = STATE_FILE + ".bak"
+    for _attempt in range(3):
+        try:
+            with open(tmp_path, "w") as f:
+                json.dump(state, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            if os.path.exists(STATE_FILE):
+                try:
+                    import shutil
+                    shutil.copy2(STATE_FILE, bak_path)
+                except Exception:
+                    pass
+            os.replace(tmp_path, STATE_FILE)
+            break
+        except OSError as _e:
+            if _attempt < 2:
+                time.sleep(0.05)
+            else:
+                _log(f"[STATE] 写入失败(重试3次): {_e}")
+                raise
+
+
+# ──────────────────────────────────────────────
+# 公开接口
+# ──────────────────────────────────────────────
+
+def can_open(size_usd: float = 0.0) -> bool:
+    """
+    是否允许开新仓。
+    规则：
+      - 此次买入金额 >= POSITION_LIMIT_THRESHOLD_USD (50U)：
+          受 MAX_POSITIONS 限制，且仅统计已有的大仓 (>=50U) 数量
+      - 此次买入金额 < 50U：
+          不受仓位数限制，直接放行（小仓多试错）
+    """
+    # 小仓：不受小周期限制
+    if size_usd > 0 and size_usd < POSITION_LIMIT_THRESHOLD_USD:
+        return True
+    # 大仓：统计当前已有大仓数（size_usd >= 50U 的）
+    s = _load()
+    big_positions = sum(
+        1 for pos in s["positions"].values()
+        if pos.get("size_usd", 0) >= POSITION_LIMIT_THRESHOLD_USD
+    )
+    return big_positions < MAX_POSITIONS
+
+
+def position_exists(token_addr: str) -> bool:
+    s = _load()
+    return token_addr.lower() in s["positions"]
+
+
+def open_position(
+    token_addr: str,
+    token_symbol: str,
+    strategy: str,
+    size_usd: float,
+    entry_price: float,
+    entry_mc: float,
+    trigger_kol: str = "",
+    # ── 开仓上下文（新增）──
+    open_strategy: str = "",           # "A" / "B" / "W"
+    trigger_kols: list | None = None,  # [{address, grade, score}, ...]
+    boost_at_entry: float = 0.0,
+    clawby_confirmed: bool = False,
+    entry_source: str = "fomo",        # "rpc" | "fomo" 触发来源
+    protect_min: int | None = None,    # 自定义保护期分钟数
+    extra_fields: dict | None = None,  # 额外字段，如 signal_grade="S"
+):
+    """记录开仓。叠加规则：同一 token 不同策略可叠加一次，不超过 MAX_POSITION_SIZE_USD"""
+    if trigger_kols is None:
+        trigger_kols = []
+    if not open_strategy:
+        # 兼容旧调用：从 strategy 字段推断
+        open_strategy = "A" if strategy == "kol" else ("W" if strategy == "whale" else "B")
+    s = _load()
+    key = token_addr.lower()
+
+    if key in s["positions"] and ALLOW_POSITION_STACK:
+        pos = s["positions"][key]
+        # 防止同一策略反复叠加
+        if strategy in pos["strategies"]:
+            _log(f"[SKIP] {token_symbol} 策略[{strategy}]已开过仓，跳过")
+            return
+        # 检查是否超出单仓上限
+        if pos["size_usd"] + size_usd > MAX_POSITION_SIZE_USD:
+            _log(f"[SKIP] {token_symbol} 叠加后 {pos['size_usd']+size_usd:.0f}U > 上限 {MAX_POSITION_SIZE_USD}U，跳过")
+            return
+        pos["size_usd"] += size_usd
+        pos["strategies"].append(strategy)
+        # 重新加权均价（按资金占比）
+        old_size = pos["size_usd"] - size_usd
+        if entry_price > 0 and pos["entry_price"] > 0:
+            pos["entry_price"] = (pos["entry_price"] * old_size + entry_price * size_usd) / pos["size_usd"]
+        # entry_mc 取两次买入的加权平均
+        pos["entry_mc"] = (pos["entry_mc"] * old_size + entry_mc * size_usd) / pos["size_usd"] if entry_mc > 0 else pos["entry_mc"]
+        # 重置 exits_done 中与价格相关的模式（如 mid_double/high_double/very_high_double）
+        # 均价降低后翻倍线也降低，之前已触发的档位应清除重算
+        pos["exits_done"] = [e for e in pos["exits_done"] if isinstance(e, (int, float))]
+        # DCA 补仓次数计数
+        if size_usd == DCA_SIZE_USD and DCA_ENABLED:
+            pos["dca_count"] = pos.get("dca_count", 0) + 1
+        # 注意：STACK 路径不更新 protect_min / entry_source，
+        # 这两个字段只在首次建仓时写入，DCA 叠加不改变原始保护期。
+        _log(f"[STACK] {token_symbol} 叠加仓位 +{size_usd}U，总计 {pos['size_usd']}U 均价更新为 ${pos['entry_price']:.6f}"
+             + (f" (第{pos['dca_count']}次DCA)" if pos.get('dca_count') else ""))
+    else:
+        # S 级开仓：position_cap = 初始仓位 × 2（应对动态仓位大小）
+        _is_s = (extra_fields or {}).get("signal_grade") == "S" or open_strategy == "W"
+        if _is_s:
+            _pos_cap = size_usd * 2
+        else:
+            _pos_cap = min(size_usd + DCA_SIZE_USD * DCA_MAX_TIMES, 120.0)
+        # 保护期：优先用调用方传入的 protect_min，否则按来源设默认值
+        _protect_min = protect_min if protect_min is not None else (
+            ENTRY_PROTECT_MIN_RPC if entry_source == "rpc" else ENTRY_PROTECT_MIN_FOMO
+        )
+        s["positions"][key] = {
+            "token_addr":   key,
+            "symbol":       token_symbol,
+            "token_symbol": token_symbol,
+            "strategies":   [strategy],
+            "size_usd":     size_usd,
+            "remaining_pct": 1.0,      # 剩余仓位比例（0~1）
+            "entry_price":  entry_price,
+            "entry_mc":     entry_mc,
+            "exits_done":   [],        # 已触发的档位 mc 值
+            "opened_at":    int(time.time()),
+            "trigger_kol":  trigger_kol,
+            "locking":      False,
+            # ── 开仓上下文（静态，只记录开仓那一刻）──
+            "open_strategy":     open_strategy,
+            "trigger_kols":      trigger_kols,
+            "trigger_kol_count": len(trigger_kols),
+            "boost_at_entry":    boost_at_entry,
+            "clawby_confirmed":  clawby_confirmed,
+            "entry_source":      entry_source,    # "rpc" | "fomo"
+            "protect_min":       _protect_min,    # 入场保护期（分钟）
+            # 策略W：记录触发入场的原始大钱包地址（用于持仓期出货追踪）
+            "entry_wallet":      (trigger_kol.lower() if open_strategy == "W" and trigger_kol else ""),
+            # ── 开仓层仓位上限（根据此仓位初始大小 + DCA 计算）──
+            "initial_size_usd": size_usd,
+            "position_cap":     _pos_cap,
+            # ── 持仓期间信号累积（动态更新）──
+            "associated_kols":   [],
+            "signal_score":      _calc_initial_signal_score(open_strategy, trigger_kols, (extra_fields or {}).get("signal_grade", "")),
+            "peak_pnl":          0.0,   # 每笔新开仓归零，防止上笔残留
+            # ── 额外字段（signal_grade 等）──
+            **(extra_fields or {}),
+        }
+        # ★ S 级信号天然进入共识持仓模式
+        if (extra_fields or {}).get("signal_grade") == "S" or open_strategy == "W":
+            s["positions"][key]["consensus_mode"] = True
+            s["positions"][key]["consensus_activated_at"] = int(time.time())
+            _log(f"[S-CONSENSUS] {token_symbol} S级信号开仓，自动进入共识持仓模式")
+        _log(f"[OPEN] {token_symbol} | {strategy} | {size_usd}U | mc={entry_mc:,.0f} "
+             f"| 策略={open_strategy}{'/S级' if (extra_fields or {}).get('signal_grade')=='S' else ''} "
+             f"信号分={s['positions'][key]['signal_score']}"
+             f" | 仓位上限=${_pos_cap:.0f}U")
+
+    _save(s)
+
+
+
+
+def lock_position(token_addr: str):
+    """卖出 SUBMITTED 时锁定仓位，禁止同期新信号加仓（避免 ZZZ 那种出本失败期间意外加仓）"""
+    s = _load()
+    key = token_addr.lower()
+    if key in s["positions"]:
+        s["positions"][key]["locking"] = True
+        _save(s)
+        _log(f"[LOCK] {s['positions'][key].get('token_symbol','?')} 仓位已锁定，禁止加仓")
+
+
+def unlock_position(token_addr: str):
+    """卖出完成/失败后解锁仓位"""
+    s = _load()
+    key = token_addr.lower()
+    if key in s["positions"]:
+        s["positions"][key]["locking"] = False
+        _save(s)
+        _log(f"[UNLOCK] {s['positions'][key].get('token_symbol','?')} 仓位解锁")
+
+
+def is_locked(token_addr: str) -> bool:
+    """检查仓位是否正在执行卖出（锁定中）"""
+    pos = get_position(token_addr)
+    return bool(pos and pos.get("locking", False))
+
+
+# ──────────────────────────────────────────────
+# 卖出冷却期分级管理
+# ──────────────────────────────────────────────
+
+def blacklist_token_today(token_addr: str):
+    """当日单币熍断：写入每日单币黑名单，当日不再开仓。"""
+    global _DAILY_LOSS_DATE
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    if _DAILY_LOSS_DATE != today:
+        _DAILY_LOSS.clear()
+        _DAILY_LOSS_DATE = today
+    key = token_addr.lower()
+    # 确保不管之前有没有产生损失，绝对值都强制达到熍断阈值
+    existing = _DAILY_LOSS.get(key, 0.0)
+    if abs(existing) < DAILY_LOSS_BLACKLIST_USD:
+        _DAILY_LOSS[key] = -DAILY_LOSS_BLACKLIST_USD
+    _log(f"[DAILY-BLACKLIST] {key[:12]}… 当日熍断，当日不再开仓")
+
+
+def record_exit(token_addr: str, exit_reason: str):
+    """
+    卖出后按原因设置冷却期。
+
+    exit_reason 枚举：
+      "take_profit"      → 止盈离场，无冷却
+      "stop_loss"        → 普通止损（-35%~-50%），冷却 30min
+      "liquidity_crash"  → 流动性崩溃止损，冷却 4h
+      "kol_sell"         → KOL 卖出跟单离场，冷却 60min（防止立即高位重开）
+      "daily_loss_limit" → 每日单币熔断，当日不再开仓
+    """
+    key = token_addr.lower()
+
+    if exit_reason == "take_profit":
+        cooldown = COOLDOWN_TAKE_PROFIT          # 0，不冷却
+    elif exit_reason == "stop_loss":
+        cooldown = COOLDOWN_NORMAL_STOP_LOSS     # 1800s
+    elif exit_reason == "liquidity_crash":
+        cooldown = COOLDOWN_LIQUIDITY_CRASH      # 14400s
+    elif exit_reason == "kol_sell":
+        cooldown = KOL_SELL_COOLDOWN_MIN * 60        # 60min
+    elif exit_reason == "vol_cliff":
+        cooldown = VOL_CLIFF_COOLDOWN_MIN * 60        # 30min
+    elif exit_reason == "trailing_stop":
+        cooldown = TRAILING_STOP_COOLDOWN_MIN * 60    # 20min
+    elif exit_reason == "hard_stop":
+        cooldown = HARD_STOP_COOLDOWN_MIN * 60        # 120min
+    elif exit_reason == "daily_loss_limit":
+        blacklist_token_today(key)
+        return
+    else:
+        cooldown = COOLDOWN_NORMAL_STOP_LOSS     # 默认按普通止损处理
+
+    if cooldown > 0:
+        _COOLDOWN_MAP[key] = time.time() + cooldown
+        # 干废 _RECENTLY_CLOSED（兼容 is_recently_closed 旧调用）
+        _RECENTLY_CLOSED[key] = time.time()
+        _log(f"[COOLDOWN] {key[:12]}… 冷却期 {cooldown//60:.0f}min，原因：{exit_reason}")
+    else:
+        # 止盈离场：清除旧冷却记录（允许立即重新开仓）
+        _COOLDOWN_MAP.pop(key, None)
+        _RECENTLY_CLOSED.pop(key, None)
+        _log(f"[COOLDOWN] {key[:12]}… 止盈离场，冷却已清除")
+
+
+def is_in_cooldown(token_addr: str) -> bool:
+    """True = 当前处于冷却期，不应开新仓"""
+    key = token_addr.lower()
+    expire_ts = _COOLDOWN_MAP.get(key, 0)
+    return time.time() < expire_ts
+
+
+def is_recently_closed(token_addr: str, cooldown_min: int = 30) -> bool:
+    """
+    兴容旧接口：直接委托给 is_in_cooldown。
+    cooldown_min 参数不再生效（冷却时长已由 record_exit 决定）。
+    """
+    return is_in_cooldown(token_addr)
+
+
+def can_dca(token_addr: str) -> tuple[bool, str]:
+    """
+    检查是否允许对该 token 进行 DCA 补仓。
+    返回 (True, "") 表示可以补仓；(False, reason) 表示跳过。
+
+    检查顺序：
+      1. DCA 次数是否达到上限（DCA_MAX_TIMES）
+      2. 当前总仓位是否达到本仓位专属上限（position_cap）或全局硬上限（DCA_MAX_TOTAL_USD=120）
+    """
+    pos = get_position(token_addr)
+    if not pos:
+        return False, "仓位不存在"
+
+    dca_count  = pos.get("dca_count", 0)
+    total_size = pos.get("size_usd", 0)
+
+    if dca_count >= DCA_MAX_TIMES:
+        return False, f"已补仓 {dca_count} 次（上限 {DCA_MAX_TIMES}）"
+
+    # 优先用本仓位专属上限（开仓时记录），干费则用全局硬上限
+    pos_cap = pos.get("position_cap")
+    if pos_cap is None:
+        # 兼容旧仓位（开仓前未记录 position_cap）
+        from config import DCA_MAX_TOTAL_USD
+        pos_cap = DCA_MAX_TOTAL_USD
+
+    if total_size >= pos_cap:
+        return False, f"总仓位 ${total_size:.0f}U 已达本仓位上限 ${pos_cap:.0f}U"
+
+    return True, ""
+
+
+def close_position(token_addr: str, reason: str = "", realized_pnl_usd: float = 0.0):
+    s = _load()
+    key = token_addr.lower()
+    pos = s["positions"].pop(key, None)
+    if pos:
+        _log(f"[CLOSE] {pos['symbol']} | reason={reason}")
+        # 注意：冷却期由 ws_monitor 调用 record_exit() 来设置，
+        # close_position 仅负责清除仓位状态 + 统计每日损失。
+        # 每日享损累计（日切换重置）
+        global _DAILY_LOSS_DATE
+        today = time.strftime("%Y-%m-%d", time.gmtime())
+        if _DAILY_LOSS_DATE != today:
+            _DAILY_LOSS.clear()
+            _DAILY_LOSS_DATE = today
+        if realized_pnl_usd < 0:
+            _DAILY_LOSS[key] = _DAILY_LOSS.get(key, 0.0) + realized_pnl_usd
+            total_loss = abs(_DAILY_LOSS[key])
+            if total_loss >= DAILY_LOSS_BLACKLIST_USD:
+                _log(f"[DAILY-BLACKLIST] {pos['symbol']} 当日已亏损 ${total_loss:.2f} >= ${DAILY_LOSS_BLACKLIST_USD}，当日不再开仓")
+                _push_daily_blacklist_notify(pos.get('symbol','?'), key, total_loss)
+    _save(s)
+    return pos
+
+
+def _push_daily_blacklist_notify(symbol: str, token_addr: str, total_loss: float):
+    """当天单币熔断触发时推送 Jarvis 通知"""
+    try:
+        import subprocess, os
+        from config import JARVIS_TARGET
+        msg = (f"⛔ {symbol} 当日单币熔断\n"
+               f"当日已亏损 ${total_loss:.2f} \u2265 阈值 ${DAILY_LOSS_BLACKLIST_USD}\n"
+               f"共识: {token_addr[:12]}… 当日不再开仓")
+        subprocess.Popen(
+            ["openclaw", "message", "send",
+             "--channel", "jarvis", "-t", JARVIS_TARGET, "-m", msg],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+
+def record_partial_loss(token_addr: str, pnl_usd: float):
+    """
+    部分卖出实现亏损时更新当日单币熔断计数器。
+    无论策略A/B/W，同一 token 当日所有已实现亏损合并计算。
+    """
+    global _DAILY_LOSS_DATE
+    if pnl_usd >= 0:
+        return
+    key = token_addr.lower()
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    if _DAILY_LOSS_DATE != today:
+        _DAILY_LOSS.clear()
+        _DAILY_LOSS_DATE = today
+    _DAILY_LOSS[key] = _DAILY_LOSS.get(key, 0.0) + pnl_usd
+    total_loss = abs(_DAILY_LOSS[key])
+    _log(f"[DAILY-LOSS] {key[:12]}… 部分亏损累计 ${total_loss:.2f}")
+    if total_loss >= DAILY_LOSS_BLACKLIST_USD:
+        _log(f"[DAILY-BLACKLIST] {key[:12]}… 当日累计亏损 ${total_loss:.2f}，当日不再开仓")
+        _push_daily_blacklist_notify(key[:12], key, total_loss)
+
+
+def is_daily_blacklisted(token_addr: str) -> bool:
+    """当日亏损黑名单检查：返回 True 表示当日不应再开仓"""
+    global _DAILY_LOSS_DATE
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    if _DAILY_LOSS_DATE != today:
+        _DAILY_LOSS.clear()
+        _DAILY_LOSS_DATE = today
+    key = token_addr.lower()
+    total_loss = abs(_DAILY_LOSS.get(key, 0.0))
+    return total_loss >= DAILY_LOSS_BLACKLIST_USD
+
+
+def get_position(token_addr: str):
+    s = _load()
+    return s["positions"].get(token_addr.lower())
+
+
+def get_all_positions() -> list:
+    s = _load()
+    return list(s["positions"].values())
+
+
+def get_low_mc_tp_ladder(position: dict) -> list:
+    """
+    根据是否处于共识模式返回对应止盈阶梯。
+    共识模式：轻仓多刀，到点少卖，尾仓继续跑。
+    共识模式不修改止盈时间点（mc阈值不变），只减少每刀卖出比例。
+    """
+    if position.get("consensus_mode"):
+        return LOW_MC_TP_CONSENSUS
+    return LOW_MC_TP_NORMAL
+
+
+# ──────────────────────────────────────────────
+# 止盈止损决策：返回 action dict 或 None
+# action = {
+#   "action": "partial_sell" | "full_sell",
+#   "sell_pct": float,      # 本次卖出占当前剩余的比例
+#   "reason": str,
+# }
+# ──────────────────────────────────────────────
+
+def evaluate_exit(token_addr: str, current_price: float, current_mc: float) -> dict | None:
+    pos = get_position(token_addr)
+    if not pos:
+        return None
+
+    entry_price = pos["entry_price"]
+    entry_mc    = pos["entry_mc"]
+    if entry_price <= 0:
+        return None
+    # entry_mc=0 时（whale/multi 早期买入未能查到mc），用默认中等mc继续评估
+    # 不能因为 mc 数据缺失就完全跳过止盈止损判断
+    if entry_mc <= 0:
+        entry_mc = MID_MC_THRESHOLD  # 默认按中等mc处理（取中间档）
+
+    pnl_pct     = (current_price - entry_price) / entry_price
+    opened_at   = pos.get("opened_at", 0)
+    age_min     = (time.time() - opened_at) / 60  # 持仓分钟数
+
+    # ── 追踪止损：更新历史最高价 ───────────────────────────
+    peak_pnl = pos.get("peak_pnl", 0.0)
+    if pnl_pct > peak_pnl:
+        peak_pnl = pnl_pct
+        pos["peak_pnl"] = peak_pnl
+        _save_pos(token_addr, pos)
+
+    # ── 超高位买入：> 10M ──────────────────────────────────
+    if entry_mc > VERY_HIGH_MC_THRESHOLD:
+        if pnl_pct <= VERY_HIGH_MC_STOP_LOSS:
+            return {"action": "full_sell", "sell_pct": 1.0,
+                    "reason": f"超高位止损 PnL={pnl_pct:.1%}",
+                    "exit_reason": "hard_stop"}
+        if pnl_pct >= 1.0 and "very_high_double" not in pos["exits_done"]:
+            pos["exits_done"].append("very_high_double")
+            _save_pos(token_addr, pos)
+            return {"action": "full_sell", "sell_pct": 1.0,
+                    "reason": f"超高位(MC>{VERY_HIGH_MC_THRESHOLD/1e6:.0f}M)翳倍全清",
+                    "exit_reason": "take_profit"}
+
+    # ── 低位买入：< 100K ────────────────────────────────────
+    elif entry_mc < LOW_MC_THRESHOLD:
+        # 根据是否处于共识模式选择阶梯
+        ladder = get_low_mc_tp_ladder(pos)
+        for exit_level in ladder:
+            mc_key = exit_level["mc"]
+            sell_pct = exit_level["pct"]
+            if mc_key in pos["exits_done"]:
+                continue
+            if current_mc >= mc_key:
+                is_last = (mc_key == ladder[-1]["mc"])
+                pos["exits_done"].append(mc_key)
+                if not is_last:
+                    pos["remaining_pct"] -= sell_pct * pos["remaining_pct"]
+                else:
+                    pos["remaining_pct"] = 0.0
+                _save_pos(token_addr, pos)
+                action = "full_sell" if is_last else "partial_sell"
+                mode_tag = " [共识模式]" if pos.get("consensus_mode") else ""
+                return {
+                    "action":   action,
+                    "sell_pct": sell_pct,
+                    "reason":   f"低位阶梯止盈{mode_tag} mc={current_mc:,.0f} 达到 {mc_key:,.0f}",
+                    "exit_reason": "take_profit",
+                }
+        # 低位不设止损
+
+    # ── 中位 / 高位：动态追踪止损逐步替换固定止损 ─────────
+    else:
+        # 共识模式超时检查（每次巡检都检查）
+        check_consensus_timeout(token_addr)
+
+        # ① 入场保护期（按来源区分时长：RPC=60min / fomoapi=30min）
+        _protect_min = pos.get("protect_min", EARLY_STOP_MINUTES)
+        if age_min < _protect_min:
+            if pnl_pct <= EARLY_STOP_PCT:
+                # ── 低市值震荡过滤（entry_mc < 1M）──────────────────────────
+                # 庄家常见手法：快速拉砸洗盘后立刻拉回。
+                # 针对 mc < EARLY_STOP_CONFIRM_MAX_MC 的场景，
+                # 跌破止损线后不立刻出局，等待 EARLY_STOP_CONFIRM_MINUTES 分钟：
+                #   - 若价格在窗口内回正 → 清除标记，继续持仓
+                #   - 若持续低于阈值 → 确认真实下跌，执行止损
+                # 高市值（≥ 1M）或保护期外仍立即止损，不受此逻辑影响。
+                if entry_mc > 0 and entry_mc < EARLY_STOP_CONFIRM_MAX_MC:
+                    first_hit = pos.get("early_stop_first_hit", 0)
+                    now_ts = time.time()
+                    if first_hit == 0:
+                        # 首次跌破：记录时间，本次不止损
+                        pos["early_stop_first_hit"] = now_ts
+                        _save_pos(token_addr, pos)
+                        _log(f"[EARLY STOP PENDING] {pos.get('token_symbol','?')} "
+                             f"pnl={pnl_pct:.1%} 首次跌破 {EARLY_STOP_PCT:.0%}，"
+                             f"等待 {EARLY_STOP_CONFIRM_MINUTES}min 确认（mc={entry_mc:,.0f} < 1M 震荡过滤）")
+                        return None   # 暂不止损
+                    elif (now_ts - first_hit) / 60 < EARLY_STOP_CONFIRM_MINUTES:
+                        # 还在观察窗口内，继续等待
+                        waited = (now_ts - first_hit) / 60
+                        _log(f"[EARLY STOP WAITING] {pos.get('token_symbol','?')} "
+                             f"pnl={pnl_pct:.1%} 已等 {waited:.1f}min / {EARLY_STOP_CONFIRM_MINUTES}min")
+                        return None
+                    else:
+                        # 超过确认窗口仍低于阈值 → 真实下跌，执行止损
+                        waited = (now_ts - first_hit) / 60
+                        return {"action": "full_sell", "sell_pct": 1.0,
+                                "reason": f"入场保护期({_protect_min}min) {waited:.1f}min 确认下跌 {pnl_pct:.1%} 触发硬止损",
+                                "exit_reason": "hard_stop"}
+                else:
+                    # 高市值（≥ 1M）或 mc 未知：立即止损，不等待
+                    return {"action": "full_sell", "sell_pct": 1.0,
+                            "reason": f"入场保护期({_protect_min}min)确认下跌 {pnl_pct:.1%} 触发硬止损",
+                            "exit_reason": "hard_stop"}
+            else:
+                # 价格回正：清除首次触发记录
+                if pos.get("early_stop_first_hit", 0) > 0:
+                    pos.pop("early_stop_first_hit", None)
+                    _save_pos(token_addr, pos)
+                    _log(f"[EARLY STOP RESET] {pos.get('token_symbol','?')} "
+                         f"pnl={pnl_pct:.1%} 回正，清除震荡过滤标记")
+
+        # ② 入场保护期后：启用追踪止损
+        else:
+            # ★ 共识模式：用宽松参数
+            consensus = pos.get("consensus_mode", False)
+            t_activate = CONSENSUS_TRAILING_ACTIVATE if consensus else TRAILING_ACTIVATE_PCT
+            t_drawdown = CONSENSUS_TRAILING_DRAWDOWN if consensus else TRAILING_DRAWDOWN_PCT
+            mode_label = "[共识]" if consensus else ""
+
+            trailing_active = pos.get("trailing_active", False)
+            if not trailing_active and pnl_pct >= t_activate:
+                pos["trailing_active"] = True
+                trailing_active = True
+                _save_pos(token_addr, pos)
+                _log(f"[TRAILING{mode_label}] {pos.get('token_symbol','?')} "
+                     f"盈利 {pnl_pct:.1%} 激活追踪止损 | 回撤阈值={t_drawdown:.0%} 峰值={peak_pnl:.1%}")
+
+            if trailing_active:
+                drawdown_from_peak = (peak_pnl - pnl_pct) / (1 + peak_pnl) if peak_pnl > -0.99 else 0
+                if drawdown_from_peak >= t_drawdown:
+                    mode_str = "共识模式追踪止损" if consensus else "追踪止损"
+                    return {"action": "full_sell", "sell_pct": 1.0,
+                            "reason": f"{mode_str}：峰值+{peak_pnl:.1%} 回撤 {drawdown_from_peak:.1%} 触发出局",
+                            "exit_reason": "trailing_stop"}
+            else:
+                if pnl_pct <= -0.50:
+                    return {"action": "full_sell", "sell_pct": 1.0,
+                            "reason": f"保底止损 PnL={pnl_pct:.1%}",
+                            "exit_reason": "hard_stop"}
+
+        # ★ 翻倍出本（共识模式下跳过，让仓位继续跑）
+        double_key = "mid_double" if entry_mc < MID_MC_THRESHOLD else "high_double"
+        double_sell = MID_MC_DOUBLE_SELL if entry_mc < MID_MC_THRESHOLD else HIGH_MC_DOUBLE_SELL
+        if pnl_pct >= 1.0 and double_key not in pos["exits_done"]:
+            if pos.get("consensus_mode") and CONSENSUS_CANCEL_DOUBLE_OUT:
+                # 共识模式：跳过翻倍出本，仅打印日志
+                if "consensus_double_skip" not in pos.get("exits_done", []):
+                    pos.setdefault("exits_done", []).append("consensus_double_skip")
+                    _save_pos(token_addr, pos)
+                    _log(f"[CONSENSUS] {pos.get('token_symbol','?')} 翻倍出本已跳过（共识模式持续持仓）")
+            else:
+                pos["exits_done"].append(double_key)
+                _save_pos(token_addr, pos)
+                return {"action": "partial_sell", "sell_pct": double_sell,
+                        "reason": f"翻倍出本 {double_sell:.0%}",
+                        "exit_reason": "take_profit"}
+
+        # 高位 5M 全清：要求至少翻倍（+100%）才全清，避免刚买入就因市值过线被踢出
+        if entry_mc >= MID_MC_THRESHOLD and current_mc >= HIGH_MC_FINAL_MC \
+                and pnl_pct >= 1.0 and "high_5m" not in pos["exits_done"]:
+            pos["exits_done"].append("high_5m")
+            _save_pos(token_addr, pos)
+            return {"action": "full_sell", "sell_pct": 1.0,
+                    "reason": f"高位 5M+ 翻倍全清 PnL={pnl_pct:.1%} mc={current_mc:,.0f}",
+                    "exit_reason": "take_profit"}
+
+    return None
+
+
+
+# ── 共识模式管理 ─────────────────────────────────────────────
+
+def record_consensus_signal(token_addr: str, source: str, usd_value: float = 0):
+    """
+    记录持仓期间的追加共识信号（KOL 加仓 / 鲸鱼大额买入）。
+    当累计不同来源的信号 >= CONSENSUS_MIN_SIGNALS 且当前盈利 >= CONSENSUS_MIN_PNL
+    时，自动切换到共识模式。
+    source: KOL handle 或 "whale:$X"
+    """
+    s = _load()
+    key = token_addr.lower()
+    pos = s["positions"].get(key)
+    if not pos:
+        return
+
+    now = time.time()
+    signals = pos.setdefault("consensus_signals", [])
+
+    # 清理超出窗口的旧信号
+    cutoff = now - CONSENSUS_WINDOW_MIN * 60
+    pos["consensus_signals"] = [sg for sg in signals if sg["ts"] >= cutoff]
+    signals = pos["consensus_signals"]
+
+    # 去重：同一 source 不重复计入
+    if any(sg["source"] == source for sg in signals):
+        return
+
+    signals.append({"source": source, "usd": usd_value, "ts": now})
+    _log(f"[CONSENSUS] {pos.get('token_symbol','?')} 追加信号: {source} ${usd_value:,.0f} "
+         f"| 累计 {len(signals)} 个")
+
+    # 检查是否满足共识模式条件
+    if not pos.get("consensus_mode") and len(signals) >= CONSENSUS_MIN_SIGNALS:
+        # 当前 PnL 必须 >= CONSENSUS_MIN_PNL
+        entry_price = pos.get("entry_price", 0)
+        # PnL 检查放到 ws_monitor 层（有实时价格），这里只记录
+        pos["consensus_pending"] = True  # 标记：待 ws_monitor 用实时价格确认激活
+        _log(f"[CONSENSUS PENDING] {pos.get('token_symbol','?')} 达到 {len(signals)} 个信号，等待盈利确认")
+
+    _save_pos(token_addr, pos)
+
+
+def try_activate_consensus(token_addr: str, current_pnl: float) -> bool:
+    """
+    在 ws_monitor 巡检时调用（有实时价格）。
+    如果 consensus_pending=True 且 current_pnl >= CONSENSUS_MIN_PNL，正式激活共识模式。
+    返回 True 表示刚刚激活。
+    """
+    pos = get_position(token_addr)
+    if not pos:
+        return False
+    if pos.get("consensus_mode"):
+        return False  # 已激活
+    if not pos.get("consensus_pending"):
+        return False
+    if current_pnl < CONSENSUS_MIN_PNL:
+        return False
+
+    pos["consensus_mode"]    = True
+    pos["consensus_pending"] = False
+    pos["consensus_activated_at"] = time.time()
+    # 激活时重置 trailing，用更宽的参数接管
+    pos["trailing_active"]   = False
+    pos["peak_pnl"]          = current_pnl  # 以激活时 PnL 为起点
+    _save_pos(token_addr, pos)
+    _log(f"[CONSENSUS ON] {pos.get('token_symbol','?')} 共识模式激活！"
+         f"PnL={current_pnl:.1%} | 追踪止损阈值={CONSENSUS_TRAILING_DRAWDOWN:.0%} | "
+         f"翻倍出本: {'关闭' if CONSENSUS_CANCEL_DOUBLE_OUT else '保持'}")
+    return True
+
+
+
+def _check_consensus_exit_on_score(token_addr: str, pos: dict, new_score: int):
+    """
+    每次 signal_score 更新后调用：
+    如果当前处于共识模式且 signal_score < CONSENSUS_EXIT_SIGNAL_SCORE，自动退出共识模式。
+    直接操作传入的 pos dict，调用方负责 _save_pos()。
+    """
+    if not pos.get("consensus_mode"):
+        return
+    if new_score < CONSENSUS_EXIT_SIGNAL_SCORE:
+        pos["consensus_mode"]  = False
+        pos["trailing_active"] = False   # 重置追踪，让普通止损重新接管
+        _log(f"[CONSENSUS OFF] {pos.get('token_symbol','?')} "
+             f"signal_score={new_score} < 阈值 {CONSENSUS_EXIT_SIGNAL_SCORE}，退出共识模式，恢复正常止盈")
+        _push_consensus_exit_notify(pos.get("token_addr", token_addr), pos.get("symbol", "?"), new_score)
+
+
+def _push_consensus_exit_notify(token_addr: str, symbol: str, score: int):
+    """共识模式因信号减弱退出时推送 Jarvis 通知"""
+    try:
+        import subprocess
+        from config import JARVIS_TARGET
+        msg = (f"⚠️ {symbol} 信号减弱，退出共识模式\n"
+               f"signal_score={score} < 阈值 {CONSENSUS_EXIT_SIGNAL_SCORE}\n"
+               f"已恢复正常止盈阶梯，追踪止损重新接管")
+        subprocess.Popen(
+            ["openclaw", "message", "send",
+             "--channel", "jarvis", "-t", JARVIS_TARGET, "-m", msg],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+def check_consensus_timeout(token_addr: str) -> bool:
+    """
+    检查共识模式是否超时（4h 无新信号）。
+    S 级共识持仓（signal_grade=="S"）豁免超时退出——就算长时间无新信号也由 score 独立控制离场。
+    普通 A/B 策略共识模式超时则降回普通模式，返回 True 表示发生降级。
+    """
+    pos = get_position(token_addr)
+    if not pos or not pos.get("consensus_mode"):
+        return False
+    # S 级共识永不因超时降级
+    if pos.get("signal_grade") == "S":
+        return False
+
+    signals = pos.get("consensus_signals", [])
+    if not signals:
+        last_ts = pos.get("consensus_activated_at", time.time())
+    else:
+        last_ts = max(sg["ts"] for sg in signals)
+
+    elapsed_h = (time.time() - last_ts) / 3600
+    if elapsed_h >= CONSENSUS_TIMEOUT_H:
+        pos["consensus_mode"]    = False
+        pos["consensus_pending"] = False
+        pos["trailing_active"]   = False  # 重置，让普通追踪重新接管
+        _save_pos(token_addr, pos)
+        _log(f"[CONSENSUS OFF] {pos.get('token_symbol','?')} {elapsed_h:.1f}h 无新信号，降回普通模式")
+        return True
+    return False
+
+
+def is_consensus_mode(token_addr: str) -> bool:
+    pos = get_position(token_addr)
+    return bool(pos and pos.get("consensus_mode"))
+
+def is_s_consensus(token_addr: str) -> bool:
+    """判断是否为 S 级共识持仓模式（signal_grade=="S"）"""
+    pos = get_position(token_addr)
+    return bool(pos and pos.get("signal_grade") == "S")
+
+
+def s_consensus_score_action(token_addr: str, new_score: int) -> dict | None:
+    """
+    S 级共识持仓模式下，根据 signal_score 决定分批离场行为。
+    score >= S_CONSENSUS_HOLD_LINE(60)：持有，返回 None
+    score 跌破 60 后按区间分批离场：
+      50~59 → 减仓 20%
+      35~49 → 减仓 40%
+      20~34 → 减仓 70%
+      <  20 → 全清
+    """
+    pos = get_position(token_addr)
+    if not pos or pos.get("signal_grade") != "S":
+        return None
+    if new_score >= S_CONSENSUS_HOLD_LINE:
+        return None  # 持有线以上，不操作
+
+    for lo, hi, pct in [S_EXIT_TIER_1, S_EXIT_TIER_2, S_EXIT_TIER_3, S_EXIT_TIER_4]:
+        if lo <= new_score <= hi:
+            action = "full_sell" if pct >= 1.0 else "partial_sell"
+            return {
+                "action":      action,
+                "sell_pct":    pct,
+                "reason":      f"S级共识score={new_score}（{lo}~{hi}），分批离场 {pct:.0%}",
+                "exit_reason": "kol_sell" if action == "full_sell" else "take_profit",
+            }
+    return None
+
+
+def s_consensus_apply_score(token_addr: str,
+                             delta: int,
+                             reason: str = "") -> tuple[int, dict | None]:
+    """
+    S 级共识模式：更新 signal_score，返回 (new_score, action_or_None)。
+    调用方根据 action 决定是否执行减仓/全清。
+    """
+    s = _load()
+    key = token_addr.lower()
+    pos = s["positions"].get(key)
+    if not pos or pos.get("signal_grade") != "S":
+        return 0, None
+
+    old_score = pos.get("signal_score", S_CONSENSUS_INIT_SCORE)
+    new_score = max(0, old_score + delta)
+    pos["signal_score"] = new_score
+    _save(s)
+    _log(f"[S-SCORE] {pos.get('symbol','?')} {old_score:+d}{delta:+d} → {new_score} | {reason}")
+
+    action = s_consensus_score_action(key, new_score)
+    return new_score, action
+
+
+def s_consensus_hard_stop(token_addr: str,
+                           kol_handle: str,
+                           sell_usd: float,
+                           recent_kol_sells: list) -> dict | None:
+    """
+    S 级共识模式硬止损检查（无视 score，直接全清）：
+    ① KOL 共振卖出：30min 内 ≥ S_HARD_STOP_KOL_RESONANCE 个 KOL 卖出
+    ② 单笔 >= S_HARD_STOP_WHALE_SELL（庄出货）
+    返回 full_sell action 或 None
+    """
+    pos = get_position(token_addr)
+    if not pos or pos.get("signal_grade") != "S":
+        return None
+
+    sym = pos.get("symbol", "?")
+
+    # 硬止损1：庄出货
+    if sell_usd >= S_HARD_STOP_WHALE_SELL:
+        _log(f"[S-HARD STOP] {sym} 庄出货 ${sell_usd:,.0f} >= ${S_HARD_STOP_WHALE_SELL} → 全清")
+        return {"action": "full_sell", "sell_pct": 1.0,
+                "reason": f"S级硬止损：庄出货 ${sell_usd:,.0f}",
+                "exit_reason": "kol_sell"}
+
+    # 硬止损2：KOL 共振卖出
+    now = int(time.time())
+    window_start = now - KOL_SELL_WINDOW_MIN * 60
+    recent = [e for e in recent_kol_sells if e.get("ts", 0) >= window_start]
+    unique_n = len(set(e["handle"] for e in recent))
+    if unique_n >= S_HARD_STOP_KOL_RESONANCE:
+        _log(f"[S-HARD STOP] {sym} KOL共振卖出 {unique_n}人/{KOL_SELL_WINDOW_MIN}min → 全清")
+        return {"action": "full_sell", "sell_pct": 1.0,
+                "reason": f"S级硬止损：{KOL_SELL_WINDOW_MIN}min内{unique_n}个KOL共振卖出",
+                "exit_reason": "kol_sell"}
+
+    return None
+
+# ── KOL 卖出信号处理 ──────────────────────────
+
+def record_kol_sell(token_addr: str, kol_handle: str, sell_usd: float) -> dict | None:
+    """
+    记录 KOL/鲸鱼对某 token 的卖出，按持仓策略分两条路径：
+
+    策略W（鲸鱼跟单）：
+      → 大额卖出（>= KOL_SELL_WHALE_THRESHOLD_USD = $50k）→ 庄出货全清
+      → 小额卖出（< $50k）→ 只扣 signal_score，不全清（给追踪止损留空间）
+
+    S 级（强信号）：
+      → 由 ws_monitor 的 s_consensus 路径处理，record_kol_sell 只做兜底
+
+    策略A/B / 趋势共振：
+      → 需要「共振反转」才全清：
+          · 触发入场的原始 KOL 卖出
+          · KOL_SELL_WINDOW_MIN 内 ≥ KOL_SELL_STRICT_COUNT 个不同 KOL 卖出
+          · 单笔 >= KOL_SELL_WHALE_THRESHOLD_USD（庄出货）
+      → 否则只扣 signal_score，不全清
+    """
+    s = _load()
+    key = token_addr.lower()
+    if key not in s["positions"]:
+        return None
+
+    pos            = s["positions"][key]
+    open_strategy  = pos.get("open_strategy", "B")
+    signal_grade   = pos.get("signal_grade", "")   # "S" 表示强信号升级
+    now            = int(time.time())
+
+    # 记录卖出（去重）
+    if key not in s["kol_sells"]:
+        s["kol_sells"][key] = []
+    existing = [e["handle"] for e in s["kol_sells"][key]]
+    if kol_handle not in existing:
+        s["kol_sells"][key].append({"handle": kol_handle, "sell_usd": sell_usd, "ts": now})
+    _save(s)
+
+    is_whale_sell = sell_usd >= KOL_SELL_WHALE_THRESHOLD_USD
+
+    # ── 路径一：策略W（鲸鱼跟单）──────────────────────────────────
+    if open_strategy == "W":
+        # 策略W 量级门槛 $15k（文档§W第三步）
+        _W_ENTRY_THRESHOLD = 15_000   # 进入决策的最低门槛
+        _W_FULL_EXIT_THRESHOLD = KOL_SELL_WHALE_THRESHOLD_USD  # $20k → 全清
+
+        # 低于 $15k：静默忽略，仅属于部分止盈
+        if sell_usd < _W_ENTRY_THRESHOLD:
+            _log(f"[KOL SELL W-IGNORE] {pos.get('symbol','?')} 策略W 卖出 ${sell_usd:,.0f}"
+                 f" < $15k，静默忽略（部分止盈）")
+            return None
+
+        # 原始触发钱包地址卖出 >= $20k → 全清（最高优先级）
+        entry_wallet = pos.get("entry_wallet", "").lower()
+        if entry_wallet and kol_handle.lower().startswith("whale:"):
+            # kol_handle 格式为 "whale:xxxxx"，提取地址前缀比对
+            seller_prefix = kol_handle.lower().replace("whale:", "")
+            if entry_wallet.startswith(seller_prefix) and sell_usd >= _W_FULL_EXIT_THRESHOLD:
+                reason = f"[策略W] 原始触发钱包 {entry_wallet[:12]}… 卖出 ${sell_usd:,.0f} → 全清"
+                _log(f"[KOL SELL W-P1] {pos.get('symbol','?')} {reason}")
+                return {"action": "full_sell", "sell_pct": 1.0, "reason": reason}
+
+        # $15k ~ $20k：部分减仓（需结合流动性——此处仅返回 None，
+        # 流动性判断在 ws_monitor 的 position_checker 里通过 entry_liquidity_usd 协同完成）
+        if sell_usd < _W_FULL_EXIT_THRESHOLD:
+            _log(f"[KOL SELL W-MID] {pos.get('symbol','?')} 策略W ${sell_usd:,.0f} 在 $15k~$20k 区间，"
+                 f"等待流动性协同判断（巡检处理）")
+            return None
+
+        # >= $20k 大额：庄出货，全清
+        reason = f"[策略W] @{kol_handle} 大额卖出 ${sell_usd:,.0f} >= ${_W_FULL_EXIT_THRESHOLD:,.0f} → 全清"
+        _log(f"[KOL SELL W-P2] {pos.get('symbol','?')} {reason}")
+        return {"action": "full_sell", "sell_pct": 1.0, "reason": reason}
+
+    # ── 路径一-B：S 级（由 ws_monitor 的 s_consensus 路径处理，此处兜底）──
+    if signal_grade == "S":
+        # 正常不走到这里（ws_monitor 先判断 is_s_consensus 再分流）
+        # 兜底：大额卖出 → 全清；小额 → 不触发
+        if is_whale_sell:
+            return {"action": "full_sell", "sell_pct": 1.0,
+                    "reason": f"S级 大额 @{kol_handle} 卖出 ${sell_usd:,.0f}"}
+        return None
+
+    # ── 路径二：策略A/B 趋势共振（需要共振反转才离场）──────────────
+    # 条件1：大额出货（庄家 >= $50K）
+    if is_whale_sell:
+        reason = f"趋势策略：大 KOL @{kol_handle} 大额卖出 ${sell_usd:,.0f}（庄出货）"
+        _log(f"[KOL SELL] {pos.get('symbol','?')} 庄出货信号 → 全清")
+        return {"action": "full_sell", "sell_pct": 1.0, "reason": reason}
+
+    # 条件2：触发入场的原始 KOL 卖出
+    trig_addrs = [k.get("address", "").lower() for k in pos.get("trigger_kols", [])]
+    trig_handles = [k.get("handle", "").lower() for k in pos.get("trigger_kols", [])]
+    if kol_handle.lower() in trig_handles:
+        reason = f"趋势策略：发起者 @{kol_handle} 卖出，趋势信号消失"
+        _log(f"[KOL SELL] {pos.get('symbol','?')} 发起者离场 → 全清")
+        return {"action": "full_sell", "sell_pct": 1.0, "reason": reason}
+
+    # 条件3：窗口内 ≥ N 个 KOL 共振卖出
+    window_start = now - KOL_SELL_WINDOW_MIN * 60
+    recent_sells = [e for e in s["kol_sells"][key] if e["ts"] >= window_start]
+    unique_recent = len(set(e["handle"] for e in recent_sells))
+    if unique_recent >= KOL_SELL_STRICT_COUNT:
+        reason = f"趋势策略：{KOL_SELL_WINDOW_MIN}分钟内 {unique_recent} 个 KOL 共振卖出"
+        _log(f"[KOL SELL] {pos.get('symbol','?')} 共振反转 → 全清")
+        return {"action": "full_sell", "sell_pct": 1.0, "reason": reason}
+
+    # 不满足全清条件 → 仅扣 signal_score
+    _log(f"[KOL SELL] {pos.get('symbol','?')} 单个小额卖出，score-{KOL_SELL_SCORE_PENALTY}，不离场")
+    return None
+
+
+# ──────────────────────────────────────────────
+# 内部工具
+# ──────────────────────────────────────────────
+
+
+# ─────────────────────────────────────────────────────────
+# 信号强度辅助函数
+# ─────────────────────────────────────────────────────────
+
+def _calc_initial_signal_score(open_strategy: str, trigger_kols: list,
+                                signal_grade: str = "") -> int:
+    """根据开仓策略计算初始信号分
+    S 级信号（W/S2/S3）天然进入共识持仓模式，初始 60 分
+    """
+    if signal_grade == "S":
+        return S_CONSENSUS_INIT_SCORE   # 60
+    if open_strategy == "W":
+        return WHALE_BUY_SCORE
+    if open_strategy == "B":
+        return 0
+    score = 0
+    for kol in trigger_kols:
+        grade = kol.get("grade", "C")
+        score += KOL_BUY_SCORE.get(grade, 5)
+    return score
+
+
+def update_signal_on_kol_buy(token_addr: str, kol_address: str,
+                              kol_grade: str, kol_score: int) -> int:
+    """
+    持仓期间收到 KOL 买入信号：
+    - 追加 associated_kols（去重）
+    - signal_score += KOL_BUY_SCORE[grade]
+    返回新 signal_score
+    """
+    s = _load()
+    key = token_addr.lower()
+    if key not in s["positions"]:
+        return 0
+    pos = s["positions"][key]
+
+    # 去重检查：同时排除 trigger_kols 中已存在的地址（防止开仓 KOL 重复计分）
+    assoc = pos.setdefault("associated_kols", [])
+    addr_lower = kol_address.lower()
+    # 先检查 trigger_kols（开仓时的 KOL）
+    trig_addrs = [k.get("address", "").lower() for k in pos.get("trigger_kols", [])]
+    if addr_lower in trig_addrs:
+        _log(f"[SIGNAL] {pos.get('symbol','?')} KOL {addr_lower[:12]}… 已是触发者，跳过重复加分")
+        return pos.get("signal_score", 0)
+    existing = next((k for k in assoc if k.get("address", "").lower() == addr_lower), None)
+    if existing:
+        # 同一 KOL 已有买入记录 → 只更新时间戳，不重复加分
+        # （防止内幕盘频繁刷单导致信号分无限畿山）
+        existing["bought_at"] = int(time.time())
+        _log(f"[SIGNAL] {pos.get('symbol','?')} KOL {addr_lower[:12]}… 已有记录，更新时间戳不重复加分 (score不变={pos.get('signal_score',0)})")
+        return pos.get("signal_score", 0)
+    else:
+        assoc.append({
+            "address":   kol_address,
+            "grade":     kol_grade,
+            "score":     kol_score,
+            "bought_at": int(time.time()),
+            "sold_at":   None,
+        })
+
+    delta = KOL_BUY_SCORE.get(kol_grade, 5)
+    pos["signal_score"] = pos.get("signal_score", 0) + delta
+    new_score = pos["signal_score"]
+    _check_consensus_exit_on_score(token_addr, pos, new_score)
+    s["positions"][key] = pos
+    _save(s)
+    _log(f"[SIGNAL+] {pos.get('symbol','?')} KOL {kol_grade}级买入 +{delta} → signal_score={new_score}")
+    return new_score
+
+
+def update_signal_on_kol_sell(token_addr: str, kol_address: str,
+                               kol_grade: str) -> tuple[int, dict | None]:
+    """
+    持仓期间收到 KOL 卖出信号：
+    - 在 associated_kols 中找到对应地址并标记 sold_at
+    - signal_score -= KOL_SELL_SCORE[grade]
+    - 根据新分数返回 (new_score, action_or_None)
+
+    原有全清逻辑优先级更高，本函数只处理不触发原逻辑的其余场景。
+    """
+    s = _load()
+    key = token_addr.lower()
+    if key not in s["positions"]:
+        return 0, None
+    pos = s["positions"][key]
+
+    # 找 associated_kols 中对应地址
+    assoc = pos.setdefault("associated_kols", [])
+    addr_lower = kol_address.lower()
+    existing = next((k for k in assoc if k.get("address", "").lower() == addr_lower), None)
+    if not existing:
+        _log(f"[SIGNAL WARN] {pos.get('symbol','?')} KOL {kol_address[:10]}… 无买入记录，忽略卖出扣分")
+        return pos.get("signal_score", 0), None
+
+    existing["sold_at"] = int(time.time())
+    delta = KOL_SELL_SCORE.get(kol_grade, 5)
+    pos["signal_score"] = pos.get("signal_score", 0) - delta
+    new_score = pos["signal_score"]
+    _check_consensus_exit_on_score(token_addr, pos, new_score)
+    s["positions"][key] = pos
+    _save(s)
+    _log(f"[SIGNAL-] {pos.get('symbol','?')} KOL {kol_grade}级卖出 -{delta} → signal_score={new_score}")
+
+    action = _score_to_action(new_score, pos.get("symbol", "?"))
+    return new_score, action
+
+
+def update_signal_on_whale(token_addr: str, is_buy: bool) -> tuple[int, dict | None]:
+    """
+    鲸鱼买入/卖出信号更新 signal_score。
+    返回 (new_score, action_or_None)
+    """
+    s = _load()
+    key = token_addr.lower()
+    if key not in s["positions"]:
+        return 0, None
+    pos = s["positions"][key]
+
+    delta = WHALE_BUY_SCORE if is_buy else -WHALE_SELL_SCORE
+    pos["signal_score"] = pos.get("signal_score", 0) + delta
+    new_score = pos["signal_score"]
+    _check_consensus_exit_on_score(token_addr, pos, new_score)
+    s["positions"][key] = pos
+    _save(s)
+
+    tag = "鲸鱼买入" if is_buy else "鲸鱼卖出"
+    _log(f"[SIGNAL{'+'if is_buy else '-'}] {pos.get('symbol','?')} {tag} {delta:+d} → signal_score={new_score}")
+
+    action = None if is_buy else _score_to_action(new_score, pos.get("symbol", "?"))
+    return new_score, action
+
+
+def _score_to_action(score: int, symbol: str = "") -> dict | None:
+    """
+    将 signal_score 映射到减仓/全清行为。
+    返回 action dict 或 None（不操作）。
+    """
+    if score >= SIGNAL_SCORE_HOLD:
+        return None   # 信号仍强，不操作
+    if score >= SIGNAL_SCORE_TRIM:
+        return {"action": "partial_sell", "sell_pct": 0.30,
+                "reason": f"信号减弱(score={score})，减仓30%"}
+    if score >= SIGNAL_SCORE_REDUCE:
+        return {"action": "partial_sell", "sell_pct": 0.60,
+                "reason": f"信号大幅减弱(score={score})，减仓60%"}
+    # score < 0
+    return {"action": "full_sell", "sell_pct": 1.0,
+            "reason": f"信号转负(score={score})，全清"}
+
+
+def get_signal_score(token_addr: str) -> int:
+    """读取持仓当前 signal_score"""
+    s = _load()
+    key = token_addr.lower()
+    return s.get("positions", {}).get(key, {}).get("signal_score", 0)
+
+
+def _save_pos(token_addr: str, pos: dict):
+    s = _load()
+    s["positions"][token_addr.lower()] = pos
+    _save(s)
+
+
+def _log(msg: str):
+    from config import LOG_FILE
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{ts}] {msg}"
+    print(line)
+    with open(LOG_FILE, "a") as f:
+        f.write(line + "\n")

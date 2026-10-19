@@ -1,0 +1,130 @@
+{
+  "_comment": "Binance AI Pro 自动交易策略配置 — 最后更新 2026-08-03（v3.0 冲突修复）",
+  "_account_policy": "仅使用主账号，子账号已完全废弃",
+
+  "position": {
+    "max_positions_total": 5,
+    "leverage_target": 50,
+    "leverage_note": "默认尝试x50，平台上限低于50则取最大值",
+    "major_symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"],
+
+    "market_mode_limits": {
+      "_comment": "按市场模式动态切换，每30分钟更新一次",
+      "bull": { "max_long": 3, "max_short": 2, "max_total": 5 },
+      "bear": { "max_long": 2, "max_short": 3, "max_total": 5 },
+      "range": { "max_long": 2, "max_short": 2, "max_total": 4 }
+    },
+
+    "hard_cap_note": "MAX_POSITIONS=5，任何情况不可突破，包括极强信号"
+  },
+
+  "scoring": {
+    "trend_long_threshold": 65,
+    "trend_short_threshold": 65,
+    "reversal_long_threshold": 60,
+    "reversal_short_threshold": 60,
+    "breakout_threshold": 65,
+    "observation_zone_min": 60,
+    "observation_zone_max": 64,
+    "_note": "2026-08-03 统一门槛：趋势65分，逆势60分。TRADING_RULES.md旧版75分已废除。"
+  },
+
+  "notional_limits": {
+    "trend_long_tiers": {
+      "65_69": 300,
+      "70_79": 500,
+      "80_89": 700,
+      "90_plus": 1000,
+      "_note_65_69": "仅限场景四（有清算密集区）才使用，无清算区进观察区"
+    },
+    "trend_short_tiers": {
+      "65_69": 300,
+      "70_79": 450,
+      "80_plus": 600,
+      "_note_65_69": "仅限场景四"
+    },
+    "reversal_long_l2": 250,
+    "reversal_long_l1": 125,
+    "hard_cap_per_position": 1000,
+    "_note": "单仓含补仓最高1000U不可突破"
+  },
+
+  "entry_modes": {
+    "_comment": "四路入场互斥，按优先级顺序判断",
+    "CHASE":    { "score_min": 90, "requires": "刚突破+量比≥1.5x+RSI<65", "order_type": "LIMIT", "ttl_min": 30 },
+    "DUAL_NET": { "score_min": 85, "requires": "清算密集区充足>50万U",     "order_type": "LIMIT+COND", "ttl_min": 240 },
+    "LIMIT_WITH_LIQ": { "score_range": "65~84", "requires": "有清算区", "order_type": "LIMIT", "ttl_min_low": 120, "ttl_min_high": 240 },
+    "LIMIT_NO_LIQ":   { "score_range": "65~84", "requires": "无清算区", "order_type": "LIMIT", "ttl_min_low": 30, "ttl_min_high": 120 },
+    "market_order_ban": "禁止市价开仓。唯一例外：止损/轧空/熔断平仓"
+  },
+
+  "addon": {
+    "flatten_type": {
+      "enabled": true,
+      "trigger_loss_pct": -3.0,
+      "max_times": 2,
+      "min_interval_minutes": 30,
+      "order_type": "LIMIT_ONLY",
+      "size_rule": "≤首仓大小"
+    },
+    "signal_enhance_type": {
+      "enabled": true,
+      "trigger": "场景四(65~69分减半)成交后评分升至≥70",
+      "size_rule": "补足至正常档位差额",
+      "order_type": "LIMIT_ONLY"
+    },
+    "max_total_per_position": 1000
+  },
+
+  "risk": {
+    "daily_loss_circuit_breaker_usdt": "动态=本金×20%",
+    "circuit_breaker_action": "取消所有挂单 + 暂停开仓 + 推送通知",
+    "circuit_breaker_reset": "次日 UTC 00:00 自动重置",
+    "stop_loss_rule": "必须基于Coinglass清算密集区外侧，禁止固定比例",
+    "tp_rule": "TP1=最近清算密集区前沿+ATR×0.1缓冲，禁止落真空带",
+    "consecutive_loss_scale": {
+      "3_losses": "仓位×0.8",
+      "5_losses": "暂停开仓"
+    }
+  },
+
+  "cancel_rules": {
+    "cold_period_min": 30,
+    "cold_period_cancel_score": 50,
+    "normal_period_cancel_score": 60,
+    "force_cancel_score": 45,
+    "order_ttl": {
+      "CHASE": "30min",
+      "breakout": "1h",
+      "reversal": "2h",
+      "LIMIT_low_score": "30min~2h",
+      "LIMIT_high_score": "4h",
+      "COND_ORDER": "4h"
+    }
+  },
+
+  "scan": {
+    "interval_minutes": 30,
+    "scan_driver": "cron驱动scanner_llm.py，ws_monitor不再内嵌扫描",
+    "token_report_cache_minutes": 30
+  },
+
+  "gates": {
+    "reversal_breakeven_pct": 0.5,
+    "trend_breakeven_pct": 3.0,
+    "gate_5pct": "entry + ATR×1.0",
+    "gate_8pct": "entry + ATR×1.5",
+    "gate_12pct": "entry + ATR×2.0",
+    "tp1_filled": "收紧止损至TP1内侧跟踪剩余仓位"
+  },
+
+  "session": {
+    "user_id": "432401404",
+    "thread_id": "019f9203-3b29-7d9e-bfb4-b67c0b06587c",
+    "channel": "jarvis"
+  },
+
+  "pause_new_entries": false,
+
+  "no_sl_symbols": []
+}

@@ -1,0 +1,87 @@
+{
+  "timestamp": "2026-08-02T16:01:04.411516",
+  "version": "v2.2",
+  "parameters": {
+    "open_threshold": 70,
+    "observe_threshold": 63
+  },
+  "results": [
+    {
+      "symbol": "BLESSUSDT",
+      "type": "gainer",
+      "decision": "跳过",
+      "reason": "24H 涨跌幅过大 (+75.84%)",
+      "score": 0
+    },
+    {
+      "symbol": "HOMEUSDT",
+      "type": "gainer",
+      "decision": "跳过",
+      "reason": "24H 涨跌幅过大 (+43.58%)",
+      "score": 0
+    },
+    {
+      "symbol": "UAIUSDT",
+      "type": "gainer",
+      "decision": "跳过",
+      "reason": "24H 涨跌幅过大 (+33.93%)",
+      "score": 0
+    },
+    {
+      "symbol": "STARUSDT",
+      "type": "gainer",
+      "decision": "跳过",
+      "reason": "成交量过低 (0.00x)",
+      "score": 0
+    },
+    {
+      "symbol": "ICNTUSDT",
+      "type": "gainer",
+      "decision": "跳过",
+      "reason": "成交量过低 (0.05x)",
+      "score": 0
+    },
+    {
+      "symbol": "BTCUSDT",
+      "type": "neutral",
+      "decision": "跳过",
+      "reason": "成交量过低 (0.01x)",
+      "score": 0
+    },
+    {
+      "symbol": "ETHUSDT",
+      "type": "neutral",
+      "decision": "跳过",
+      "reason": "成交量过低 (0.01x)",
+      "score": 0
+    },
+    {
+      "symbol": "SOLUSDT",
+      "type": "neutral",
+      "decision": "跳过",
+      "reason": "成交量过低 (0.01x)",
+      "score": 0
+    },
+    {
+      "symbol": "BNBUSDT",
+      "type": "neutral",
+      "decision": "跳过",
+      "reason": "成交量过低 (0.08x)",
+      "score": 0
+    },
+    {
+      "symbol": "XRPUSDT",
+      "type": "neutral",
+      "decision": "跳过",
+      "reason": "成交量过低 (0.02x)",
+      "score": 0
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "open": 0,
+    "observe": 0,
+    "skip": 10,
+    "open_rate": 0.0
+  }
+}

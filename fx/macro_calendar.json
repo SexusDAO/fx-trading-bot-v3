@@ -1,0 +1,20 @@
+{
+  "_comment": "宏观日历配置文件——你手动维护，系统自动读取。",
+  "_usage": [
+    "在重大宏观事件前一天或当天填入，系统扫描时会自动进入保守模式。",
+    "保守模式效果：仓位上限减半、停止 reversal/breakout、评分门槛+10分。",
+    "日期格式：YYYY-MM-DD（UTC）。事件过后删掉对应条目即可。",
+    "event_type 可选：fed（美联储）/ cpi（通胀数据）/ regulation（监管）/ other（其他）",
+    "conservative_hours：事件前后保守模式持续时间（小时），填 0 表示当天全天。"
+  ],
+  "events": [
+    {
+      "_example": true,
+      "date": "2026-10-31",
+      "event": "美联储利率决议",
+      "event_type": "fed",
+      "conservative_hours": 24,
+      "note": "示例条目，实际使用时删掉 _example 字段"
+    }
+  ]
+}

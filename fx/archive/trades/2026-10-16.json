@@ -1,0 +1,61 @@
+{
+  "date": "2026-10-16",
+  "generated_at": "2026-10-17T02:00:27Z",
+  "summary": {
+    "total_trades": 1,
+    "win": 0,
+    "loss": 1,
+    "win_rate": 0.0,
+    "total_pnl_usdt": -8.75,
+    "by_mode": {
+      "pullback": {
+        "count": 1,
+        "win": 0,
+        "pnl": -8.75
+      }
+    },
+    "by_signal_strength": {
+      "medium": {
+        "count": 1,
+        "win": 0,
+        "pnl": -8.75
+      }
+    }
+  },
+  "trades": [
+    {
+      "trade_id": "1792164999511_AKEUSDT",
+      "symbol": "AKEUSDT",
+      "direction": "long",
+      "mode": "pullback",
+      "signal_strength": "medium",
+      "volatility_tier": "mid",
+      "entry_price": 0.02958012,
+      "exit_price": 0.0289034,
+      "sl_price": null,
+      "tp1_price": null,
+      "tp2_price": null,
+      "sl_dist_pct": null,
+      "rr_tp1": null,
+      "quantity": 12933.0,
+      "leverage": 10,
+      "pnl_usdt": -8.752,
+      "pnl_pct": -2.2878,
+      "holding_minutes": 361.4,
+      "open_time": 1792143318423,
+      "close_time": 1792164999511,
+      "close_reason": "early_stagnation",
+      "tp1_filled": false,
+      "tp2_filled": false,
+      "sl_degraded": true,
+      "liq_data_available": true,
+      "vol_ratio_at_entry": 0.3985,
+      "momentum_coeff": null,
+      "consistency_score": null,
+      "judge_detail": {
+        "vol_ratio": 0.3984532997845044
+      }
+    }
+  ],
+  "open_positions_snapshot": []
+}

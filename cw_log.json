@@ -1,0 +1,46 @@
+[
+  {
+    "ts": 1785225348479,
+    "action": "BUY_FAIL",
+    "token": "COCOFLIP",
+    "addr": "0x7dad77937ce9bfdebc8d0529b332e38d45107777",
+    "error": "- Submitting market order...\n✖ Order submission failed\n[00351716] A transaction to the same address on this network is already in progress. Please wait for it to complete before submitting a new one.\n"
+  },
+  {
+    "ts": 1785225348613,
+    "action": "BUY_FAIL",
+    "token": "币有",
+    "addr": "0xd0bc8ab397851ecfa58009d03bbc1a41fc764444",
+    "error": "- Submitting market order...\n✖ Order submission failed\n[30003001] There is currently insufficient liquidity for this trade. Please try again later or consider reducing the trade amount.\nOrder ID: 2607"
+  },
+  {
+    "ts": 1785225379234,
+    "action": "BUY_OK",
+    "token": "TCC",
+    "addr": "0xa4390b901a63641c92327e5793b45fcb46954444",
+    "price": 0.00243,
+    "order_id": "26072800001759320276",
+    "buyers": [
+      "阿峰_Afeng"
+    ],
+    "score": 115,
+    "price5m": -0.13,
+    "price1h": 4.76,
+    "liq": 210987.58
+  },
+  {
+    "ts": 1785276437418,
+    "action": "BUY_OK",
+    "token": "MarsCoin",
+    "addr": "0xfe189e97832da1573e4e4ff034f4ffc3a15c7777",
+    "price": 0.003314,
+    "order_id": "26072800001760873691",
+    "buyers": [
+      "Reljoo"
+    ],
+    "score": 105,
+    "price5m": 15.75,
+    "price1h": 0.74,
+    "liq": 202123.33
+  }
+]

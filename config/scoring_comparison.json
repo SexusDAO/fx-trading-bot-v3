@@ -1,0 +1,101 @@
+{
+  "timestamp": "2026-08-02T15:13:39.361776",
+  "market_regime": "bear",
+  "results": [
+    {
+      "symbol": "MSTRUSDT",
+      "old_score": 0,
+      "new_score": 40.75,
+      "old_decision": "开仓（评分缺失）",
+      "new_decision": "跳过",
+      "position": 840.0,
+      "details": {
+        "rsi": 46.62,
+        "macd_hist": -1.7724,
+        "ema_alignment": 15,
+        "volume_ratio": 0.19308195322485622,
+        "support_strength": 60,
+        "resistance_strength": 60,
+        "risk_reward_ratio": 2.0,
+        "confidence": 0.7
+      }
+    },
+    {
+      "symbol": "UBUSDT",
+      "old_score": 0,
+      "new_score": 40.75,
+      "old_decision": "开仓（评分缺失）",
+      "new_decision": "跳过",
+      "position": 840.0,
+      "details": {
+        "rsi": 45.1,
+        "macd_hist": -11.399,
+        "ema_alignment": 15,
+        "volume_ratio": 0.15584630322819518,
+        "support_strength": 60,
+        "resistance_strength": 60,
+        "risk_reward_ratio": 2.0,
+        "confidence": 0.7
+      }
+    },
+    {
+      "symbol": "BTWUSDT",
+      "old_score": 0,
+      "new_score": 55.75,
+      "old_decision": "开仓（评分缺失）",
+      "new_decision": "跳过",
+      "position": 840.0,
+      "details": {
+        "rsi": 40.43,
+        "macd_hist": 20.0701,
+        "ema_alignment": 15,
+        "volume_ratio": 0.3642338042297669,
+        "support_strength": 60,
+        "resistance_strength": 60,
+        "risk_reward_ratio": 2.0,
+        "confidence": 0.7
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "old_score": 0,
+      "new_score": 52.5,
+      "old_decision": "开仓（评分缺失）",
+      "new_decision": "跳过",
+      "position": 840.0,
+      "details": {
+        "rsi": 61.44,
+        "macd_hist": -0.5629,
+        "ema_alignment": 50,
+        "volume_ratio": 0.14443719093518456,
+        "support_strength": 60,
+        "resistance_strength": 60,
+        "risk_reward_ratio": 2.0,
+        "confidence": 0.7
+      }
+    },
+    {
+      "symbol": "ONDOUSDT",
+      "old_score": 0,
+      "new_score": 40.75,
+      "old_decision": "开仓（评分缺失）",
+      "new_decision": "跳过",
+      "position": 840.0,
+      "details": {
+        "rsi": 52.36,
+        "macd_hist": -2.8137,
+        "ema_alignment": 15,
+        "volume_ratio": 0.15444347004525885,
+        "support_strength": 60,
+        "resistance_strength": 60,
+        "risk_reward_ratio": 2.0,
+        "confidence": 0.7
+      }
+    }
+  ],
+  "summary": {
+    "avg_score": 46.1,
+    "would_open": 0,
+    "total": 5
+  }
+}

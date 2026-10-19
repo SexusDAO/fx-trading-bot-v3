@@ -1,0 +1,502 @@
+[
+  {
+    "rank": 1,
+    "label": "Vali",
+    "avatar": null,
+    "xLink": null,
+    "wallets": [
+      "0xfe277aa25a4f65a182c0ec135854794eb7131e79"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 3305676.1414241763,
+    "realizedUsd": 38140.26429548829,
+    "unrealizedUsd": 3267535.877128688,
+    "unrealizedIncomplete": true,
+    "winratePct": 28.57142857142857,
+    "medianHoldMinutes": 1179.1333333333334,
+    "followers": null,
+    "volumeUsd": 38900.871682118006,
+    "trades": 46,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 2,
+    "label": "Yeon",
+    "avatar": null,
+    "xLink": null,
+    "wallets": [
+      "0x54d209d9d224a615e0e5f0476644886897b75e45"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 1447281.4014864396,
+    "realizedUsd": 2613.6292061623367,
+    "unrealizedUsd": 1444667.7722802772,
+    "unrealizedIncomplete": true,
+    "winratePct": 52,
+    "medianHoldMinutes": 524.65,
+    "followers": null,
+    "volumeUsd": 30433.279881746566,
+    "trades": 18,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 3,
+    "label": "Kryptk33p3r666",
+    "avatar": null,
+    "xLink": null,
+    "wallets": [
+      "0x758e83c114e36a28ca1f31c4d2adb5ec7c04c578"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 1217583.9754464608,
+    "realizedUsd": -521.7376299824851,
+    "unrealizedUsd": 1218105.7130764432,
+    "unrealizedIncomplete": true,
+    "winratePct": 44.44444444444444,
+    "medianHoldMinutes": 2651.6583333333333,
+    "followers": null,
+    "volumeUsd": 901078.6688045071,
+    "trades": 206,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 4,
+    "label": "Zemrics",
+    "avatar": "https://kol-avatar.solanatracker.io/EP5mvfhGv6x1XR33Fd8eioiYjtRXAawafPmkz9xBpDvG",
+    "xLink": null,
+    "wallets": [
+      "0x9dbfded199ee3a6b291c223e65f97d387156aada"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 626593.7169918051,
+    "realizedUsd": -1238.4029606331778,
+    "unrealizedUsd": 627832.1199524383,
+    "unrealizedIncomplete": true,
+    "winratePct": 39.273927392739274,
+    "medianHoldMinutes": 5.916666666666667,
+    "followers": null,
+    "volumeUsd": 67335.5353334881,
+    "trades": 115,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 5,
+    "label": "Reljoo",
+    "avatar": "https://kol-avatar.solanatracker.io/FsG3BaPmRTdSrPaivbgJsFNCCa8cPfkUtk8VLWXkHpHP",
+    "xLink": null,
+    "wallets": [
+      "0x3391a39a1b508e54a361924a26056c01c1c2c07d"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 364413.1526626686,
+    "realizedUsd": -6495.7300281362,
+    "unrealizedUsd": 370908.88269080484,
+    "unrealizedIncomplete": true,
+    "winratePct": 44.230769230769226,
+    "medianHoldMinutes": 10.633333333333333,
+    "followers": null,
+    "volumeUsd": 85470.62202600745,
+    "trades": 86,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 6,
+    "label": "0xJumpman",
+    "avatar": "https://kol-avatar.solanatracker.io/8eioZubsRjFkNEFcSHKDbWa8MkpmXMBvQcfarGsLviuE",
+    "xLink": null,
+    "wallets": [
+      "0xd5ff53f48f14e9409b581e41a4cddfe0e97dc724"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 319070.9632045625,
+    "realizedUsd": -9688.417898467605,
+    "unrealizedUsd": 328759.3811030301,
+    "unrealizedIncomplete": true,
+    "winratePct": 58.333333333333336,
+    "medianHoldMinutes": 4029.8166666666666,
+    "followers": null,
+    "volumeUsd": 5764.8034253115,
+    "trades": 9,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 7,
+    "label": "Veloce",
+    "avatar": "https://kol-avatar.solanatracker.io/2W14ahXD3XBfWJchQ4K5NLXmguWWcTTUTuHDhEzeuvP3",
+    "xLink": null,
+    "wallets": [
+      "0x5fa57fcaf86e137cb8185c4cb2c01ea7b5b14cfb"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 70841.01496343908,
+    "realizedUsd": -18.405249318148158,
+    "unrealizedUsd": 70859.42021275724,
+    "unrealizedIncomplete": true,
+    "winratePct": 38.552188552188554,
+    "medianHoldMinutes": 1.1666666666666667,
+    "followers": null,
+    "volumeUsd": 21406.193259588585,
+    "trades": 127,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 8,
+    "label": "casino847",
+    "avatar": null,
+    "xLink": null,
+    "wallets": [
+      "0x7b3d8e939ee08b52d06ab5e6f85791a6007e8d61"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 63079.110058200444,
+    "realizedUsd": 12081.527015350428,
+    "unrealizedUsd": 50997.58304285002,
+    "unrealizedIncomplete": true,
+    "winratePct": 40.44943820224719,
+    "medianHoldMinutes": 16.716666666666665,
+    "followers": null,
+    "volumeUsd": 262748.32338342164,
+    "trades": 340,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 9,
+    "label": "milito",
+    "avatar": "https://kol-avatar.solanatracker.io/EeXvxkcGqMDZeTaVeawzxm9mbzZwqDUMmfG3bF7uzumH",
+    "xLink": null,
+    "wallets": [
+      "0xd41feaa24dede516a501862cf1f376defb811772"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 47427.876230586466,
+    "realizedUsd": 865.7426799143345,
+    "unrealizedUsd": 46562.13355067213,
+    "unrealizedIncomplete": true,
+    "winratePct": 38.042381432896065,
+    "medianHoldMinutes": 6.666666666666667,
+    "followers": null,
+    "volumeUsd": 60349.43320138997,
+    "trades": 312,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 10,
+    "label": "No.17",
+    "avatar": "https://kol-avatar.solanatracker.io/2PuAxxGcUk14L45vXt8gEuaY9zAYsVJtmAT3CdnxhygZ",
+    "xLink": null,
+    "wallets": [
+      "0xeb1222a0c07d4e62b0235d8b4b3e7e617d259be2"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 27790.62459448323,
+    "realizedUsd": 1146.4047061354509,
+    "unrealizedUsd": 26644.21988834778,
+    "unrealizedIncomplete": true,
+    "winratePct": 37.765957446808514,
+    "medianHoldMinutes": 27.783333333333335,
+    "followers": null,
+    "volumeUsd": 73283.34692931871,
+    "trades": 179,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 11,
+    "label": "Aomake70",
+    "avatar": null,
+    "xLink": null,
+    "wallets": [
+      "0xca1a2fb7f3179d887504966b25d1606978adcd42"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 24041.024628812233,
+    "realizedUsd": 937.4653713201358,
+    "unrealizedUsd": 23103.559257492096,
+    "unrealizedIncomplete": true,
+    "winratePct": 46.046046046046044,
+    "medianHoldMinutes": 3660.633333333333,
+    "followers": null,
+    "volumeUsd": 40798.48191244261,
+    "trades": 209,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 12,
+    "label": "Cupsey",
+    "avatar": "https://stalkchain.nyc3.cdn.digitaloceanspaces.com/assets/images/avatars/kol/226a5f514205440d21054753086b1232454b76415b07643501535545553255600e50026b272f1300737a647c.jpg",
+    "xLink": {
+      "handle": "Cupseyy",
+      "url": "https://x.com/Cupseyy",
+      "followers": 95800
+    },
+    "wallets": [
+      "0x3475831749ea6c9992e638d01427453b9cc83a12"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 21027.917467356074,
+    "realizedUsd": 905.90841460642,
+    "unrealizedUsd": 20122.009052749654,
+    "unrealizedIncomplete": true,
+    "winratePct": 47.72727272727273,
+    "medianHoldMinutes": 2.566666666666667,
+    "followers": 95800,
+    "volumeUsd": 149668.91355766176,
+    "trades": 821,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 13,
+    "label": "Nach",
+    "avatar": "https://stalkchain.nyc3.cdn.digitaloceanspaces.com/assets/images/avatars/kol/5a534149705d7e0a1013535f167c085274634f702d256c114200747a580c4074035d320c5a1b174a7461634e.jpg",
+    "xLink": {
+      "handle": "NachSOL",
+      "url": "https://x.com/NachSOL",
+      "followers": 26500
+    },
+    "wallets": [
+      "0xf41e3186861afb9840ea3c87f00366440a648320"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 16979.710152774765,
+    "realizedUsd": 0,
+    "unrealizedUsd": 16979.710152774765,
+    "unrealizedIncomplete": true,
+    "winratePct": 26.41509433962264,
+    "medianHoldMinutes": 2379.1666666666665,
+    "followers": 26500,
+    "volumeUsd": 5064.810560662579,
+    "trades": 2,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 14,
+    "label": "NΞO",
+    "avatar": null,
+    "xLink": null,
+    "wallets": [
+      "0xe28601398a5448d1147e6e8b0e0c6d686f0d216d"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 15655.258670550975,
+    "realizedUsd": 403.5672923361894,
+    "unrealizedUsd": 15251.691378214786,
+    "unrealizedIncomplete": true,
+    "winratePct": 61.03515625,
+    "medianHoldMinutes": 0.6166666666666667,
+    "followers": null,
+    "volumeUsd": 21841.48104964697,
+    "trades": 108,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 15,
+    "label": "Cowboy🔶BNB",
+    "avatar": "https://kol-avatar.solanatracker.io/6EDaVsS6enYgJ81tmhEkiKFcb4HuzPUVFZeom6PHUqN3",
+    "xLink": null,
+    "wallets": [
+      "0x38e47fece3ea323e864c65410f6458c820eaa897"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 7005.444702667749,
+    "realizedUsd": -203.97860429292695,
+    "unrealizedUsd": 7209.423306960676,
+    "unrealizedIncomplete": true,
+    "winratePct": 50.814332247557005,
+    "medianHoldMinutes": 873.1666666666666,
+    "followers": null,
+    "volumeUsd": 15800.146045403852,
+    "trades": 120,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 16,
+    "label": "Lucas",
+    "avatar": "https://kol-avatar.solanatracker.io/6uwzmiSnR2vVwrh6EsQfuwSVk8ScqsfYkJPQQ2eydU2M",
+    "xLink": null,
+    "wallets": [
+      "0x07591d902e68503c113ac4beca8abb3e3f6b0ab3"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 5061.971086724564,
+    "realizedUsd": -909.2701584031456,
+    "unrealizedUsd": 5971.24124512771,
+    "unrealizedIncomplete": true,
+    "winratePct": 34.58646616541353,
+    "medianHoldMinutes": 1.975,
+    "followers": null,
+    "volumeUsd": 46638.36000403531,
+    "trades": 221,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 17,
+    "label": "Loopierr",
+    "avatar": "https://stalkchain.nyc3.cdn.digitaloceanspaces.com/assets/images/avatars/kol/5a40614157077451272c5b740f70282d660442060139421f631b4c7a391e76564760517d551b3a41015d4478.jpg",
+    "xLink": {
+      "handle": "Loopierr",
+      "url": "https://x.com/Loopierr",
+      "followers": 10200
+    },
+    "wallets": [
+      "0x38e4203f12b1e74d87deb0083d3c8b51ad9a104e"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 5029.889252341591,
+    "realizedUsd": -106.56798288494326,
+    "unrealizedUsd": 5136.457235226534,
+    "unrealizedIncomplete": true,
+    "winratePct": 39.166666666666664,
+    "medianHoldMinutes": 13.433333333333334,
+    "followers": 10200,
+    "volumeUsd": 48209.12377273128,
+    "trades": 82,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 18,
+    "label": "zhynx",
+    "avatar": "https://kol-avatar.solanatracker.io/zhYnXqK3MNSmwS3yxSvPmY5kUa1n2WUaCJgYUDrAHkL",
+    "xLink": null,
+    "wallets": [
+      "0x86b9ad8fc7bec77c85913b0f80f69c2cfa129c3e"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 3983.579333126323,
+    "realizedUsd": -1.267767304687979,
+    "unrealizedUsd": 3984.847100431011,
+    "unrealizedIncomplete": true,
+    "winratePct": 34.883720930232556,
+    "medianHoldMinutes": 14.833333333333334,
+    "followers": null,
+    "volumeUsd": 6678.707127916668,
+    "trades": 8,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 19,
+    "label": "Kreo",
+    "avatar": "https://kol-avatar.solanatracker.io/BCnqsPEtA1TkgednYEebRpkmwFRJDCjMQcKZMMtEdArc",
+    "xLink": null,
+    "wallets": [
+      "0x7551fd7a88afd941ddcc0a4f1cb62cf85afdae61"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 3353.058688879575,
+    "realizedUsd": 200.75382838789469,
+    "unrealizedUsd": 3152.3048604916803,
+    "unrealizedIncomplete": true,
+    "winratePct": 60.80402010050251,
+    "medianHoldMinutes": 0.65,
+    "followers": null,
+    "volumeUsd": 32123.212463910822,
+    "trades": 226,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 20,
+    "label": "Jerry",
+    "avatar": "https://kol-avatar.solanatracker.io/E33jP6RWVpGkv3fDVbuR5Ee6ak42tTKW9yYszqERtobs",
+    "xLink": null,
+    "wallets": [
+      "0x76a280376c5332abbbae1786a73c70116906e757"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 2216.2524710861126,
+    "realizedUsd": -194.92492138559584,
+    "unrealizedUsd": 2411.1773924717086,
+    "unrealizedIncomplete": true,
+    "winratePct": 47.011308562197094,
+    "medianHoldMinutes": 1.4333333333333333,
+    "followers": null,
+    "volumeUsd": 5555.119969987318,
+    "trades": 9,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 21,
+    "label": "Trey",
+    "avatar": "https://stalkchain.nyc3.cdn.digitaloceanspaces.com/assets/images/avatars/kol/5b0a09415e42045333167f492d702c0c535f4f001b0c703357077e7f26314a0d655b116b095b0a5e50587047.jpg",
+    "xLink": {
+      "handle": "treysocial",
+      "url": "https://x.com/treysocial",
+      "followers": 7019
+    },
+    "wallets": [
+      "0x745d81601ab13c63ef200848003d548514c9eeb9"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 1996.1621006815076,
+    "realizedUsd": 559.1428458966764,
+    "unrealizedUsd": 1437.0192547848312,
+    "unrealizedIncomplete": true,
+    "winratePct": 37.81512605042017,
+    "medianHoldMinutes": 2.35,
+    "followers": 7019,
+    "volumeUsd": 41230.24076076563,
+    "trades": 170,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 22,
+    "label": "小叮当",
+    "avatar": "https://kol-avatar.solanatracker.io/tmdStKtueEqdeAa4kiy1MWXk1Wsj4AbdDZ6dasBFDUo",
+    "xLink": null,
+    "wallets": [
+      "0x729b03f4592371a0eadd6e3800c9468b50c48b3f"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 362.7051507644303,
+    "realizedUsd": 0,
+    "unrealizedUsd": 362.7051507644303,
+    "unrealizedIncomplete": true,
+    "winratePct": 31.03448275862069,
+    "medianHoldMinutes": 1282.2166666666667,
+    "followers": null,
+    "volumeUsd": 0,
+    "trades": 0,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 23,
+    "label": "ZachXBT",
+    "avatar": "https://stalkchain.nyc3.cdn.digitaloceanspaces.com/assets/images/avatars/kol/510e4b5e6f79732803047c6b115812525f767473160143535f067c670f12015d5c795c725411516978065261.jpg",
+    "xLink": null,
+    "wallets": [
+      "0x3f1c0ea76342cc3427962452891f8de8649a301b"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 177.63083950351555,
+    "realizedUsd": 0,
+    "unrealizedUsd": 177.63083950351555,
+    "unrealizedIncomplete": true,
+    "winratePct": 68,
+    "medianHoldMinutes": 106.81666666666666,
+    "followers": null,
+    "volumeUsd": 0,
+    "trades": 0,
+    "basisIncomplete": true
+  },
+  {
+    "rank": 24,
+    "label": "b",
+    "avatar": "https://stalkchain.nyc3.cdn.digitaloceanspaces.com/assets/images/avatars/kol/107a757644784a2710555f0e0c6b141060067e663950563c5f5b5e0032555a585c47266c2b1328507e5e74.jpg",
+    "xLink": {
+      "handle": "bsol_x",
+      "url": "https://x.com/bsol_x",
+      "followers": 21200
+    },
+    "wallets": [
+      "0xa3d3fed954a332992cfec8c606eeb2a25fbb3864"
+    ],
+    "walletsCount": 1,
+    "pnlUsd": 8.720270450601342,
+    "realizedUsd": -7.144985919261387,
+    "unrealizedUsd": 15.86525636986273,
+    "unrealizedIncomplete": true,
+    "winratePct": 54.54545454545454,
+    "medianHoldMinutes": 0.11666666666666667,
+    "followers": 21200,
+    "volumeUsd": 2671.197385,
+    "trades": 5,
+    "basisIncomplete": true
+  }
+]

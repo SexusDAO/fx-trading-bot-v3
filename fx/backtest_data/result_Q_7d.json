@@ -1,0 +1,92 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-10-15 11:15",
+      "close_ts": "2026-10-15 15:00",
+      "symbol": "QUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.051716,
+      "exit_price": 0.04831143,
+      "close_reason": "sl",
+      "pnl": -6.7832,
+      "hold_min": 225.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-10-16 02:30",
+      "close_ts": "2026-10-16 14:30",
+      "symbol": "QUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.051621,
+      "exit_price": 0.05687636,
+      "close_reason": "tp1_partial",
+      "pnl": 4.9903,
+      "hold_min": 720.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-15 21:15",
+      "close_ts": "2026-10-16 23:30",
+      "symbol": "QUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.051937,
+      "exit_price": 0.05848193,
+      "close_reason": "tp1_partial",
+      "pnl": 6.2008,
+      "hold_min": 1575.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-10-15 21:15",
+      "close_ts": "2026-10-18 12:45",
+      "symbol": "QUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.051937,
+      "exit_price": 0.11048,
+      "close_reason": "force_close_end",
+      "pnl": 56.2596,
+      "hold_min": 3810.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-10-16 02:30",
+      "close_ts": "2026-10-18 12:45",
+      "symbol": "QUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.051621,
+      "exit_price": 0.11048,
+      "close_reason": "force_close_end",
+      "pnl": 56.9107,
+      "hold_min": 3495.0,
+      "signal_score": 50
+    }
+  ],
+  "stats": {
+    "symbol": "QUSDT",
+    "days": 7,
+    "total_trades": 5,
+    "win_trades": 4,
+    "loss_trades": 1,
+    "win_rate_pct": 80.0,
+    "total_pnl_u": 117.58,
+    "total_win_u": 124.36,
+    "total_loss_u": -6.78,
+    "profit_factor": 18.33,
+    "max_drawdown_u": 6.78,
+    "max_single_loss": -6.78,
+    "avg_hold_min": 2510.0,
+    "by_mode": {
+      "pullback": {
+        "n": 5,
+        "win": 4,
+        "pnl": 117.58,
+        "win_rate": 80.0
+      }
+    }
+  }
+}

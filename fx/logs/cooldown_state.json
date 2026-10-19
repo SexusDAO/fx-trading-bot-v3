@@ -1,0 +1,122 @@
+{
+  "BLURUSDT": {
+    "cooldown_until": 1792268785399,
+    "reason": "crash_guard",
+    "set_at": 1792254385400
+  },
+  "DOSUSDT": {
+    "cooldown_until": 1792268665158,
+    "reason": "crash_guard_short",
+    "set_at": 1792254265159
+  },
+  "ARCUSDT": {
+    "cooldown_until": 1791871094362,
+    "reason": "crash_guard",
+    "set_at": 1791856694363
+  },
+  "1000RATSUSDT": {
+    "cooldown_until": 1791878397182,
+    "reason": "crash_guard",
+    "set_at": 1791863997183
+  },
+  "GPSUSDT": {
+    "cooldown_until": 1791871095124,
+    "reason": "crash_guard",
+    "set_at": 1791856695124
+  },
+  "USUSDT": {
+    "cooldown_until": 1792266131022,
+    "reason": "crash_guard",
+    "set_at": 1792251731023
+  },
+  "ICNTUSDT": {
+    "cooldown_until": 1792277929715,
+    "reason": "crash_guard_short",
+    "set_at": 1792263529723
+  },
+  "AGTUSDT": {
+    "cooldown_until": 1792341988847,
+    "reason": "crash_guard_short",
+    "set_at": 1792327588847
+  },
+  "QUSDT": {
+    "cooldown_until": 1792403455142,
+    "reason": "crash_guard_short",
+    "set_at": 1792389055143
+  },
+  "LUMIAUSDT": {
+    "cooldown_until": 1792265202686,
+    "reason": "crash_guard_short",
+    "set_at": 1792250802687
+  },
+  "MAGICUSDT": {
+    "cooldown_until": 1792265268171,
+    "reason": "crash_guard_short",
+    "set_at": 1792250868171
+  },
+  "SUSDT": {
+    "cooldown_until": 1792266170853,
+    "reason": "crash_guard_short",
+    "set_at": 1792251770854
+  },
+  "CKBUSDT": {
+    "cooldown_until": 1792266446007,
+    "reason": "crash_guard_short",
+    "set_at": 1792252046008
+  },
+  "WUSDT": {
+    "cooldown_until": 1792267204119,
+    "reason": "crash_guard_short",
+    "set_at": 1792252804127
+  },
+  "RSRUSDT": {
+    "cooldown_until": 1792267380934,
+    "reason": "crash_guard_short",
+    "set_at": 1792252980935
+  },
+  "CAPUSDT": {
+    "cooldown_until": 1792267874382,
+    "reason": "crash_guard_short",
+    "set_at": 1792253474384
+  },
+  "AVAUSDT": {
+    "cooldown_until": 1792342589125,
+    "reason": "crash_guard_short",
+    "set_at": 1792328189126
+  },
+  "BTWUSDT": {
+    "cooldown_until": 1792351053157,
+    "reason": "crash_guard_short",
+    "set_at": 1792336653157
+  },
+  "GTCUSDT": {
+    "cooldown_until": 1792313348589,
+    "reason": "crash_guard_short",
+    "set_at": 1792298948603
+  },
+  "AKEUSDT": {
+    "cooldown_until": 1792341597198,
+    "reason": "crash_guard_short",
+    "set_at": 1792327197199
+  },
+  "ARIAUSDT": {
+    "cooldown_until": 1792369640735,
+    "reason": "crash_guard_short",
+    "set_at": 1792355240740
+  },
+  "1000PEPEUSDT": {
+    "cooldown_until": 1792352037066,
+    "reason": "crash_guard_short",
+    "set_at": 1792337637066
+  },
+  "SKUUUSDT_SHORT_open_dir": {
+    "cooldown_until": 1792390232614,
+    "reason": "open_dir",
+    "set_at": 1792375832614
+  },
+  "BRUSDT": {
+    "cooldown_until": 1792428811685,
+    "reason": "crash_guard_short",
+    "set_at": 1792414411686
+  }
+}

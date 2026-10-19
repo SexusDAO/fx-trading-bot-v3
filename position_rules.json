@@ -1,0 +1,226 @@
+{
+  "_comment": "仓位管理规则，所有金额均为加杠杆后名义量（USDT）",
+  "open_position": {
+    "normal_signal_min": 100,
+    "normal_signal_max": 250,
+    "strong_signal_min": 250,
+    "strong_signal_max": 500,
+    "hard_cap": 500,
+    "strong_signal_score_threshold": 85
+  },
+  "addon": {
+    "trigger_loss_pct": -3.0,
+    "require_logic": true,
+    "max_times": 2,
+    "max_size_per_addon": "first_size",
+    "min_interval_minutes": 30,
+    "order_type": "LIMIT_ONLY",
+    "total_cap_including_first": 1000
+  },
+  "circuit_breaker": {
+    "daily_loss_limit": 100.0
+  },
+  "signal_classification": {
+    "_comment": "开仓前先判断信号类型，再选对应评分轨道",
+    "trend_signal_conditions": [
+      "EMA多周期方向一致（多排或空排）",
+      "价格突破关键位且量能跟上",
+      "RSI在40~65区间（无超买超卖）",
+      "近期趋势延续性强"
+    ],
+    "reversal_signal_conditions": [
+      "4H RSI < 15（极度超卖）",
+      "资金费率 < -0.5%",
+      "价格距近期高点跌幅 > 15%",
+      "BB% 贴近下轨 < 5%"
+    ],
+    "reversal_min_conditions": 3,
+    "default_when_unclear": "trend"
+  },
+  "trend_scoring": {
+    "trend": {
+      "max": 30,
+      "desc": "EMA排列/方向一致性"
+    },
+    "momentum": {
+      "max": 25,
+      "desc": "RSI/MACD"
+    },
+    "volume": {
+      "max": 20,
+      "desc": "量比/成交量"
+    },
+    "structure_sentiment": {
+      "max": 40,
+      "desc": "BB/资金费率/多空比/聪明钱资讯"
+    },
+    "entry_threshold": 75,
+    "watch_threshold": 60,
+    "note": "聪明钱正面信号最多+15分加入结构情绪维度，负面最多-20分"
+  },
+  "reversal_scoring": {
+    "oversold_depth": {
+      "max": 35,
+      "rules": {
+        "4h_rsi_lt_10": 20,
+        "4h_rsi_10_to_15": 15,
+        "1h_rsi_lt_30": 8,
+        "5m_or_15m_rsi_lt_30": 4,
+        "4h_bb_pct_lt_5": 3
+      }
+    },
+    "funding_rate": {
+      "max": 25,
+      "rules": {
+        "lt_neg_0_5pct": 15,
+        "neg_0_3_to_0_5pct": 10,
+        "neg_0_1_to_0_3pct": 5,
+        "positive": 0
+      }
+    },
+    "bounce_momentum": {
+      "max": 35,
+      "rules": {
+        "hammer_or_engulfing_candle": 10,
+        "short_tf_vol_ratio_gt_1_2x": 6,
+        "rsi_bullish_divergence": 4,
+        "positive_token_report": 15,
+        "negative_token_report": -20
+      }
+    },
+    "drop_magnitude": {
+      "max": 20,
+      "rules": {
+        "24h_drop_gt_20pct": 12,
+        "24h_drop_15_to_20pct": 8,
+        "24h_drop_10_to_15pct": 4
+      }
+    },
+    "entry_threshold": 65,
+    "position_cap_usdt": 100,
+    "addon_allowed": false,
+    "max_hold_hours": 24,
+    "stop_loss_rule": "跌破近期低点立即止损",
+    "max_concurrent": 1,
+    "note": "聪明钱正面+15分，负面-20分，加入反弹动能维度"
+  },
+  "global_rules": {
+    "max_concurrent_reversal": 1,
+    "reversal_independent_of_trend_quota": true,
+    "no_mixing_scoring": true,
+    "default_type_when_unclear": "trend"
+  },
+  "trailing_stop_rules": {
+    "_comment": "移动止损分轨，逆势单和趋势单门槛不同",
+    "reversal_order": {
+      "breakeven_trigger_pct": 0.5,
+      "breakeven_target": "entry",
+      "micro_profit_trigger_pct": 3.0,
+      "micro_profit_target": "entry + ATR*0.3",
+      "small_profit_trigger_pct": 5.0,
+      "small_profit_target": "entry + ATR*1.0",
+      "mid_profit_trigger_pct": 8.0,
+      "mid_profit_target": "entry + ATR*1.5",
+      "large_profit_trigger_pct": 12.0,
+      "large_profit_target": "entry + ATR*2.0",
+      "note": "逆势单反弹幅度有限，0.5%即保本，防止假突破回吐"
+    },
+    "trend_order": {
+      "breakeven_trigger_pct": 3.0,
+      "breakeven_target": "entry",
+      "small_profit_trigger_pct": 5.0,
+      "small_profit_target": "entry + ATR*1.0",
+      "mid_profit_trigger_pct": 8.0,
+      "mid_profit_target": "entry + ATR*1.5",
+      "large_profit_trigger_pct": 12.0,
+      "large_profit_target": "entry + ATR*2.0",
+      "note": "趋势单给行情足够空间，3%以上再保本"
+    }
+  },
+  "token_report_check": {
+    "_comment": "开仓前必须调用 binance-pro-cli search report --symbol XXX 获取 Token Report",
+    "required": true,
+    "when": "进入观察区后、开仓前必须执行",
+    "command": "binance-pro-cli search report --symbol {TOKEN}",
+    "scoring": {
+      "positive_signals": {
+        "examples": [
+          "聪明钱/机构钱包大量买入",
+          "鲸鱼地址持续增持",
+          "链上资金净流入",
+          "知名 KOL/做市商建仓",
+          "团队钱包未动，社区情绪乐观",
+          "无异常大额转账"
+        ],
+        "score_impact": "+10到+15分（加入对应评分轨道总分）",
+        "action": "利好，支持开仓"
+      },
+      "negative_signals": {
+        "examples": [
+          "项目方/团队钱包向交易所转账（砸盘风险）",
+          "大额解锁即将到来",
+          "聪明钱大量卖出/减持",
+          "链上资金净流出",
+          "异常合约交互/蜜罐风险",
+          "社区情绪极度恐慌"
+        ],
+        "score_impact": "-15到-20分，严重负面可直接否决开仓",
+        "action": "利空，降低仓位或拒绝开仓"
+      },
+      "neutral_or_no_data": {
+        "score_impact": "0分，不影响评分",
+        "action": "正常按技术评分判断"
+      }
+    },
+    "veto_rule": "若 Token Report 显示项目方钱包向交易所大额转账（砸盘），无论技术评分多高，禁止开仓",
+    "integration": {
+      "trend_scoring": "聪明钱加分项纳入【结构/市场情绪】维度（原25分扩展至40分）",
+      "reversal_scoring": "聪明钱加分项纳入【反弹动能】维度（原20分扩展至35分）"
+    },
+    "additional_checks": [
+      "oi_divergence_check（查OI是否与价格背离）",
+      "high_concentration_check（查前三地址持仓占比）"
+    ]
+  },
+  "oi_divergence_check": {
+    "_comment": "开仓前必须检查 OI 趋势，防止虚涨陷阱",
+    "required": true,
+    "when": "进入观察区后、开仓前执行",
+    "command": "binance-pro-cli search --query \"{TOKEN} OI open interest\" 或查看 CoinGlass",
+    "rule": "若价格创高但 OI 持续下降（价涨 OI 不跟），判定为虚涨/派发段",
+    "veto_condition": "价格创近期高点 + OI 同期下降超过 20%",
+    "veto_action": "禁止做多，判定为庄家出货结构",
+    "example": "DEXE 7/16~7/21：OI 从 $81M 跌到 $45M，而价格仍在高位 → 虚涨信号，应禁止开多",
+    "score_impact": "OI 确认上涨（同步放量）+10分；OI 背离（价涨量缩）-20分，严重背离直接否决"
+  },
+  "high_concentration_check": {
+    "_comment": "高控盘代币风险极高，需降级处理",
+    "required": true,
+    "when": "查阅 Token Report 时同步识别持仓集中度",
+    "data_source": "Token Report 中的持仓分布 / Arkham / 链上数据",
+    "threshold": "前三地址合计持仓 > 70% 判定为高控盘结构",
+    "actions": {
+      "前三地址持仓 50~70%": "高风险，仓位上限减半，止损更严格",
+      "前三地址持仓 > 70%": "极高风险，仓位上限减至正常的 1/3，逆势单禁止开仓",
+      "项目方地址在前三且持仓 > 30%": "一票否决，禁止开仓"
+    },
+    "example": "DEXE：GovPool 42% + Wormhole 19% + GovUserKeeper 17% = 78%，属于极高风险，逆势单应直接禁止",
+    "score_impact": "高控盘结构（>70%）在两套评分体系中各扣 -15 分"
+  },
+  "pre_entry_checklist": {
+    "_comment": "开仓前必须完成的所有检查项，全部通过才可开仓",
+    "mandatory_checks": [
+      "1. binance-pro-cli search report --symbol XXX（Token Report + 聪明钱）",
+      "2. OI 趋势检查（价涨OI不跟 → 禁止做多）",
+      "3. 持仓集中度检查（前三地址 > 70% → 极高风险）",
+      "4. 双轨评分（趋势型≥75分 / 逆势型≥65分）",
+      "5. 资金费率方向确认（逆势单需费率 < -0.3%）"
+    ],
+    "veto_rules": [
+      "项目方钱包向交易所大额转账 → 一票否决",
+      "价格创高但OI下降>20% → 禁止做多",
+      "前三地址持仓>70%且为逆势单 → 禁止开仓",
+      "Token Report 显示聪明钱大量出逃 → 一票否决"
+    ]
+  }
+}

@@ -1,0 +1,1676 @@
+[
+  {
+    "breakout_time": 1783188000000,
+    "breakout_price": 0.0027586,
+    "direction": "LONG",
+    "pre_24h": {},
+    "pre_12h": {},
+    "pre_6h": {}
+  },
+  {
+    "breakout_time": 1783191600000,
+    "breakout_price": 0.0027414,
+    "direction": "LONG",
+    "pre_24h": {},
+    "pre_12h": {},
+    "pre_6h": {}
+  },
+  {
+    "breakout_time": 1783195200000,
+    "breakout_price": 0.002723,
+    "direction": "LONG",
+    "pre_24h": {},
+    "pre_12h": {},
+    "pre_6h": {}
+  },
+  {
+    "breakout_time": 1783504800000,
+    "breakout_price": 0.0025819,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 2568270555.96,
+      "volume_vs_baseline": 1.25,
+      "price_change_pct": 0.1,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2581557043.33,
+      "volume_vs_baseline": 1.26,
+      "price_change_pct": -1.38,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 2299029593.83,
+      "volume_vs_baseline": 1.12,
+      "price_change_pct": -2.66,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1783526400000,
+    "breakout_price": 0.0025942,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 2192766316.25,
+      "volume_vs_baseline": 0.84,
+      "price_change_pct": -1.03,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2352572352.92,
+      "volume_vs_baseline": 0.9,
+      "price_change_pct": -4.38,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 2574459322.33,
+      "volume_vs_baseline": 0.98,
+      "price_change_pct": -2.13,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1783533600000,
+    "breakout_price": 0.0025924,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 2082163153.88,
+      "volume_vs_baseline": 0.73,
+      "price_change_pct": 0.35,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 2114434783.83,
+      "volume_vs_baseline": 0.74,
+      "price_change_pct": -3.09,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 3164157659.17,
+      "volume_vs_baseline": 1.11,
+      "price_change_pct": -0.77,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1783695600000,
+    "breakout_price": 0.0027544,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1588222058.79,
+      "volume_vs_baseline": 0.62,
+      "price_change_pct": 1.43,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 1485723405.0,
+      "volume_vs_baseline": 0.58,
+      "price_change_pct": 2.24,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 1534273087.83,
+      "volume_vs_baseline": 0.6,
+      "price_change_pct": 0.66,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    }
+  },
+  {
+    "breakout_time": 1783699200000,
+    "breakout_price": 0.0028434,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1565654329.71,
+      "volume_vs_baseline": 0.62,
+      "price_change_pct": 0.08,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 1465105051.33,
+      "volume_vs_baseline": 0.58,
+      "price_change_pct": 2.81,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 1605338943.83,
+      "volume_vs_baseline": 0.63,
+      "price_change_pct": 1.19,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    }
+  },
+  {
+    "breakout_time": 1783702800000,
+    "breakout_price": 0.0027489,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1578377282.42,
+      "volume_vs_baseline": 0.64,
+      "price_change_pct": 0.26,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 1353308685.33,
+      "volume_vs_baseline": 0.54,
+      "price_change_pct": 1.89,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 1764113736.5,
+      "volume_vs_baseline": 0.71,
+      "price_change_pct": 1.55,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    }
+  },
+  {
+    "breakout_time": 1783706400000,
+    "breakout_price": 0.0027693,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1563031988.92,
+      "volume_vs_baseline": 0.64,
+      "price_change_pct": 0.83,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 1325851287.58,
+      "volume_vs_baseline": 0.54,
+      "price_change_pct": 1.85,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 1863992491.17,
+      "volume_vs_baseline": 0.76,
+      "price_change_pct": 1.75,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    }
+  },
+  {
+    "breakout_time": 1783710000000,
+    "breakout_price": 0.002816,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1586901009.92,
+      "volume_vs_baseline": 0.68,
+      "price_change_pct": 0.94,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 1288370527.5,
+      "volume_vs_baseline": 0.55,
+      "price_change_pct": 1.44,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 1999813961.5,
+      "volume_vs_baseline": 0.85,
+      "price_change_pct": 2.02,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1783713600000,
+    "breakout_price": 0.0027949,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1577869513.29,
+      "volume_vs_baseline": 0.69,
+      "price_change_pct": 1.33,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 1317360164.83,
+      "volume_vs_baseline": 0.57,
+      "price_change_pct": 1.17,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 2264852988.17,
+      "volume_vs_baseline": 0.99,
+      "price_change_pct": 2.19,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1783717200000,
+    "breakout_price": 0.0028281,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1560815600.12,
+      "volume_vs_baseline": 0.68,
+      "price_change_pct": 1.18,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 1534256938.0,
+      "volume_vs_baseline": 0.67,
+      "price_change_pct": 2.31,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 2796405064.17,
+      "volume_vs_baseline": 1.22,
+      "price_change_pct": 1.78,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1783720800000,
+    "breakout_price": 0.0028108,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1538989533.08,
+      "volume_vs_baseline": 0.67,
+      "price_change_pct": 1.02,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 1622043175.42,
+      "volume_vs_baseline": 0.71,
+      "price_change_pct": 3.09,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 3007750844.83,
+      "volume_vs_baseline": 1.31,
+      "price_change_pct": 1.58,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1783724400000,
+    "breakout_price": 0.0027973,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1535433862.0,
+      "volume_vs_baseline": 0.69,
+      "price_change_pct": 0.43,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 1713601638.67,
+      "volume_vs_baseline": 0.77,
+      "price_change_pct": 4.13,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 4421127910.17,
+      "volume_vs_baseline": 1.98,
+      "price_change_pct": 5.41,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1783728000000,
+    "breakout_price": 0.0027939,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1521718121.75,
+      "volume_vs_baseline": 0.68,
+      "price_change_pct": 0.6,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 1760973501.0,
+      "volume_vs_baseline": 0.79,
+      "price_change_pct": 3.19,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 5676878284.67,
+      "volume_vs_baseline": 2.54,
+      "price_change_pct": 1.76,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1783731600000,
+    "breakout_price": 0.0027841,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1525222283.33,
+      "volume_vs_baseline": 0.69,
+      "price_change_pct": 1.41,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 1815750333.5,
+      "volume_vs_baseline": 0.82,
+      "price_change_pct": 1.74,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 6021855906.83,
+      "volume_vs_baseline": 2.71,
+      "price_change_pct": 1.0,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1784048400000,
+    "breakout_price": 0.0028232,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 2041375109.96,
+      "volume_vs_baseline": 1.05,
+      "price_change_pct": -2.97,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 1995637364.83,
+      "volume_vs_baseline": 1.02,
+      "price_change_pct": 2.69,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 1207149849.5,
+      "volume_vs_baseline": 0.62,
+      "price_change_pct": -0.43,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    }
+  },
+  {
+    "breakout_time": 1784052000000,
+    "breakout_price": 0.0028159,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 2155795210.71,
+      "volume_vs_baseline": 1.12,
+      "price_change_pct": -4.86,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 1743201066.83,
+      "volume_vs_baseline": 0.91,
+      "price_change_pct": 2.27,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 1220318745.0,
+      "volume_vs_baseline": 0.63,
+      "price_change_pct": -0.52,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    }
+  },
+  {
+    "breakout_time": 1784055600000,
+    "breakout_price": 0.0028191,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 2102948244.29,
+      "volume_vs_baseline": 1.03,
+      "price_change_pct": -4.32,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 1633004000.92,
+      "volume_vs_baseline": 0.8,
+      "price_change_pct": 1.4,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 2000336234.0,
+      "volume_vs_baseline": 0.98,
+      "price_change_pct": 1.82,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1784066400000,
+    "breakout_price": 0.0028214,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 2171850814.33,
+      "volume_vs_baseline": 1.1,
+      "price_change_pct": -3.17,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 1571421412.75,
+      "volume_vs_baseline": 0.8,
+      "price_change_pct": 1.0,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 4835212699.33,
+      "volume_vs_baseline": 2.45,
+      "price_change_pct": 4.27,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1784516400000,
+    "breakout_price": 0.0028841,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1327043490.62,
+      "volume_vs_baseline": 0.62,
+      "price_change_pct": 0.2,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 2270348781.92,
+      "volume_vs_baseline": 1.07,
+      "price_change_pct": 4.08,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 1496856500.33,
+      "volume_vs_baseline": 0.7,
+      "price_change_pct": -0.32,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    }
+  },
+  {
+    "breakout_time": 1785034800000,
+    "breakout_price": 0.0029232,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1339546398.25,
+      "volume_vs_baseline": 0.9,
+      "price_change_pct": -2.86,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 1104197100.67,
+      "volume_vs_baseline": 0.74,
+      "price_change_pct": -0.42,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 3879335121.33,
+      "volume_vs_baseline": 2.6,
+      "price_change_pct": 1.35,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785038400000,
+    "breakout_price": 0.0028976,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1319107089.25,
+      "volume_vs_baseline": 0.9,
+      "price_change_pct": -2.33,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 1235941074.08,
+      "volume_vs_baseline": 0.84,
+      "price_change_pct": 0.57,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 3789015423.83,
+      "volume_vs_baseline": 2.58,
+      "price_change_pct": -0.14,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785042000000,
+    "breakout_price": 0.0029466,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1306273781.58,
+      "volume_vs_baseline": 0.9,
+      "price_change_pct": -2.47,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 1680309910.08,
+      "volume_vs_baseline": 1.15,
+      "price_change_pct": 2.54,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 2930311984.83,
+      "volume_vs_baseline": 2.01,
+      "price_change_pct": -1.97,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785045600000,
+    "breakout_price": 0.0029958,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1331865672.88,
+      "volume_vs_baseline": 0.92,
+      "price_change_pct": -3.51,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2168591458.17,
+      "volume_vs_baseline": 1.5,
+      "price_change_pct": 4.8,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 1942184373.5,
+      "volume_vs_baseline": 1.34,
+      "price_change_pct": -1.42,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1785049200000,
+    "breakout_price": 0.0029868,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1386380080.75,
+      "volume_vs_baseline": 0.94,
+      "price_change_pct": -4.23,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2286467998.5,
+      "volume_vs_baseline": 1.55,
+      "price_change_pct": 4.02,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 1549575746.33,
+      "volume_vs_baseline": 1.05,
+      "price_change_pct": -1.49,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1785052800000,
+    "breakout_price": 0.0029862,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1318611413.92,
+      "volume_vs_baseline": 0.87,
+      "price_change_pct": -4.25,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2428048032.42,
+      "volume_vs_baseline": 1.61,
+      "price_change_pct": 4.4,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 1316224806.0,
+      "volume_vs_baseline": 0.87,
+      "price_change_pct": 0.2,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1785056400000,
+    "breakout_price": 0.0029536,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1330908759.83,
+      "volume_vs_baseline": 0.88,
+      "price_change_pct": -4.03,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2484425416.42,
+      "volume_vs_baseline": 1.65,
+      "price_change_pct": 2.72,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 2412192670.5,
+      "volume_vs_baseline": 1.6,
+      "price_change_pct": 3.46,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785060000000,
+    "breakout_price": 0.0029529,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1335023471.54,
+      "volume_vs_baseline": 0.88,
+      "price_change_pct": -3.13,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2499571803.0,
+      "volume_vs_baseline": 1.64,
+      "price_change_pct": 2.59,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 3155412898.83,
+      "volume_vs_baseline": 2.07,
+      "price_change_pct": 6.28,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785063600000,
+    "breakout_price": 0.0030091,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1324681740.08,
+      "volume_vs_baseline": 0.86,
+      "price_change_pct": -3.06,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2486929569.42,
+      "volume_vs_baseline": 1.61,
+      "price_change_pct": 2.45,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 3928249284.33,
+      "volume_vs_baseline": 2.55,
+      "price_change_pct": 5.71,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785067200000,
+    "breakout_price": 0.0030101,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1306323732.96,
+      "volume_vs_baseline": 0.84,
+      "price_change_pct": -2.45,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2528793552.0,
+      "volume_vs_baseline": 1.63,
+      "price_change_pct": 1.77,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 4683097141.67,
+      "volume_vs_baseline": 3.01,
+      "price_change_pct": 7.23,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785070800000,
+    "breakout_price": 0.0029528,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1258214509.08,
+      "volume_vs_baseline": 0.87,
+      "price_change_pct": -1.15,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2605354307.5,
+      "volume_vs_baseline": 1.8,
+      "price_change_pct": 1.59,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 6243965149.33,
+      "volume_vs_baseline": 4.31,
+      "price_change_pct": 8.35,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785074400000,
+    "breakout_price": 0.0028982,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1106052375.38,
+      "volume_vs_baseline": 0.73,
+      "price_change_pct": -0.03,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 2537651802.08,
+      "volume_vs_baseline": 1.67,
+      "price_change_pct": 2.52,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 7677768175.17,
+      "volume_vs_baseline": 5.05,
+      "price_change_pct": 4.73,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785078000000,
+    "breakout_price": 0.0029319,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1021223949.75,
+      "volume_vs_baseline": 0.67,
+      "price_change_pct": -0.49,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 3145763895.92,
+      "volume_vs_baseline": 2.07,
+      "price_change_pct": 4.74,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 6989288800.83,
+      "volume_vs_baseline": 4.59,
+      "price_change_pct": 2.16,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785081600000,
+    "breakout_price": 0.002936,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1018200040.25,
+      "volume_vs_baseline": 0.69,
+      "price_change_pct": 1.26,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 3472214161.33,
+      "volume_vs_baseline": 2.36,
+      "price_change_pct": 5.9,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 6647675381.83,
+      "volume_vs_baseline": 4.53,
+      "price_change_pct": 1.93,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785085200000,
+    "breakout_price": 0.0029316,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1188124584.79,
+      "volume_vs_baseline": 0.82,
+      "price_change_pct": 1.73,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 3429280634.58,
+      "volume_vs_baseline": 2.37,
+      "price_change_pct": 3.27,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 6189783368.33,
+      "volume_vs_baseline": 4.28,
+      "price_change_pct": 0.21,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785099600000,
+    "breakout_price": 0.0029127,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1677831624.96,
+      "volume_vs_baseline": 1.21,
+      "price_change_pct": 1.97,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 4700740735.67,
+      "volume_vs_baseline": 3.38,
+      "price_change_pct": 8.34,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 5451168989.67,
+      "volume_vs_baseline": 3.92,
+      "price_change_pct": -1.88,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785103200000,
+    "breakout_price": 0.0029775,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1714888456.54,
+      "volume_vs_baseline": 1.23,
+      "price_change_pct": 1.51,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 4901544140.33,
+      "volume_vs_baseline": 3.51,
+      "price_change_pct": 7.39,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 5608460249.83,
+      "volume_vs_baseline": 4.02,
+      "price_change_pct": -0.71,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785106800000,
+    "breakout_price": 0.0029793,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1718646706.21,
+      "volume_vs_baseline": 1.24,
+      "price_change_pct": 1.22,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 5059016326.33,
+      "volume_vs_baseline": 3.65,
+      "price_change_pct": 7.73,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 5654623575.67,
+      "volume_vs_baseline": 4.08,
+      "price_change_pct": -2.43,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785110400000,
+    "breakout_price": 0.0029745,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1747681337.79,
+      "volume_vs_baseline": 1.26,
+      "price_change_pct": 0.88,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 5379832093.67,
+      "volume_vs_baseline": 3.89,
+      "price_change_pct": 9.51,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 5028460792.0,
+      "volume_vs_baseline": 3.63,
+      "price_change_pct": -2.61,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785114000000,
+    "breakout_price": 0.0029523,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1774365547.46,
+      "volume_vs_baseline": 1.3,
+      "price_change_pct": 1.34,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 5751329293.58,
+      "volume_vs_baseline": 4.22,
+      "price_change_pct": 8.87,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 4453707562.33,
+      "volume_vs_baseline": 3.27,
+      "price_change_pct": -1.24,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785117600000,
+    "breakout_price": 0.0029357,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1797909880.17,
+      "volume_vs_baseline": 1.33,
+      "price_change_pct": 2.19,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 6321848692.42,
+      "volume_vs_baseline": 4.69,
+      "price_change_pct": 3.54,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 3402822045.0,
+      "volume_vs_baseline": 2.52,
+      "price_change_pct": 0.51,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785193200000,
+    "breakout_price": 0.002824,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 4527183477.58,
+      "volume_vs_baseline": 2.63,
+      "price_change_pct": 8.62,
+      "signal": "放量"
+    },
+    "pre_12h": {
+      "volume_avg": 3713575850.42,
+      "volume_vs_baseline": 2.16,
+      "price_change_pct": -0.42,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 4058201174.83,
+      "volume_vs_baseline": 2.36,
+      "price_change_pct": -0.29,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785196800000,
+    "breakout_price": 0.0027978,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 4595473542.33,
+      "volume_vs_baseline": 2.63,
+      "price_change_pct": 8.42,
+      "signal": "放量"
+    },
+    "pre_12h": {
+      "volume_avg": 3597579537.92,
+      "volume_vs_baseline": 2.06,
+      "price_change_pct": -0.52,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 4085472711.83,
+      "volume_vs_baseline": 2.34,
+      "price_change_pct": -1.37,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785200400000,
+    "breakout_price": 0.0027892,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 4640650260.38,
+      "volume_vs_baseline": 2.62,
+      "price_change_pct": 7.58,
+      "signal": "放量"
+    },
+    "pre_12h": {
+      "volume_avg": 3734199193.83,
+      "volume_vs_baseline": 2.1,
+      "price_change_pct": 0.76,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 4088230424.17,
+      "volume_vs_baseline": 2.3,
+      "price_change_pct": -2.81,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785204000000,
+    "breakout_price": 0.0028004,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 4700796225.08,
+      "volume_vs_baseline": 2.61,
+      "price_change_pct": 3.52,
+      "signal": "放量"
+    },
+    "pre_12h": {
+      "volume_avg": 3970121226.67,
+      "volume_vs_baseline": 2.21,
+      "price_change_pct": 2.11,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 3476962399.17,
+      "volume_vs_baseline": 1.93,
+      "price_change_pct": -1.01,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785218400000,
+    "breakout_price": 0.0028325,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 4197684268.04,
+      "volume_vs_baseline": 1.53,
+      "price_change_pct": 1.79,
+      "signal": "放量"
+    },
+    "pre_12h": {
+      "volume_avg": 4094345871.58,
+      "volume_vs_baseline": 1.49,
+      "price_change_pct": -4.43,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 3097643904.33,
+      "volume_vs_baseline": 1.13,
+      "price_change_pct": -3.07,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1785222000000,
+    "breakout_price": 0.0028069,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 4023645620.62,
+      "volume_vs_baseline": 1.3,
+      "price_change_pct": 2.78,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 3890341110.75,
+      "volume_vs_baseline": 1.26,
+      "price_change_pct": -3.29,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 2944049357.5,
+      "volume_vs_baseline": 0.95,
+      "price_change_pct": -3.97,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1785225600000,
+    "breakout_price": 0.0028121,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 3778605459.17,
+      "volume_vs_baseline": 1.09,
+      "price_change_pct": 0.88,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 3714099870.5,
+      "volume_vs_baseline": 1.07,
+      "price_change_pct": -2.36,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 3323141947.83,
+      "volume_vs_baseline": 0.96,
+      "price_change_pct": -4.5,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1785229200000,
+    "breakout_price": 0.0028087,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 3813590519.5,
+      "volume_vs_baseline": 1.06,
+      "price_change_pct": 1.03,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 3381717914.17,
+      "volume_vs_baseline": 0.94,
+      "price_change_pct": -1.36,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 3374875280.83,
+      "volume_vs_baseline": 0.94,
+      "price_change_pct": -3.6,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1785232800000,
+    "breakout_price": 0.002816,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 3886213449.29,
+      "volume_vs_baseline": 1.05,
+      "price_change_pct": 0.27,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 3017004871.92,
+      "volume_vs_baseline": 0.82,
+      "price_change_pct": -2.08,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 3423262254.17,
+      "volume_vs_baseline": 0.93,
+      "price_change_pct": -0.83,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1785236400000,
+    "breakout_price": 0.0028094,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 3854463239.62,
+      "volume_vs_baseline": 1.02,
+      "price_change_pct": -1.41,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 3399868230.67,
+      "volume_vs_baseline": 0.9,
+      "price_change_pct": -4.44,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 2580615318.67,
+      "volume_vs_baseline": 0.68,
+      "price_change_pct": -0.5,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    }
+  },
+  {
+    "breakout_time": 1785240000000,
+    "breakout_price": 0.0028159,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 3704347264.46,
+      "volume_vs_baseline": 0.94,
+      "price_change_pct": -1.69,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 3591558308.08,
+      "volume_vs_baseline": 0.91,
+      "price_change_pct": -5.06,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 2238716198.33,
+      "volume_vs_baseline": 0.57,
+      "price_change_pct": 0.56,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    }
+  },
+  {
+    "breakout_time": 1785243600000,
+    "breakout_price": 0.0027768,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 3632085210.5,
+      "volume_vs_baseline": 0.87,
+      "price_change_pct": 0.74,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 3516139890.83,
+      "volume_vs_baseline": 0.84,
+      "price_change_pct": -6.67,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 1933806878.5,
+      "volume_vs_baseline": 0.46,
+      "price_change_pct": 1.55,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    }
+  },
+  {
+    "breakout_time": 1785247200000,
+    "breakout_price": 0.0027956,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 3524932492.21,
+      "volume_vs_baseline": 0.8,
+      "price_change_pct": 3.43,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 3400052173.5,
+      "volume_vs_baseline": 0.77,
+      "price_change_pct": -5.23,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 1524255691.17,
+      "volume_vs_baseline": 0.34,
+      "price_change_pct": 0.23,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    }
+  },
+  {
+    "breakout_time": 1785250800000,
+    "breakout_price": 0.0028301,
+    "direction": "SHORT",
+    "pre_24h": {
+      "volume_avg": 3533181204.5,
+      "volume_vs_baseline": 0.75,
+      "price_change_pct": 0.39,
+      "signal": "缩量"
+    },
+    "pre_12h": {
+      "volume_avg": 2904389689.75,
+      "volume_vs_baseline": 0.62,
+      "price_change_pct": -4.87,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    },
+    "pre_6h": {
+      "volume_avg": 1468567429.5,
+      "volume_vs_baseline": 0.31,
+      "price_change_pct": 0.28,
+      "atr_ratio": 0.0,
+      "signal": "缩量"
+    }
+  },
+  {
+    "breakout_time": 1785650400000,
+    "breakout_price": 0.0029241,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1750011186.88,
+      "volume_vs_baseline": 1.26,
+      "price_change_pct": 2.1,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 1541785036.58,
+      "volume_vs_baseline": 1.11,
+      "price_change_pct": -1.12,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 1868657240.83,
+      "volume_vs_baseline": 1.34,
+      "price_change_pct": 0.83,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1785657600000,
+    "breakout_price": 0.0029134,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1737147501.5,
+      "volume_vs_baseline": 1.23,
+      "price_change_pct": 1.6,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2024872147.17,
+      "volume_vs_baseline": 1.43,
+      "price_change_pct": -0.73,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 1564361172.33,
+      "volume_vs_baseline": 1.1,
+      "price_change_pct": 3.76,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1785664800000,
+    "breakout_price": 0.0028945,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1762076402.83,
+      "volume_vs_baseline": 1.24,
+      "price_change_pct": 1.15,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 1989307922.25,
+      "volume_vs_baseline": 1.4,
+      "price_change_pct": 1.02,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 2367690681.33,
+      "volume_vs_baseline": 1.67,
+      "price_change_pct": 3.82,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785668400000,
+    "breakout_price": 0.0028963,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1788578824.62,
+      "volume_vs_baseline": 1.27,
+      "price_change_pct": 0.4,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 1871095526.33,
+      "volume_vs_baseline": 1.32,
+      "price_change_pct": 0.51,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 2661592737.83,
+      "volume_vs_baseline": 1.88,
+      "price_change_pct": 4.08,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785672000000,
+    "breakout_price": 0.0028972,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1800182718.79,
+      "volume_vs_baseline": 1.28,
+      "price_change_pct": -0.15,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 1843616877.5,
+      "volume_vs_baseline": 1.31,
+      "price_change_pct": 0.68,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 3169305748.5,
+      "volume_vs_baseline": 2.25,
+      "price_change_pct": 5.35,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785675600000,
+    "breakout_price": 0.0028942,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1773309934.12,
+      "volume_vs_baseline": 1.25,
+      "price_change_pct": 0.38,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 1865878891.42,
+      "volume_vs_baseline": 1.31,
+      "price_change_pct": 0.83,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 3429280503.33,
+      "volume_vs_baseline": 2.41,
+      "price_change_pct": 2.3,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785682800000,
+    "breakout_price": 0.0028996,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1443407633.25,
+      "volume_vs_baseline": 0.91,
+      "price_change_pct": 1.88,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2474531112.83,
+      "volume_vs_baseline": 1.57,
+      "price_change_pct": 2.27,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    },
+    "pre_6h": {
+      "volume_avg": 2639057166.67,
+      "volume_vs_baseline": 1.67,
+      "price_change_pct": 1.33,
+      "atr_ratio": 0.0,
+      "signal": "放量"
+    }
+  },
+  {
+    "breakout_time": 1785693600000,
+    "breakout_price": 0.0029124,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1440893849.71,
+      "volume_vs_baseline": 0.83,
+      "price_change_pct": -0.52,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2518981494.67,
+      "volume_vs_baseline": 1.44,
+      "price_change_pct": 6.68,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 1958135395.17,
+      "volume_vs_baseline": 1.12,
+      "price_change_pct": -0.95,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1785697200000,
+    "breakout_price": 0.0029184,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1509027548.25,
+      "volume_vs_baseline": 0.84,
+      "price_change_pct": -0.0,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2404550345.08,
+      "volume_vs_baseline": 1.34,
+      "price_change_pct": 5.87,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 1674810965.17,
+      "volume_vs_baseline": 0.93,
+      "price_change_pct": -1.72,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1785700800000,
+    "breakout_price": 0.0029075,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1591460558.67,
+      "volume_vs_baseline": 0.87,
+      "price_change_pct": 0.52,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2241561999.17,
+      "volume_vs_baseline": 1.23,
+      "price_change_pct": 7.01,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 1620698207.0,
+      "volume_vs_baseline": 0.89,
+      "price_change_pct": -0.66,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1785704400000,
+    "breakout_price": 0.0029266,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1592630630.92,
+      "volume_vs_baseline": 0.87,
+      "price_change_pct": 0.42,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2360856838.75,
+      "volume_vs_baseline": 1.29,
+      "price_change_pct": 5.0,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 1817575681.17,
+      "volume_vs_baseline": 1.0,
+      "price_change_pct": 0.1,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  },
+  {
+    "breakout_time": 1785708000000,
+    "breakout_price": 0.0028975,
+    "direction": "LONG",
+    "pre_24h": {
+      "volume_avg": 1597418648.04,
+      "volume_vs_baseline": 0.87,
+      "price_change_pct": 0.82,
+      "signal": "持平"
+    },
+    "pre_12h": {
+      "volume_avg": 2418451712.0,
+      "volume_vs_baseline": 1.31,
+      "price_change_pct": 5.32,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    },
+    "pre_6h": {
+      "volume_avg": 1794851973.0,
+      "volume_vs_baseline": 0.97,
+      "price_change_pct": 0.18,
+      "atr_ratio": 0.0,
+      "signal": "持平"
+    }
+  }
+]

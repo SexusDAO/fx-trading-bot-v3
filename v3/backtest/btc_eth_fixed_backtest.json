@@ -1,0 +1,272 @@
+[
+  {
+    "symbol": "BTCUSDT",
+    "period": "2026-07 BTC",
+    "scene_stats": {
+      "A_pullback": 24,
+      "E_short": 5
+    },
+    "total_trades": 15,
+    "winning_trades": 4,
+    "win_rate": 26.666666666666668,
+    "total_pnl": -92.36,
+    "profit_factor": 0.42850071158962927,
+    "max_consecutive_losses": 9,
+    "sl_distance_min": 0.13,
+    "bias_distribution": {
+      "NEUTRAL": 15
+    },
+    "trades": [
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 86,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 1.57,
+        "exit_type": "sl",
+        "bars_held": 12,
+        "pnl": -16.2
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 75,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 1.59,
+        "exit_type": "tp",
+        "bars_held": 13,
+        "pnl": 29.88
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 86,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 0.76,
+        "exit_type": "tp",
+        "bars_held": 4,
+        "pnl": 33.49
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 86,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 0.9,
+        "exit_type": "sl",
+        "bars_held": 4,
+        "pnl": -14.85
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 83,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 0.75,
+        "exit_type": "sl",
+        "bars_held": 2,
+        "pnl": -8.31
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 86,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 0.81,
+        "exit_type": "sl",
+        "bars_held": 2,
+        "pnl": -6.35
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 93,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 2.24,
+        "exit_type": "sl",
+        "bars_held": 7,
+        "pnl": -26.47
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 100,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 1.34,
+        "exit_type": "sl",
+        "bars_held": 9,
+        "pnl": -30.86
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 93,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 0.96,
+        "exit_type": "sl",
+        "bars_held": 1,
+        "pnl": -18.1
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 86,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 1.16,
+        "exit_type": "sl",
+        "bars_held": 4,
+        "pnl": -17.05
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 76,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 1.94,
+        "exit_type": "sl",
+        "bars_held": 17,
+        "pnl": -10.63
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "second_score": 73,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 0.3,
+        "exit_type": "sl",
+        "bars_held": 2,
+        "pnl": -0.96
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "second_score": 72,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 0.73,
+        "exit_type": "sl",
+        "bars_held": 0,
+        "pnl": 4.81
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "second_score": 72,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 1.63,
+        "exit_type": "sl",
+        "bars_held": 13,
+        "pnl": -11.83
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 78,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 0.13,
+        "exit_type": "sl",
+        "bars_held": 0,
+        "pnl": 1.07
+      }
+    ]
+  },
+  {
+    "symbol": "ETHUSDT",
+    "period": "2024-01 ETH",
+    "scene_stats": {
+      "A_pullback": 16,
+      "E_short": 7
+    },
+    "total_trades": 8,
+    "winning_trades": 4,
+    "win_rate": 50.0,
+    "total_pnl": 308.68,
+    "profit_factor": 8.623610768090886,
+    "max_consecutive_losses": 2,
+    "sl_distance_min": 0.34,
+    "bias_distribution": {
+      "NEUTRAL": 8
+    },
+    "trades": [
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 93,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 2.24,
+        "exit_type": "tp",
+        "bars_held": 13,
+        "pnl": 177.81
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 86,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 1.38,
+        "exit_type": "tp",
+        "bars_held": 3,
+        "pnl": 75.76
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "second_score": 72,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 0.82,
+        "exit_type": "sl",
+        "bars_held": 1,
+        "pnl": -8.0
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "second_score": 76,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 1.23,
+        "exit_type": "sl",
+        "bars_held": 22,
+        "pnl": -12.74
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 86,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 1.0,
+        "exit_type": "tp",
+        "bars_held": 19,
+        "pnl": 54.03
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "second_score": 72,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 1.86,
+        "exit_type": "sl",
+        "bars_held": 55,
+        "pnl": -16.99
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "second_score": 76,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 0.34,
+        "exit_type": "sl",
+        "bars_held": 0,
+        "pnl": -2.76
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "second_score": 72,
+        "market_bias_at_entry": "NEUTRAL",
+        "sl_distance_atr_multiple": 1.86,
+        "exit_type": "tp",
+        "bars_held": 97,
+        "pnl": 41.57
+      }
+    ]
+  }
+]

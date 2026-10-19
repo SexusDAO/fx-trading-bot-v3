@@ -1,0 +1,122 @@
+{
+  "timestamp": "2026-08-02T16:02:01.264234",
+  "version": "v2.2-fixed",
+  "parameters": {
+    "open_threshold": 70,
+    "observe_threshold": 63
+  },
+  "results": [
+    {
+      "symbol": "BLESSUSDT",
+      "type": "gainer",
+      "decision": "跳过",
+      "reason": "24H 涨跌幅过大 (+73.59%)",
+      "score": 0
+    },
+    {
+      "symbol": "HOMEUSDT",
+      "type": "gainer",
+      "price": 0.008462,
+      "change_pct": 43.133,
+      "quote_vol": 210051299.503937,
+      "score": 99.75,
+      "decision": "开仓",
+      "position": 856.5,
+      "divergence": "none"
+    },
+    {
+      "symbol": "UAIUSDT",
+      "type": "gainer",
+      "price": 0.558,
+      "change_pct": 33.142,
+      "quote_vol": 193023109.9965,
+      "score": 105.0,
+      "decision": "开仓",
+      "position": 930.0,
+      "divergence": "none"
+    },
+    {
+      "symbol": "STARUSDT",
+      "type": "gainer",
+      "price": 0.09714,
+      "change_pct": 28.594,
+      "quote_vol": 22246611.97415,
+      "score": 96.9,
+      "decision": "开仓",
+      "position": 816.6000000000001,
+      "divergence": "none"
+    },
+    {
+      "symbol": "ICNTUSDT",
+      "type": "gainer",
+      "price": 0.1463,
+      "change_pct": 22.427,
+      "quote_vol": 6419724.6681,
+      "score": 96.9,
+      "decision": "开仓",
+      "position": 816.6000000000001,
+      "divergence": "none"
+    },
+    {
+      "symbol": "BTCUSDT",
+      "type": "neutral",
+      "price": 63080.7,
+      "change_pct": 0.171,
+      "quote_vol": 5771732790.88,
+      "score": 90.0,
+      "decision": "开仓",
+      "position": 720.0,
+      "divergence": "none"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "type": "neutral",
+      "price": 1857.48,
+      "change_pct": -0.656,
+      "quote_vol": 5431346587.86,
+      "score": 75.0,
+      "decision": "开仓",
+      "position": 510.0,
+      "divergence": "none"
+    },
+    {
+      "symbol": "SOLUSDT",
+      "type": "neutral",
+      "price": 72.98,
+      "change_pct": 0.289,
+      "quote_vol": 1130357817.4112,
+      "score": 85.0,
+      "decision": "开仓",
+      "position": 650.0,
+      "divergence": "none"
+    },
+    {
+      "symbol": "BNBUSDT",
+      "type": "neutral",
+      "price": 587.3,
+      "change_pct": 1.824,
+      "quote_vol": 217778688.986,
+      "score": 85.0,
+      "decision": "开仓",
+      "position": 650.0,
+      "divergence": "none"
+    },
+    {
+      "symbol": "XRPUSDT",
+      "type": "neutral",
+      "price": 1.0787,
+      "change_pct": 1.544,
+      "quote_vol": 330150193.42,
+      "score": 95.0,
+      "decision": "开仓",
+      "position": 790.0,
+      "divergence": "none"
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "open": 9,
+    "observe": 0,
+    "skip": 1
+  }
+}

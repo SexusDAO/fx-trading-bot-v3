@@ -1,0 +1,12 @@
+{
+  "symbol": "ONUSDT",
+  "alert_price": 0.115,
+  "direction": "below",
+  "triggered": false,
+  "half_closed": false,
+  "entry_price": 0.11932,
+  "qty": 12571,
+  "sl_price": 0.1072,
+  "created_at": "2026-07-26T16:08:00Z",
+  "note": "价格跌至0.115时AI自动判断是否平仓一半"
+}

@@ -1,0 +1,2551 @@
+{
+  "generated_at": "2026-08-03T13:36:52Z",
+  "elapsed_seconds": 25.7,
+  "dry_run": true,
+  "market": {
+    "btc_24h_pct": -0.381,
+    "btc_trend": "neutral",
+    "candidates": 100,
+    "scored": 100,
+    "top10_count": 10
+  },
+  "score_distribution": {
+    "total": 100,
+    "floor": 40,
+    "min": 25,
+    "max": 87,
+    "p30": 43.7,
+    "p50": 58.0,
+    "p70": 66.3
+  },
+  "all_scored": [
+    {
+      "symbol": "AMZNUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 87,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "连续7根阳线(+15) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 20,
+        "volatility": 20,
+        "structure": 12,
+        "mkt_sync": 10
+      },
+      "chg24_pct": 4.39,
+      "in_top10": true,
+      "discard_reason": null
+    },
+    {
+      "symbol": "DOTUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 84,
+      "score_detail": {
+        "trend": 20,
+        "trend_reason": "连续3根阳线(+10) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 20,
+        "volatility": 20,
+        "structure": 16,
+        "mkt_sync": 8
+      },
+      "chg24_pct": 2.72,
+      "in_top10": true,
+      "discard_reason": null
+    },
+    {
+      "symbol": "CLUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 83,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 14,
+        "volatility": 18,
+        "structure": 14,
+        "mkt_sync": 12
+      },
+      "chg24_pct": -3.56,
+      "in_top10": true,
+      "discard_reason": null
+    },
+    {
+      "symbol": "METAUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 83,
+      "score_detail": {
+        "trend": 20,
+        "trend_reason": "连续3根阳线(+10) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 20,
+        "structure": 20,
+        "mkt_sync": 6
+      },
+      "chg24_pct": 2.73,
+      "in_top10": true,
+      "discard_reason": null
+    },
+    {
+      "symbol": "FILUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 82,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "连续7根阳线(+15) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 20,
+        "structure": 12,
+        "mkt_sync": 8
+      },
+      "chg24_pct": 0.15,
+      "in_top10": true,
+      "discard_reason": null
+    },
+    {
+      "symbol": "TSLAUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 79,
+      "score_detail": {
+        "trend": 16,
+        "trend_reason": "连续2根阳线(+6) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 20,
+        "structure": 20,
+        "mkt_sync": 6
+      },
+      "chg24_pct": 1.29,
+      "in_top10": true,
+      "discard_reason": null
+    },
+    {
+      "symbol": "SKYAIUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 79,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "连续4根阳线(+15) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 20,
+        "structure": 20,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 25.1,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "ZHIPUUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 79,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA多头排列(+12) | HH+HL(+7) | 4H顺势(+4) | 24h顺多(+2)",
+        "volume": 10,
+        "volatility": 18,
+        "structure": 14,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 1.27,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "VICUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 79,
+      "score_detail": {
+        "trend": 13,
+        "trend_reason": "连续2根阳线(+6) | 均线多头(+7)",
+        "volume": 20,
+        "volatility": 20,
+        "structure": 16,
+        "mkt_sync": 10
+      },
+      "chg24_pct": 32.51,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "COTIUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 78,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 9,
+        "volatility": 18,
+        "structure": 14,
+        "mkt_sync": 12
+      },
+      "chg24_pct": -14.27,
+      "in_top10": true,
+      "discard_reason": null
+    },
+    {
+      "symbol": "UNIUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 78,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 16,
+        "volatility": 18,
+        "structure": 7,
+        "mkt_sync": 12
+      },
+      "chg24_pct": -2.88,
+      "in_top10": true,
+      "discard_reason": null
+    },
+    {
+      "symbol": "ENAUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 77,
+      "score_detail": {
+        "trend": 21,
+        "trend_reason": "EMA多头排列(+12) | 部分多头结构(+3) | 4H顺势(+4) | 24h顺多(+2)",
+        "volume": 9,
+        "volatility": 18,
+        "structure": 17,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 4.4,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "GOOGLUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 75,
+      "score_detail": {
+        "trend": 16,
+        "trend_reason": "连续2根阳线(+6) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 20,
+        "structure": 12,
+        "mkt_sync": 10
+      },
+      "chg24_pct": 4.34,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "BTWUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 75,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "连续8根阳线(+15) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 20,
+        "structure": 16,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 6.83,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "MSFTUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 75,
+      "score_detail": {
+        "trend": 12,
+        "trend_reason": "阳线不足(+2) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 20,
+        "structure": 16,
+        "mkt_sync": 10
+      },
+      "chg24_pct": 5.01,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "ONUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 75,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 6,
+        "volatility": 20,
+        "structure": 12,
+        "mkt_sync": 12
+      },
+      "chg24_pct": -7.95,
+      "in_top10": true,
+      "discard_reason": null
+    },
+    {
+      "symbol": "1000PEPEUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 74,
+      "score_detail": {
+        "trend": 16,
+        "trend_reason": "EMA多头排列(+12) | 4H顺势(+4)",
+        "volume": 16,
+        "volatility": 18,
+        "structure": 14,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -0.5,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "TAOUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 73,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 6,
+        "volatility": 18,
+        "structure": 12,
+        "mkt_sync": 12
+      },
+      "chg24_pct": -2.67,
+      "in_top10": true,
+      "discard_reason": null
+    },
+    {
+      "symbol": "ZECUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 71,
+      "score_detail": {
+        "trend": 18,
+        "trend_reason": "EMA多头排列(+12) | 4H顺势(+4) | 24h顺多(+2)",
+        "volume": 9,
+        "volatility": 18,
+        "structure": 14,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 2.91,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "PENGUUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 71,
+      "score_detail": {
+        "trend": 16,
+        "trend_reason": "EMA多头排列(+12) | 4H顺势(+4)",
+        "volume": 13,
+        "volatility": 18,
+        "structure": 14,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -1.58,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "BZUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 70,
+      "score_detail": {
+        "trend": 18,
+        "trend_reason": "EMA空头排列(+12) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 8,
+        "volatility": 18,
+        "structure": 14,
+        "mkt_sync": 12
+      },
+      "chg24_pct": -1.93,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "ONDOUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 70,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 13,
+        "volatility": 18,
+        "structure": 2,
+        "mkt_sync": 12
+      },
+      "chg24_pct": -2.81,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "MSTRUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 70,
+      "score_detail": {
+        "trend": 16,
+        "trend_reason": "连续2根阳线(+6) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 20,
+        "volatility": 8,
+        "structure": 20,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -0.59,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "LTCUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 70,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 6,
+        "volatility": 20,
+        "structure": 7,
+        "mkt_sync": 12
+      },
+      "chg24_pct": -1.03,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "IDOLUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 70,
+      "score_detail": {
+        "trend": 8,
+        "trend_reason": "EMA20<50,排列未完全(+6) | 24h顺空(+2)",
+        "volume": 16,
+        "volatility": 20,
+        "structure": 14,
+        "mkt_sync": 12
+      },
+      "chg24_pct": -9.71,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "NEARUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 69,
+      "score_detail": {
+        "trend": 23,
+        "trend_reason": "EMA多头排列(+12) | HH+HL(+7) | 4H顺势(+4)",
+        "volume": 9,
+        "volatility": 18,
+        "structure": 9,
+        "mkt_sync": 10
+      },
+      "chg24_pct": 0.94,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "XAUTUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 69,
+      "score_detail": {
+        "trend": 23,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4)",
+        "volume": 11,
+        "volatility": 8,
+        "structure": 17,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -0.77,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 69,
+      "score_detail": {
+        "trend": 21,
+        "trend_reason": "EMA多头排列(+12) | 部分多头结构(+3) | 4H顺势(+4) | 24h顺多(+2)",
+        "volume": 6,
+        "volatility": 18,
+        "structure": 12,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 4.22,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "BABAUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 69,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA多头排列(+12) | HH+HL(+7) | 4H顺势(+4) | 24h顺多(+2)",
+        "volume": 18,
+        "volatility": 8,
+        "structure": 6,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 3.48,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "INJUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 67,
+      "score_detail": {
+        "trend": 16,
+        "trend_reason": "EMA多头排列(+12) | 4H顺势(+4)",
+        "volume": 9,
+        "volatility": 20,
+        "structure": 12,
+        "mkt_sync": 10
+      },
+      "chg24_pct": 0.83,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "DEXEUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 66,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 14,
+        "volatility": 2,
+        "structure": 17,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -10.96,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "MANTRAUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 65,
+      "score_detail": {
+        "trend": 6,
+        "trend_reason": "EMA20>50,排列未完全(+6)",
+        "volume": 10,
+        "volatility": 20,
+        "structure": 19,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -13.5,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "MMTUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 65,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 10,
+        "volatility": 20,
+        "structure": 2,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -10.63,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 64,
+      "score_detail": {
+        "trend": 23,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4)",
+        "volume": 6,
+        "volatility": 18,
+        "structure": 7,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -0.38,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "SOLUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 64,
+      "score_detail": {
+        "trend": 23,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4)",
+        "volume": 6,
+        "volatility": 18,
+        "structure": 7,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -0.19,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "HYPEUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 64,
+      "score_detail": {
+        "trend": 8,
+        "trend_reason": "EMA20>50,排列未完全(+6) | 24h顺多(+2)",
+        "volume": 9,
+        "volatility": 18,
+        "structure": 17,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 3.34,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "SPCXUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 64,
+      "score_detail": {
+        "trend": 11,
+        "trend_reason": "连续2根阳线(+6) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 8,
+        "structure": 20,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -1.08,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 64,
+      "score_detail": {
+        "trend": 6,
+        "trend_reason": "EMA20>50,排列未完全(+6)",
+        "volume": 13,
+        "volatility": 18,
+        "structure": 17,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -1.34,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "ADAUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 63,
+      "score_detail": {
+        "trend": 19,
+        "trend_reason": "EMA多头排列(+12) | 部分多头结构(+3) | 4H顺势(+4)",
+        "volume": 9,
+        "volatility": 8,
+        "structure": 17,
+        "mkt_sync": 10
+      },
+      "chg24_pct": 0.26,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "SNXXUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 62,
+      "score_detail": {
+        "trend": 8,
+        "trend_reason": "连续2根阳线(+6) | 均线未顺(+2)",
+        "volume": 20,
+        "volatility": 8,
+        "structure": 20,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -3.99,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 61,
+      "score_detail": {
+        "trend": 20,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H中性(+1)",
+        "volume": 6,
+        "volatility": 18,
+        "structure": 7,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -0.34,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 61,
+      "score_detail": {
+        "trend": 8,
+        "trend_reason": "EMA20>50,排列未完全(+6) | 24h顺多(+2)",
+        "volume": 9,
+        "volatility": 18,
+        "structure": 14,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 1.58,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "XLMUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 61,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 6,
+        "volatility": 18,
+        "structure": 0,
+        "mkt_sync": 12
+      },
+      "chg24_pct": -1.7,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "SKHYNIXUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 60,
+      "score_detail": {
+        "trend": 8,
+        "trend_reason": "EMA20<50,排列未完全(+6) | 24h顺空(+2)",
+        "volume": 10,
+        "volatility": 18,
+        "structure": 12,
+        "mkt_sync": 12
+      },
+      "chg24_pct": -2.64,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "SUIUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 60,
+      "score_detail": {
+        "trend": 6,
+        "trend_reason": "EMA20>50,排列未完全(+6)",
+        "volume": 9,
+        "volatility": 18,
+        "structure": 17,
+        "mkt_sync": 10
+      },
+      "chg24_pct": 0.36,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "SPYUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 60,
+      "score_detail": {
+        "trend": 23,
+        "trend_reason": "EMA多头排列(+12) | HH+HL(+7) | 4H顺势(+4)",
+        "volume": 14,
+        "volatility": 2,
+        "structure": 11,
+        "mkt_sync": 10
+      },
+      "chg24_pct": 0.56,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "SNDKUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 59,
+      "score_detail": {
+        "trend": 8,
+        "trend_reason": "连续2根阳线(+6) | 均线未顺(+2)",
+        "volume": 17,
+        "volatility": 8,
+        "structure": 20,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -2.56,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "QQQUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 59,
+      "score_detail": {
+        "trend": 11,
+        "trend_reason": "连续2根阳线(+6) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 20,
+        "volatility": 2,
+        "structure": 20,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -0.04,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "WLDUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 59,
+      "score_detail": {
+        "trend": 6,
+        "trend_reason": "EMA20>50,排列未完全(+6)",
+        "volume": 13,
+        "volatility": 18,
+        "structure": 12,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -0.6,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "SOXLUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 58,
+      "score_detail": {
+        "trend": 8,
+        "trend_reason": "连续2根阳线(+6) | 均线未顺(+2)",
+        "volume": 20,
+        "volatility": 2,
+        "structure": 20,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -11.4,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "WAXPUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 58,
+      "score_detail": {
+        "trend": 12,
+        "trend_reason": "阳线不足(+2) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 20,
+        "structure": 16,
+        "mkt_sync": 8
+      },
+      "chg24_pct": 17.74,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "BTCUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 57,
+      "score_detail": {
+        "trend": 23,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4)",
+        "volume": 6,
+        "volatility": 18,
+        "structure": 0,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -0.38,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "LINKUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 57,
+      "score_detail": {
+        "trend": 6,
+        "trend_reason": "EMA20>50,排列未完全(+6)",
+        "volume": 11,
+        "volatility": 18,
+        "structure": 12,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -0.71,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "MRVLUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 56,
+      "score_detail": {
+        "trend": 11,
+        "trend_reason": "连续2根阳线(+6) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 2,
+        "structure": 20,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -4.15,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "AMDUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 56,
+      "score_detail": {
+        "trend": 11,
+        "trend_reason": "连续2根阳线(+6) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 2,
+        "structure": 20,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -4.18,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "BICOUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 55,
+      "score_detail": {
+        "trend": 12,
+        "trend_reason": "阳线不足(+2) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 9,
+        "volatility": 20,
+        "structure": 4,
+        "mkt_sync": 10
+      },
+      "chg24_pct": 56.66,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "TRXUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 55,
+      "score_detail": {
+        "trend": 16,
+        "trend_reason": "EMA空头排列(+12) | 部分空头结构(+3) | 4H中性(+1)",
+        "volume": 9,
+        "volatility": 18,
+        "structure": 2,
+        "mkt_sync": 10
+      },
+      "chg24_pct": 0.23,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "TRUMPUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 55,
+      "score_detail": {
+        "trend": 6,
+        "trend_reason": "EMA20>50,排列未完全(+6)",
+        "volume": 9,
+        "volatility": 16,
+        "structure": 14,
+        "mkt_sync": 10
+      },
+      "chg24_pct": 0.97,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "SOXSUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 54,
+      "score_detail": {
+        "trend": 12,
+        "trend_reason": "阳线不足(+2) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 15,
+        "structure": 0,
+        "mkt_sync": 10
+      },
+      "chg24_pct": 13.67,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "BCHUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 54,
+      "score_detail": {
+        "trend": 6,
+        "trend_reason": "EMA20>50,排列未完全(+6)",
+        "volume": 11,
+        "volatility": 18,
+        "structure": 9,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -1.15,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "NBISUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 53,
+      "score_detail": {
+        "trend": 8,
+        "trend_reason": "连续2根阳线(+6) | 均线未顺(+2)",
+        "volume": 17,
+        "volatility": 2,
+        "structure": 20,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -3.61,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "HYPERUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 53,
+      "score_detail": {
+        "trend": 6,
+        "trend_reason": "EMA20>50,排列未完全(+6)",
+        "volume": 10,
+        "volatility": 18,
+        "structure": 9,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -8.34,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "XRPUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 52,
+      "score_detail": {
+        "trend": 6,
+        "trend_reason": "EMA20>50,排列未完全(+6)",
+        "volume": 9,
+        "volatility": 18,
+        "structure": 9,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -1.02,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "NVDAUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 52,
+      "score_detail": {
+        "trend": 11,
+        "trend_reason": "连续2根阳线(+6) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 2,
+        "structure": 16,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -0.49,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "USUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 50,
+      "score_detail": {
+        "trend": 12,
+        "trend_reason": "阳线不足(+2) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 8,
+        "structure": 16,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 6.33,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "ZAMAUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 50,
+      "score_detail": {
+        "trend": 12,
+        "trend_reason": "阳线不足(+2) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 20,
+        "structure": 8,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -0.27,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "AKEUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 49,
+      "score_detail": {
+        "trend": 12,
+        "trend_reason": "阳线不足(+2) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 15,
+        "structure": 8,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 9.68,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "CRCLUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 45,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 20,
+        "volatility": 2,
+        "structure": 8,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -2.47,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "VANRYUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 45,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 12,
+        "volatility": 2,
+        "structure": 20,
+        "mkt_sync": 4
+      },
+      "chg24_pct": -10.04,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "DRAMUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 44,
+      "score_detail": {
+        "trend": 11,
+        "trend_reason": "连续2根阳线(+6) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 2,
+        "structure": 8,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -3.81,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "EPICUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 43,
+      "score_detail": {
+        "trend": 15,
+        "trend_reason": "连续3根阳线(+10) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 2,
+        "structure": 16,
+        "mkt_sync": 8
+      },
+      "chg24_pct": 0.04,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "MUUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 42,
+      "score_detail": {
+        "trend": 11,
+        "trend_reason": "连续2根阳线(+6) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 2,
+        "structure": 4,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -5.89,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "PUMPUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 42,
+      "score_detail": {
+        "trend": 8,
+        "trend_reason": "EMA20<50,排列未完全(+6) | 24h顺空(+2)",
+        "volume": 8,
+        "volatility": 14,
+        "structure": 0,
+        "mkt_sync": 12
+      },
+      "chg24_pct": -1.49,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "AIOUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 42,
+      "score_detail": {
+        "trend": 4,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2)",
+        "volume": 8,
+        "volatility": 2,
+        "structure": 20,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -22.62,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "XAUUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 41,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 20,
+        "volatility": 2,
+        "structure": 4,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -0.8,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "PAXGUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 41,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 20,
+        "volatility": 2,
+        "structure": 4,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -0.83,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "MUUUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 40,
+      "score_detail": {
+        "trend": 8,
+        "trend_reason": "连续2根阳线(+6) | 均线未顺(+2)",
+        "volume": 20,
+        "volatility": 2,
+        "structure": 4,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -12.05,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "LITUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 40,
+      "score_detail": {
+        "trend": 6,
+        "trend_reason": "EMA20<50,排列未完全(+6)",
+        "volume": 10,
+        "volatility": 14,
+        "structure": 0,
+        "mkt_sync": 10
+      },
+      "chg24_pct": 1.28,
+      "in_top10": false,
+      "discard_reason": "落选Top10（分数不够竞争）"
+    },
+    {
+      "symbol": "1000RATSUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 38,
+      "score_detail": {
+        "trend": 4,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2)",
+        "volume": 2,
+        "volatility": 8,
+        "structure": 12,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 24.12,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "EULUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 38,
+      "score_detail": {
+        "trend": 12,
+        "trend_reason": "阳线不足(+2) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 5,
+        "volatility": 15,
+        "structure": 0,
+        "mkt_sync": 6
+      },
+      "chg24_pct": 0.14,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "XAGUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 37,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 20,
+        "volatility": 2,
+        "structure": 0,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -3.14,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "INTCUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 36,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 2,
+        "structure": 4,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -5.31,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "ACEUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 36,
+      "score_detail": {
+        "trend": 12,
+        "trend_reason": "阳线不足(+2) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 2,
+        "structure": 16,
+        "mkt_sync": 4
+      },
+      "chg24_pct": 2.1,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "TAKEUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 35,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 2,
+        "structure": 12,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 16.12,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "AAPLUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 35,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 20,
+        "volatility": 2,
+        "structure": 0,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -0.85,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "SAMSUNGUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 34,
+      "score_detail": {
+        "trend": 6,
+        "trend_reason": "EMA20>50,排列未完全(+6)",
+        "volume": 10,
+        "volatility": 8,
+        "structure": 0,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -2.56,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "HOMEUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 33,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 2,
+        "structure": 16,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -15.94,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "SKHYUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 32,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 2,
+        "structure": 0,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -5.93,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "GIGGLEUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 32,
+      "score_detail": {
+        "trend": 12,
+        "trend_reason": "阳线不足(+2) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 2,
+        "structure": 8,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -3.21,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "GRVTUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 31,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 2,
+        "structure": 8,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 5.64,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "EWYUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 30,
+      "score_detail": {
+        "trend": 6,
+        "trend_reason": "EMA20>50,排列未完全(+6)",
+        "volume": 6,
+        "volatility": 8,
+        "structure": 0,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -2.37,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "BANKUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 29,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 2,
+        "structure": 12,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -10.8,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "ALLOUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 29,
+      "score_detail": {
+        "trend": 4,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2)",
+        "volume": 9,
+        "volatility": 2,
+        "structure": 8,
+        "mkt_sync": 6
+      },
+      "chg24_pct": 0.81,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "BLESSUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 28,
+      "score_detail": {
+        "trend": 4,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2)",
+        "volume": 2,
+        "volatility": 2,
+        "structure": 8,
+        "mkt_sync": 12
+      },
+      "chg24_pct": 20.05,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "KOMAUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 27,
+      "score_detail": {
+        "trend": 4,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2)",
+        "volume": 5,
+        "volatility": 2,
+        "structure": 8,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -7.1,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "UAIUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 27,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 2,
+        "structure": 8,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -29.99,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "ICNTUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 27,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 2,
+        "structure": 8,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -15.37,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "KORUUSDT",
+      "track": "oscillation",
+      "direction": "LONG",
+      "score": 26,
+      "score_detail": {
+        "trend": 6,
+        "trend_reason": "EMA20>50,排列未完全(+6)",
+        "volume": 2,
+        "volatility": 8,
+        "structure": 0,
+        "mkt_sync": 10
+      },
+      "chg24_pct": -7.03,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "KAITOUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 25,
+      "score_detail": {
+        "trend": 7,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2) | 无大幅回撤(+3)",
+        "volume": 2,
+        "volatility": 2,
+        "structure": 8,
+        "mkt_sync": 6
+      },
+      "chg24_pct": -13.27,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    },
+    {
+      "symbol": "BEATUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 25,
+      "score_detail": {
+        "trend": 4,
+        "trend_reason": "阳线不足(+2) | 均线未顺(+2)",
+        "volume": 11,
+        "volatility": 2,
+        "structure": 0,
+        "mkt_sync": 8
+      },
+      "chg24_pct": -18.53,
+      "in_top10": false,
+      "discard_reason": "绝对下限<40分"
+    }
+  ],
+  "top10_analysis": [
+    {
+      "symbol": "AMZNUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 87,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "连续7根阳线(+15) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 20,
+        "volatility": 20,
+        "structure": 12,
+        "mkt_sync": 10
+      },
+      "position": "position_pct=0.87 [高位(>80%)]",
+      "candidate_scenes": [
+        "C_first_pull"
+      ],
+      "scene_matched": "none",
+      "second_score": 0,
+      "rr": 0,
+      "scene_reason": "场景C不满足: ['vol_ok']",
+      "scene_conditions": {},
+      "order": null
+    },
+    {
+      "symbol": "DOTUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 84,
+      "score_detail": {
+        "trend": 20,
+        "trend_reason": "连续3根阳线(+10) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 20,
+        "volatility": 20,
+        "structure": 16,
+        "mkt_sync": 8
+      },
+      "position": "position_pct=0.92 [高位(>80%)]",
+      "candidate_scenes": [
+        "C_first_pull"
+      ],
+      "scene_matched": "none",
+      "second_score": 0,
+      "rr": 0,
+      "scene_reason": "场景C不满足: ['vol_ok']",
+      "scene_conditions": {},
+      "order": null
+    },
+    {
+      "symbol": "METAUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 83,
+      "score_detail": {
+        "trend": 20,
+        "trend_reason": "连续3根阳线(+10) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 20,
+        "structure": 20,
+        "mkt_sync": 6
+      },
+      "position": "position_pct=0.90 [高位(>80%)]",
+      "candidate_scenes": [
+        "C_first_pull"
+      ],
+      "scene_matched": "none",
+      "second_score": 0,
+      "rr": 0,
+      "scene_reason": "场景C不满足: ['vol_ok']",
+      "scene_conditions": {},
+      "order": null
+    },
+    {
+      "symbol": "CLUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 83,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 14,
+        "volatility": 18,
+        "structure": 14,
+        "mkt_sync": 12
+      },
+      "position": "position_pct=0.07 [低位(<20%)]",
+      "candidate_scenes": [],
+      "scene_matched": "none",
+      "second_score": 0,
+      "rr": 0,
+      "scene_reason": "位置判断：低位空头不追空",
+      "scene_conditions": {},
+      "order": null
+    },
+    {
+      "symbol": "FILUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 82,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "连续7根阳线(+15) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 20,
+        "structure": 12,
+        "mkt_sync": 8
+      },
+      "position": "position_pct=0.80 [高位(>80%)]",
+      "candidate_scenes": [
+        "C_first_pull"
+      ],
+      "scene_matched": "none",
+      "second_score": 0,
+      "rr": 0,
+      "scene_reason": "场景C不满足: ['gain_ok', 'vol_ok']",
+      "scene_conditions": {},
+      "order": null
+    },
+    {
+      "symbol": "TSLAUSDT",
+      "track": "momentum",
+      "direction": "LONG",
+      "score": 79,
+      "score_detail": {
+        "trend": 16,
+        "trend_reason": "连续2根阳线(+6) | 均线多头(+7) | 无大幅回撤(+3)",
+        "volume": 17,
+        "volatility": 20,
+        "structure": 20,
+        "mkt_sync": 6
+      },
+      "position": "position_pct=0.96 [高位(>80%)]",
+      "candidate_scenes": [
+        "C_first_pull"
+      ],
+      "scene_matched": "none",
+      "second_score": 0,
+      "rr": 0,
+      "scene_reason": "场景C不满足: ['gain_ok', 'vol_ok']",
+      "scene_conditions": {},
+      "order": null
+    },
+    {
+      "symbol": "COTIUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 78,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 9,
+        "volatility": 18,
+        "structure": 14,
+        "mkt_sync": 12
+      },
+      "position": "position_pct=0.13 [低位(<20%)]",
+      "candidate_scenes": [],
+      "scene_matched": "none",
+      "second_score": 0,
+      "rr": 0,
+      "scene_reason": "位置判断：低位空头不追空",
+      "scene_conditions": {},
+      "order": null
+    },
+    {
+      "symbol": "UNIUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 78,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 16,
+        "volatility": 18,
+        "structure": 7,
+        "mkt_sync": 12
+      },
+      "position": "position_pct=0.27 [中位(27%)]",
+      "candidate_scenes": [
+        "E_short"
+      ],
+      "scene_matched": "none",
+      "second_score": 0,
+      "rr": 0,
+      "scene_reason": "",
+      "scene_conditions": {},
+      "order": null
+    },
+    {
+      "symbol": "ONUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 75,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 6,
+        "volatility": 20,
+        "structure": 12,
+        "mkt_sync": 12
+      },
+      "position": "position_pct=0.23 [中位(23%)]",
+      "candidate_scenes": [
+        "E_short"
+      ],
+      "scene_matched": "none",
+      "second_score": 0,
+      "rr": 0,
+      "scene_reason": "",
+      "scene_conditions": {},
+      "order": null
+    },
+    {
+      "symbol": "TAOUSDT",
+      "track": "oscillation",
+      "direction": "SHORT",
+      "score": 73,
+      "score_detail": {
+        "trend": 25,
+        "trend_reason": "EMA空头排列(+12) | LH+LL(+7) | 4H顺势(+4) | 24h顺空(+2)",
+        "volume": 6,
+        "volatility": 18,
+        "structure": 12,
+        "mkt_sync": 12
+      },
+      "position": "position_pct=0.08 [低位(<20%)]",
+      "candidate_scenes": [],
+      "scene_matched": "none",
+      "second_score": 0,
+      "rr": 0,
+      "scene_reason": "位置判断：低位空头不追空",
+      "scene_conditions": {},
+      "order": null
+    }
+  ],
+  "final_orders": [],
+  "elimination_stats": {
+    "API异常/数据不足": 0,
+    "方向不明(NONE)": 0,
+    "分数低出Top10": 68,
+    "绝对下限<40分": 22,
+    "场景条件不满足": 5,
+    "二次打分<70": 0,
+    "低位空头不追空": 3
+  },
+  "watchlist": [
+    {
+      "symbol": "AMZNUSDT",
+      "reason": "场景C不满足: ['vol_ok']"
+    },
+    {
+      "symbol": "DOTUSDT",
+      "reason": "场景C不满足: ['vol_ok']"
+    },
+    {
+      "symbol": "METAUSDT",
+      "reason": "场景C不满足: ['vol_ok']"
+    },
+    {
+      "symbol": "CLUSDT",
+      "reason": "位置判断：低位空头不追空"
+    },
+    {
+      "symbol": "FILUSDT",
+      "reason": "场景C不满足: ['gain_ok', 'vol_ok']"
+    },
+    {
+      "symbol": "TSLAUSDT",
+      "reason": "场景C不满足: ['gain_ok', 'vol_ok']"
+    },
+    {
+      "symbol": "COTIUSDT",
+      "reason": "位置判断：低位空头不追空"
+    },
+    {
+      "symbol": "UNIUSDT",
+      "reason": ""
+    },
+    {
+      "symbol": "ONUSDT",
+      "reason": ""
+    },
+    {
+      "symbol": "TAOUSDT",
+      "reason": "位置判断：低位空头不追空"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "score": 64,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "BTCUSDT",
+      "score": 57,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "SNDKUSDT",
+      "score": 59,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "SKHYNIXUSDT",
+      "score": 60,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "BLESSUSDT",
+      "score": 28,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "SOXLUSDT",
+      "score": 58,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "XAUUSDT",
+      "score": 41,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "MUUSDT",
+      "score": 42,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "SOLUSDT",
+      "score": 64,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "KORUUSDT",
+      "score": 26,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "SKHYUSDT",
+      "score": 32,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "XAGUSDT",
+      "score": 37,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "ZECUSDT",
+      "score": 71,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "1000RATSUSDT",
+      "score": 38,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "BZUSDT",
+      "score": 70,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "HYPEUSDT",
+      "score": 64,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "SPCXUSDT",
+      "score": 64,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "AKEUSDT",
+      "score": 49,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "EWYUSDT",
+      "score": 30,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "SNXXUSDT",
+      "score": 62,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "ADAUSDT",
+      "score": 63,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "HOMEUSDT",
+      "score": 33,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "BICOUSDT",
+      "score": 55,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "XRPUSDT",
+      "score": 52,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "score": 61,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "DRAMUSDT",
+      "score": 44,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "SAMSUNGUSDT",
+      "score": 34,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "BANKUSDT",
+      "score": 29,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "SOXSUSDT",
+      "score": 54,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "GIGGLEUSDT",
+      "score": 32,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "KOMAUSDT",
+      "score": 27,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "KAITOUSDT",
+      "score": 25,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "BEATUSDT",
+      "score": 25,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "QQQUSDT",
+      "score": 59,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "ENAUSDT",
+      "score": 77,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "UAIUSDT",
+      "score": 27,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "ICNTUSDT",
+      "score": 27,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "MUUUSDT",
+      "score": 40,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "1000PEPEUSDT",
+      "score": 74,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "WLDUSDT",
+      "score": 59,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "NVDAUSDT",
+      "score": 52,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "CRCLUSDT",
+      "score": 45,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "NBISUSDT",
+      "score": 53,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "INTCUSDT",
+      "score": 36,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "MRVLUSDT",
+      "score": 56,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "LINKUSDT",
+      "score": 57,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "PUMPUSDT",
+      "score": 42,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "ONDOUSDT",
+      "score": 70,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "SUIUSDT",
+      "score": 60,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "score": 64,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "score": 61,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "NEARUSDT",
+      "score": 69,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "MANTRAUSDT",
+      "score": 65,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "DEXEUSDT",
+      "score": 66,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "ALLOUSDT",
+      "score": 29,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "XAUTUSDT",
+      "score": 69,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "SKYAIUSDT",
+      "score": 79,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "GOOGLUSDT",
+      "score": 75,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "BTWUSDT",
+      "score": 75,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "MSFTUSDT",
+      "score": 75,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "AIOUSDT",
+      "score": 42,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "EULUSDT",
+      "score": 38,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "TAKEUSDT",
+      "score": 35,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "PAXGUSDT",
+      "score": 41,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "AMDUSDT",
+      "score": 56,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "MSTRUSDT",
+      "score": 70,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "MMTUSDT",
+      "score": 65,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "WAXPUSDT",
+      "score": 58,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "USUSDT",
+      "score": 50,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "HYPERUSDT",
+      "score": 53,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "GRVTUSDT",
+      "score": 31,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "VANRYUSDT",
+      "score": 45,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "AAPLUSDT",
+      "score": 35,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "INJUSDT",
+      "score": 67,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "ZHIPUUSDT",
+      "score": 79,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "TRXUSDT",
+      "score": 55,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "LTCUSDT",
+      "score": 70,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "XLMUSDT",
+      "score": 61,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "SPYUSDT",
+      "score": 60,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "BCHUSDT",
+      "score": 54,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "VICUSDT",
+      "score": 79,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "score": 69,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "PENGUUSDT",
+      "score": 71,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "EPICUSDT",
+      "score": 43,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "TRUMPUSDT",
+      "score": 55,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "IDOLUSDT",
+      "score": 70,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "ZAMAUSDT",
+      "score": 50,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "LITUSDT",
+      "score": 40,
+      "direction": "SHORT",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "ACEUSDT",
+      "score": 36,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    },
+    {
+      "symbol": "BABAUSDT",
+      "score": 69,
+      "direction": "LONG",
+      "reason": "落选Top10"
+    }
+  ]
+}

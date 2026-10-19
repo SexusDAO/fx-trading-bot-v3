@@ -1,0 +1,95 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-08-24 19:00",
+      "close_ts": "2026-08-25 07:50",
+      "symbol": "BNBUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 703.33,
+      "exit_price": 706.73,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.2834,
+      "hold_min": 770.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-09-16 20:00",
+      "close_ts": "2026-09-16 23:20",
+      "symbol": "BNBUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 719.56,
+      "exit_price": 723.88516,
+      "close_reason": "sl",
+      "pnl": -0.8011,
+      "hold_min": 200.0,
+      "signal_score": 60
+    },
+    {
+      "open_ts": "2026-10-01 18:45",
+      "close_ts": "2026-10-02 02:45",
+      "symbol": "BNBUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 770.83,
+      "exit_price": 773.12,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -0.4971,
+      "hold_min": 480.0,
+      "signal_score": 55
+    },
+    {
+      "open_ts": "2026-10-02 14:30",
+      "close_ts": "2026-10-03 13:05",
+      "symbol": "BNBUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 775.93,
+      "exit_price": 773.02,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.175,
+      "hold_min": 1355.0,
+      "signal_score": 65
+    }
+  ],
+  "stats": {
+    "symbol": "BNBUSDT",
+    "days": 60,
+    "total_trades": 4,
+    "win_trades": 2,
+    "loss_trades": 2,
+    "win_rate_pct": 50.0,
+    "total_pnl_u": -0.84,
+    "total_win_u": 0.46,
+    "total_loss_u": -1.3,
+    "profit_factor": 0.35,
+    "max_drawdown_u": 1.3,
+    "max_single_loss": -0.8,
+    "avg_hold_min": 701.2,
+    "by_mode": {
+      "pullback": {
+        "n": 1,
+        "win": 1,
+        "pnl": 0.28,
+        "win_rate": 100.0
+      },
+      "stop_hunt": {
+        "n": 3,
+        "win": 1,
+        "pnl": -1.12,
+        "win_rate": 33.3
+      }
+    },
+    "funnel": {
+      "judge_pass": 7,
+      "filter_bear_reversal": 0,
+      "filter_settle_win": 0,
+      "filter_cooldown": 3,
+      "filter_same_dir": 0,
+      "filter_calc_sl": 0,
+      "filter_score": 0,
+      "opened": 4
+    }
+  }
+}

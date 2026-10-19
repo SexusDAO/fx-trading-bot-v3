@@ -1,0 +1,63 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-08-19 22:45",
+      "close_ts": "2026-08-20 06:45",
+      "symbol": "BTCUSDT",
+      "direction": "short",
+      "mode": "reversal",
+      "entry_price": 69227.1,
+      "exit_price": 69761.1,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -0.9714,
+      "hold_min": 480.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-08-20 02:45",
+      "close_ts": "2026-08-20 08:05",
+      "symbol": "BTCUSDT",
+      "direction": "short",
+      "mode": "reversal",
+      "entry_price": 69284.6,
+      "exit_price": 71016.715,
+      "close_reason": "sl",
+      "pnl": -2.7,
+      "hold_min": 320.0,
+      "signal_score": 65
+    }
+  ],
+  "stats": {
+    "symbol": "BTCUSDT",
+    "days": 90,
+    "total_trades": 2,
+    "win_trades": 0,
+    "loss_trades": 2,
+    "win_rate_pct": 0.0,
+    "total_pnl_u": -3.67,
+    "total_win_u": 0,
+    "total_loss_u": -3.67,
+    "profit_factor": 0.0,
+    "max_drawdown_u": 3.67,
+    "max_single_loss": -2.7,
+    "avg_hold_min": 400.0,
+    "by_mode": {
+      "reversal": {
+        "n": 2,
+        "win": 0,
+        "pnl": -3.67,
+        "win_rate": 0.0
+      }
+    },
+    "funnel": {
+      "judge_pass": 6,
+      "filter_bear_reversal": 0,
+      "filter_settle_win": 0,
+      "filter_cooldown": 4,
+      "filter_same_dir": 0,
+      "filter_calc_sl": 0,
+      "filter_score": 0,
+      "opened": 2
+    }
+  }
+}

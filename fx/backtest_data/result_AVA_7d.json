@@ -1,0 +1,163 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-10-13 16:15",
+      "close_ts": "2026-10-14 03:15",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2274,
+      "exit_price": 0.26151,
+      "close_reason": "tp1_partial",
+      "pnl": 7.4,
+      "hold_min": 660.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-13 21:15",
+      "close_ts": "2026-10-14 04:30",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2358,
+      "exit_price": 0.27117,
+      "close_reason": "tp1_partial",
+      "pnl": 7.4,
+      "hold_min": 435.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-14 01:15",
+      "close_ts": "2026-10-14 05:00",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2426,
+      "exit_price": 0.27899,
+      "close_reason": "tp1_partial",
+      "pnl": 7.4,
+      "hold_min": 225.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-14 11:15",
+      "close_ts": "2026-10-14 16:45",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "range_bounce",
+      "entry_price": 0.25,
+      "exit_price": 0.2875,
+      "close_reason": "tp1_partial",
+      "pnl": 7.4,
+      "hold_min": 330.0,
+      "signal_score": 80
+    },
+    {
+      "open_ts": "2026-10-14 11:15",
+      "close_ts": "2026-10-15 07:30",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "range_bounce",
+      "entry_price": 0.25,
+      "exit_price": 0.25025,
+      "close_reason": "sl",
+      "pnl": -0.05,
+      "hold_min": 1215.0,
+      "signal_score": 80
+    },
+    {
+      "open_ts": "2026-10-16 14:30",
+      "close_ts": "2026-10-17 11:15",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2772,
+      "exit_price": 0.31806429,
+      "close_reason": "tp1_partial",
+      "pnl": 7.2709,
+      "hold_min": 1245.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-13 16:15",
+      "close_ts": "2026-10-18 12:45",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2274,
+      "exit_price": 0.4176,
+      "close_reason": "force_close_end",
+      "pnl": 41.7206,
+      "hold_min": 6990.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-13 21:15",
+      "close_ts": "2026-10-18 12:45",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2358,
+      "exit_price": 0.4176,
+      "close_reason": "force_close_end",
+      "pnl": 38.4496,
+      "hold_min": 6690.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-14 01:15",
+      "close_ts": "2026-10-18 12:45",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2426,
+      "exit_price": 0.4176,
+      "close_reason": "force_close_end",
+      "pnl": 35.9676,
+      "hold_min": 6450.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-16 14:30",
+      "close_ts": "2026-10-18 12:45",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2772,
+      "exit_price": 0.4176,
+      "close_reason": "force_close_end",
+      "pnl": 25.2247,
+      "hold_min": 2775.0,
+      "signal_score": 50
+    }
+  ],
+  "stats": {
+    "symbol": "AVAUSDT",
+    "days": 7,
+    "total_trades": 10,
+    "win_trades": 9,
+    "loss_trades": 1,
+    "win_rate_pct": 90.0,
+    "total_pnl_u": 178.18,
+    "total_win_u": 178.23,
+    "total_loss_u": -0.05,
+    "profit_factor": 3564.67,
+    "max_drawdown_u": 0.0,
+    "max_single_loss": -0.05,
+    "avg_hold_min": 4824.0,
+    "by_mode": {
+      "pullback": {
+        "n": 8,
+        "win": 8,
+        "pnl": 170.83,
+        "win_rate": 100.0
+      },
+      "range_bounce": {
+        "n": 2,
+        "win": 1,
+        "pnl": 7.35,
+        "win_rate": 50.0
+      }
+    }
+  }
+}

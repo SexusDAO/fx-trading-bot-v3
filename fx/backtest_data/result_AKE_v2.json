@@ -1,0 +1,79 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-10-13 14:00",
+      "close_ts": "2026-10-14 08:15",
+      "symbol": "AKEUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.024653,
+      "exit_price": 0.02665293,
+      "close_reason": "tp1_partial",
+      "pnl": 3.9562,
+      "hold_min": 1095.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-17 10:00",
+      "close_ts": "2026-10-17 15:15",
+      "symbol": "AKEUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.030529,
+      "exit_price": 0.02913936,
+      "close_reason": "sl",
+      "pnl": -4.7519,
+      "hold_min": 315.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-10-17 00:15",
+      "close_ts": "2026-10-17 16:30",
+      "symbol": "AKEUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.030632,
+      "exit_price": 0.02862982,
+      "close_reason": "sl",
+      "pnl": -6.7362,
+      "hold_min": 975.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-10-13 14:00",
+      "close_ts": "2026-10-18 12:00",
+      "symbol": "AKEUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.024653,
+      "exit_price": 0.029995,
+      "close_reason": "force_close_end",
+      "pnl": 10.7344,
+      "hold_min": 7080.0,
+      "signal_score": 50
+    }
+  ],
+  "stats": {
+    "symbol": "AKEUSDT",
+    "days": 30,
+    "total_trades": 4,
+    "win_trades": 2,
+    "loss_trades": 2,
+    "win_rate_pct": 50.0,
+    "total_pnl_u": 3.2,
+    "total_win_u": 14.69,
+    "total_loss_u": -11.49,
+    "profit_factor": 1.28,
+    "max_drawdown_u": 7.53,
+    "max_single_loss": -6.74,
+    "avg_hold_min": 2790.0,
+    "by_mode": {
+      "pullback": {
+        "n": 4,
+        "win": 2,
+        "pnl": 3.2,
+        "win_rate": 50.0
+      }
+    }
+  }
+}

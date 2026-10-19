@@ -1,0 +1,1 @@
+{"scoring": {"trend_threshold": 65, "watchlist_threshold": 40, "drop_threshold": 30}, "position": {"max_positions_total": 4, "market_mode_limits": {"bull": {"max_long": 2, "max_short": 2, "max_total": 4}}}, "notional": {"trend_long": {"65_69": 300}, "hard_cap": 1000}, "risk": {"daily_loss_pct": 0.2}, "ttl_minutes": {"limit_low_score": 120, "limit_high_score": 240}}

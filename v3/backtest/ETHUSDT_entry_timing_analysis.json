@@ -1,0 +1,179 @@
+[
+  {
+    "symbol": "ETHUSDT",
+    "direction": "LONG",
+    "entry": 1772.484,
+    "exit": 1860.7,
+    "result": "win",
+    "second_score": 93,
+    "position_size_usd": 800,
+    "scene": "A_pullback",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阳线",
+      "body": 18.57,
+      "lower_shadow_ratio": 0.1,
+      "upper_shadow_ratio": 0.09,
+      "volume_vs_avg3": 1.55,
+      "confirmations": [
+        "阳线收盘",
+        "止跌放量"
+      ],
+      "confirmation_count": 2
+    }
+  },
+  {
+    "symbol": "ETHUSDT",
+    "direction": "LONG",
+    "entry": 1875.6445,
+    "exit": 1926.73,
+    "result": "win",
+    "second_score": 86,
+    "position_size_usd": 600,
+    "scene": "A_pullback",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阴线",
+      "body": 1.91,
+      "lower_shadow_ratio": 1.66,
+      "upper_shadow_ratio": 3.43,
+      "volume_vs_avg3": 0.67,
+      "confirmations": [
+        "长下影线（锤子形态）"
+      ],
+      "confirmation_count": 1
+    }
+  },
+  {
+    "symbol": "ETHUSDT",
+    "direction": "SHORT",
+    "entry": 1838.0222,
+    "exit": 1842.88,
+    "result": "loss",
+    "second_score": 72,
+    "position_size_usd": 250,
+    "scene": "E_short",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阳线",
+      "body": 4.87,
+      "lower_shadow_ratio": 0.92,
+      "upper_shadow_ratio": 0.99,
+      "volume_vs_avg3": 0.67,
+      "confirmations": [],
+      "confirmation_count": 0
+    }
+  },
+  {
+    "symbol": "ETHUSDT",
+    "direction": "SHORT",
+    "entry": 1844.7163,
+    "exit": 1856.7,
+    "result": "loss",
+    "second_score": 76,
+    "position_size_usd": 250,
+    "scene": "E_short",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阴线",
+      "body": 0.77,
+      "lower_shadow_ratio": 7.7,
+      "upper_shadow_ratio": 3.18,
+      "volume_vs_avg3": 0.37,
+      "confirmations": [
+        "阴线收盘",
+        "长上影线（射击之星）"
+      ],
+      "confirmation_count": 2
+    }
+  },
+  {
+    "symbol": "ETHUSDT",
+    "direction": "LONG",
+    "entry": 1919.078875,
+    "exit": 1932.4,
+    "result": "win",
+    "second_score": 86,
+    "position_size_usd": 600,
+    "scene": "A_pullback",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阳线",
+      "body": 3.17,
+      "lower_shadow_ratio": 0.6,
+      "upper_shadow_ratio": 0.91,
+      "volume_vs_avg3": 0.58,
+      "confirmations": [
+        "阳线收盘"
+      ],
+      "confirmation_count": 1
+    }
+  },
+  {
+    "symbol": "ETHUSDT",
+    "direction": "SHORT",
+    "entry": 1890.51925,
+    "exit": 1913.75,
+    "result": "loss",
+    "second_score": 72,
+    "position_size_usd": 250,
+    "scene": "E_short",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阴线",
+      "body": 7.93,
+      "lower_shadow_ratio": 0.24,
+      "upper_shadow_ratio": 0.0,
+      "volume_vs_avg3": 0.41,
+      "confirmations": [
+        "阴线收盘"
+      ],
+      "confirmation_count": 1
+    }
+  },
+  {
+    "symbol": "ETHUSDT",
+    "direction": "LONG",
+    "entry": 1953.342375,
+    "exit": 1956.56,
+    "result": "loss",
+    "second_score": 76,
+    "position_size_usd": 250,
+    "scene": "A_pullback",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阴线",
+      "body": 2.21,
+      "lower_shadow_ratio": 6.68,
+      "upper_shadow_ratio": 2.2,
+      "volume_vs_avg3": 2.61,
+      "confirmations": [
+        "长下影线（锤子形态）",
+        "止跌放量"
+      ],
+      "confirmation_count": 2
+    }
+  },
+  {
+    "symbol": "ETHUSDT",
+    "direction": "SHORT",
+    "entry": 1905.1475,
+    "exit": 1835.75,
+    "result": "win",
+    "second_score": 72,
+    "position_size_usd": 250,
+    "scene": "E_short",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阴线",
+      "body": 23.96,
+      "lower_shadow_ratio": 0.42,
+      "upper_shadow_ratio": 0.0,
+      "volume_vs_avg3": 0.93,
+      "confirmations": [
+        "阴线收盘"
+      ],
+      "confirmation_count": 1
+    }
+  }
+]

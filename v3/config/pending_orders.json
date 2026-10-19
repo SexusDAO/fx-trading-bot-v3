@@ -1,0 +1,113 @@
+{
+  "orders": [
+    {
+      "id": "scan_20260804T180544Z_SKHYNIXUSDT",
+      "symbol": "SKHYNIXUSDT",
+      "direction": "LONG",
+      "entry_price": 1169.40275,
+      "entry_method": "C_first_pull",
+      "notional": 500,
+      "signal_type": "trend_long",
+      "score": 79,
+      "score_details": {
+        "trend_clarity": 25,
+        "volume_health": 2,
+        "volatility_fit": 20,
+        "structure": 20,
+        "mkt_sync": 12
+      },
+      "hard_sl": 1121.9273,
+      "tp1_price": 1226.37329,
+      "tp2_price": 1311.8291,
+      "funding_rate": 0.00079453,
+      "scene": "C_first_pull",
+      "scene_reason": "场景C强势回踩 二次分=88 RR=2.5 | 回踩1%极浅,可能继续(+18) | 守住突破位且有余量(+25) | 缩量59%(+20) | 收盘上EMA20(+15) | RR预估≥2.0(+10)",
+      "status": "pending",
+      "placed_at": "2026-08-04T18:05:44Z",
+      "expire_at": "2026-08-04T20:05:44Z",
+      "exchange_order_id": null
+    },
+    {
+      "id": "scan_20260804T180544Z_SAMSUNGUSDT",
+      "symbol": "SAMSUNGUSDT",
+      "direction": "LONG",
+      "entry_price": 180.40472355,
+      "entry_method": "C_first_pull",
+      "notional": 500,
+      "signal_type": "trend_long",
+      "score": 79,
+      "score_details": {
+        "trend_clarity": 25,
+        "volume_health": 2,
+        "volatility_fit": 20,
+        "structure": 20,
+        "mkt_sync": 12
+      },
+      "hard_sl": 173.30415,
+      "tp1_price": 188.92541181,
+      "tp2_price": 201.7064442,
+      "funding_rate": 0.00071785,
+      "scene": "C_first_pull",
+      "scene_reason": "场景C强势回踩 二次分=88 RR=2.5 | 回踩0%极浅,可能继续(+18) | 守住突破位且有余量(+25) | 缩量61%(+20) | 收盘上EMA20(+15) | RR预估≥2.0(+10)",
+      "status": "pending",
+      "placed_at": "2026-08-04T18:05:44Z",
+      "expire_at": "2026-08-04T20:05:44Z",
+      "exchange_order_id": null
+    },
+    {
+      "id": "scan_20260804T183355Z_EWYUSDT",
+      "symbol": "EWYUSDT",
+      "direction": "LONG",
+      "entry_price": 171.98075,
+      "entry_method": "C_first_pull",
+      "notional": 700,
+      "signal_type": "trend_long",
+      "score": 85,
+      "score_details": {
+        "trend_clarity": 25,
+        "volume_health": 8,
+        "volatility_fit": 20,
+        "structure": 20,
+        "mkt_sync": 12
+      },
+      "hard_sl": 166.6789,
+      "tp1_price": 178.34297,
+      "tp2_price": 187.8863,
+      "funding_rate": 0.0,
+      "scene": "C_first_pull",
+      "scene_reason": "场景C强势回踩 二次分=81 RR=2.5 | 回踩1%极浅,可能继续(+18) | 守住突破位且有余量(+25) | 缩量34%(+13) | 收盘上EMA20(+15) | RR预估≥2.0(+10)",
+      "status": "pending",
+      "placed_at": "2026-08-04T18:33:55Z",
+      "expire_at": "2026-08-04T22:33:55Z",
+      "exchange_order_id": null
+    },
+    {
+      "id": "scan_20260804T183355Z_AIOUSDT",
+      "symbol": "AIOUSDT",
+      "direction": "LONG",
+      "entry_price": 0.0417645,
+      "entry_method": "C_first_pull",
+      "notional": 700,
+      "signal_type": "trend_long",
+      "score": 80,
+      "score_details": {
+        "trend_clarity": 17,
+        "volume_health": 8,
+        "volatility_fit": 20,
+        "structure": 20,
+        "mkt_sync": 15
+      },
+      "hard_sl": 0.0368674,
+      "tp1_price": 0.04764102,
+      "tp2_price": 0.0564558,
+      "funding_rate": 5e-05,
+      "scene": "C_first_pull",
+      "scene_reason": "场景C强势回踩 二次分=75 RR=2.5 | 回踩2%极浅,可能继续(+18) | 守住突破位且有余量(+25) | 轻微缩量(+7) | 收盘上EMA20(+15) | RR预估≥2.0(+10)",
+      "status": "pending",
+      "placed_at": "2026-08-04T18:33:55Z",
+      "expire_at": "2026-08-04T22:33:55Z",
+      "exchange_order_id": null
+    }
+  ],
+  "generated_at": "2026-08-04T19:03:43Z"
+}

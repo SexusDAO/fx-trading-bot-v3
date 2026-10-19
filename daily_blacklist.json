@@ -1,0 +1,17 @@
+{
+  "date": "2026-08-03",
+  "symbols": {
+    "WLDUSDT": {
+      "direction": "SHORT",
+      "expire_ts": 1785725193.2926073,
+      "expire_str": "02:46 UTC",
+      "reason": "止损后1.0h冷静期"
+    },
+    "SOXSUSDT": {
+      "direction": "SHORT",
+      "expire_ts": 1785731173.7130096,
+      "expire_str": "04:26 UTC",
+      "reason": "止损后1.0h冷静期"
+    }
+  }
+}

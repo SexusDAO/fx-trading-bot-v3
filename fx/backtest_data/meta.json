@@ -1,0 +1,1 @@
+{"symbol": "1000PEPEUSDT", "days": 65, "start_ms": 1786721009155, "end_ms": 1792337009155, "prepared_at": "2026-10-18T15:23:34.875229+00:00", "cg_bonus_note": "CG清算图无历史接口，回测时 cg_bonus 固定为 0", "news_note": "新闻信号无法精确历史化，回测时 news_bias 固定为 None（不拦截不加分）", "llm_note": "LLM判断跳过，回测时边界信号全部走规则系统原始结果"}

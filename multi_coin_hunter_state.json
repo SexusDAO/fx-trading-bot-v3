@@ -1,0 +1,35 @@
+{
+  "last_run": "2026-07-18T10:48:00Z",
+  "positions": [
+    {
+      "symbol": "TRUMPUSDT",
+      "side": "LONG",
+      "qty": 58.9,
+      "entry_price": 1.697,
+      "notional": 99.97,
+      "sl": 1.668,
+      "tp": 1.720,
+      "open_time": "2026-07-18T10:15:18Z",
+      "sl_algo_id": "1000002460800275",
+      "tp_algo_id": "1000002460800379",
+      "add_count": 0,
+      "notes": "SL/TP set at 10:48 UTC; 1h trend bullish breakout"
+    }
+  ],
+  "pending_orders": [
+    {
+      "symbol": "BANKUSDT",
+      "side": "LONG",
+      "order_id": "1293422489",
+      "entry_price": 0.0726,
+      "qty": 1377,
+      "notional": 99.97,
+      "sl_plan": 0.0685,
+      "tp_plan": 0.0780,
+      "placed_time": "2026-07-18T10:48:00Z",
+      "cancel_if_unfilled_by": "2026-07-18T12:48:00Z",
+      "notes": "Bounce play after -12.7% drop; stabilizing above 0.069"
+    }
+  ],
+  "notes": "Total positions+orders: 2 (< 3 threshold). Next scan: check BANKUSDT fill status + TRUMPUSDT trend."
+}

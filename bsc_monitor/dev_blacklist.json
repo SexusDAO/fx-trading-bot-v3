@@ -1,0 +1,358 @@
+{
+  "blacklist": {
+    "0xb29454c8da1de94fc3a5df8d44b0993a4435466d": {
+      "ath_mc": 89526.856,
+      "token_count": 37,
+      "added_at": 1791224370.8596873
+    },
+    "0x5ad467b2dafadc27d1708c31dbd6e4565b0010d1": {
+      "ath_mc": 33303.109,
+      "token_count": 84,
+      "added_at": 1791230821.4348257
+    },
+    "0xdadca49e762abb5c904223d73388eb9dcceba21c": {
+      "ath_mc": 437357.07,
+      "token_count": 4094,
+      "added_at": 1791241484.830972
+    },
+    "0xd41feaa24dede516a501862cf1f376defb811772": {
+      "ath_mc": 217663.53,
+      "token_count": 2020,
+      "added_at": 1791243606.8169975
+    },
+    "0x14dec1eb8598cee77b5104cf94521b5964fdb052": {
+      "ath_mc": 480512.15,
+      "token_count": 640,
+      "added_at": 1791249402.8489938
+    },
+    "0x653d2bd9e20db2a45ff19ff386dfa2a6011ba99e": {
+      "ath_mc": 291646.52,
+      "token_count": 680,
+      "added_at": 1791250972.7687857
+    },
+    "0xa6bce800bb299696d1b235316d2249f2036a9a3d": {
+      "ath_mc": 17737.168,
+      "token_count": 210,
+      "added_at": 1791251239.7151887
+    },
+    "0x511ff3ae421c8d5a6db79e78cfb827a16f16e63f": {
+      "ath_mc": 55336.021,
+      "token_count": 191,
+      "added_at": 1791251570.8452475
+    },
+    "0xc5d978900e49f0a976fa6316ed3654a0a85dc53c": {
+      "ath_mc": 148255.29,
+      "token_count": 122,
+      "added_at": 1791254887.3303752
+    },
+    "0xf5f7addece80ac83eafc9ebad2c7d08e5431baf4": {
+      "ath_mc": 118666.75,
+      "token_count": 52,
+      "added_at": 1791257515.5152025
+    },
+    "0x3f8eeaa6037804b2513646efb92dfaa4beb0ed8c": {
+      "ath_mc": 14860.745,
+      "token_count": 135,
+      "added_at": 1791261396.247099
+    },
+    "0xa678418561eb6998dfcff914f9852ee5b46c4f0a": {
+      "ath_mc": 177316.37,
+      "token_count": 1546,
+      "added_at": 1791270605.8313003
+    },
+    "0x2a27d4a80cac33f92fc2cd8fc2a62aa88df60980": {
+      "ath_mc": 59986.32,
+      "token_count": 114,
+      "added_at": 1791279811.4925303
+    },
+    "0xb83ae281cbd1a3eece0fef1a13ca0a5b268e3c81": {
+      "ath_mc": 204349.13,
+      "token_count": 3459,
+      "added_at": 1791280900.837684
+    },
+    "0xd7ee74f748b5d7622120d8279f9bcbf24be2f3f8": {
+      "ath_mc": 40088.047,
+      "token_count": 130,
+      "added_at": 1791280937.7826612
+    },
+    "0xb1fd7856a27794fd39e0b799b68a623a587444d0": {
+      "ath_mc": 319470.78,
+      "token_count": 63,
+      "added_at": 1791282026.544232
+    },
+    "0xfdcad9c77dea8361a4a4c4f0e394c98fabe30a93": {
+      "ath_mc": 59617.134,
+      "token_count": 41,
+      "added_at": 1791285954.8542237
+    },
+    "0x86f92c0119919ecc30e9d163214143e1f526028f": {
+      "ath_mc": 168881.28,
+      "token_count": 173,
+      "added_at": 1791287526.174076
+    },
+    "0x1877a12849855819b4e4d12d14a49182dfbb3c69": {
+      "ath_mc": 83411.642,
+      "token_count": 86,
+      "added_at": 1791288536.7963023
+    },
+    "0x59d4a9673b32e108155eb533a9e0d50ed71480ca": {
+      "ath_mc": 33569.239,
+      "token_count": 287,
+      "added_at": 1791293813.6350894
+    },
+    "0x6cc083c8a565f0b0d2486266b00e45f1c762622d": {
+      "ath_mc": 49521.553,
+      "token_count": 131,
+      "added_at": 1791294749.935964
+    },
+    "0x59c67584abb82317a8d8307b492c15ffdce0fdb3": {
+      "ath_mc": 469551.75,
+      "token_count": 262,
+      "added_at": 1791297276.149765
+    },
+    "0x6f440e7d3a7b22cb93f7e7bf08c0031421ed1e6d": {
+      "ath_mc": 113408.27,
+      "token_count": 403,
+      "added_at": 1791298658.8867114
+    },
+    "0x637a155baa88a37afbe0979ef0a93d8f2653b8ce": {
+      "ath_mc": 227603.7,
+      "token_count": 794,
+      "added_at": 1791299783.0951898
+    },
+    "0xd68d10e85f318c99a8ada2d5839a23f06eb70f7c": {
+      "ath_mc": 183514.1,
+      "token_count": 61,
+      "added_at": 1791300103.5842023
+    },
+    "0x79b91b923bcc80bfd20274fdeec1eb3f6a1e4e06": {
+      "ath_mc": 272199.76,
+      "token_count": 626,
+      "added_at": 1791302219.8636925
+    },
+    "0xea1a19ed166097b3574a68f363292ef006700c90": {
+      "ath_mc": 50466.173,
+      "token_count": 37,
+      "added_at": 1791305113.1088116
+    },
+    "0x57454713aeee279932d71aa01601b8440ffc95ae": {
+      "ath_mc": 0,
+      "token_count": 0,
+      "added_at": 1791305174.6789477,
+      "reason": "用户手动拉黑"
+    },
+    "0xaef42f886a553c665bd11ff616ed148299a9195b": {
+      "ath_mc": 0,
+      "token_count": 0,
+      "added_at": 1791305174.678958,
+      "reason": "用户手动拉黑"
+    },
+    "0x319555bc59edb925cc5bf202ee7d7d12b7504cd8": {
+      "ath_mc": 0,
+      "token_count": 0,
+      "added_at": 1791305346.888543,
+      "reason": "用户手动拉黑"
+    },
+    "0x4192a81036bcf890252c2840db96171ab052b2c5": {
+      "ath_mc": 231674.05,
+      "token_count": 412,
+      "added_at": 1791305657.4849677
+    },
+    "0x403582c59c397b21924fa30ce514309aec054193": {
+      "ath_mc": 0,
+      "token_count": 0,
+      "added_at": 1791306130.2944958,
+      "reason": "用户手动拉黑"
+    },
+    "0xaa8e772a0d163a131a673c731e8ee83583c0d355": {
+      "ath_mc": 46402.654,
+      "token_count": 37,
+      "added_at": 1791307161.0146043
+    },
+    "0xe2617c0f3ce660e5ef5f592e99aa3ca179637b09": {
+      "ath_mc": 265064.83,
+      "token_count": 1730,
+      "added_at": 1791310809.0637548
+    },
+    "0x149ef4519f21edda08745ec00fec57f3e44f5cc8": {
+      "ath_mc": 122718.88,
+      "token_count": 78,
+      "added_at": 1791311109.9930978
+    },
+    "0xc4c30437c3c313310a264741ed20b41fc7ebb85b": {
+      "ath_mc": 39331.423,
+      "token_count": 104,
+      "added_at": 1791329471.7688265
+    },
+    "0x1f2525edc7019542f7d43d4583e4d7e8a1cd6f25": {
+      "ath_mc": 5353.8054,
+      "token_count": 4737,
+      "added_at": 1791334037.966461
+    },
+    "0x5bcd28cdee7a4578bd6190b8b2912a1359ad034a": {
+      "ath_mc": 5615.6622,
+      "token_count": 4737,
+      "added_at": 1791334051.6393325
+    },
+    "0x702efbd8168e5acbcb3fa6e98a7caec3cd8e4444": {
+      "ath_mc": 4678.7977,
+      "token_count": 696,
+      "added_at": 1791334054.3085604
+    },
+    "0xd06f6f96c6af0ee2c31f8ab1ded5c1b706544444": {
+      "ath_mc": 6798.0306,
+      "token_count": 647,
+      "added_at": 1791334060.1489916
+    },
+    "0xba4e1690c0384ffc3069c1e5f4ae232af1c34444": {
+      "ath_mc": 7569.6121,
+      "token_count": 666,
+      "added_at": 1791334065.5977654
+    },
+    "0x8b6ce457963f1cbb6dfbd5b6ea9d870f1da8699f": {
+      "ath_mc": 14909.905,
+      "token_count": 44,
+      "added_at": 1791334070.734026
+    },
+    "0x118248d11e1beee1fea76f60c3a25a4ebe1d6074": {
+      "ath_mc": 4950.4422,
+      "token_count": 345,
+      "added_at": 1791334073.3789527
+    },
+    "0x8556b7bac71049c39469dd86d49687a737e2ca20": {
+      "ath_mc": 4913.5577,
+      "token_count": 4826,
+      "added_at": 1791334076.1009016
+    },
+    "0xeeed05b860c54a05d3f51a2c8f137ed92f22421b": {
+      "ath_mc": 5487.1305,
+      "token_count": 26,
+      "added_at": 1791334079.1005015
+    },
+    "0x54e33baa4dfddd6d6b799fe5991862dd84c23aea": {
+      "ath_mc": 16588.675,
+      "token_count": 4548,
+      "added_at": 1791334081.8583007
+    },
+    "0xe46ac37677e0b0a2e26bc24e01f3241eced0ca16": {
+      "ath_mc": 0,
+      "token_count": 272,
+      "added_at": 1791334084.5691924
+    },
+    "0x29cf4f78a80edfe62c79d1e589c7eb5171729454": {
+      "ath_mc": 33949.568,
+      "token_count": 4634,
+      "added_at": 1791334090.220952
+    },
+    "0xdaceb1ff5956d76a8c69ebaf596b1a1260b608a7": {
+      "ath_mc": 91027.379,
+      "token_count": 8613,
+      "added_at": 1791334095.739302
+    },
+    "0x247b195032f7326b4505c8387ebf1815c4f44af2": {
+      "ath_mc": 4646.8013,
+      "token_count": 364,
+      "added_at": 1791334098.5862563
+    },
+    "0x0e0c3e4917e06a7778c4139d2af9ce4f11354ef8": {
+      "ath_mc": 4558.6055,
+      "token_count": 273,
+      "added_at": 1791334116.4572847
+    },
+    "0xb7c5d1e255bc7280000112cecba6ece2e2054444": {
+      "ath_mc": 5315.3511,
+      "token_count": 676,
+      "added_at": 1791334119.220956
+    },
+    "0x66e119ca46709cad22277b4b2c1ecf8f69ef4444": {
+      "ath_mc": 7479.2996,
+      "token_count": 645,
+      "added_at": 1791334123.827782
+    },
+    "0x9c2ffadee786f9a24342add1fdc9479c99664444": {
+      "ath_mc": 6188.0474,
+      "token_count": 684,
+      "added_at": 1791334127.5547082
+    },
+    "0xef445b8e5e232f133ad35899e17369b0d1c465bd": {
+      "ath_mc": 4780.7969,
+      "token_count": 347,
+      "added_at": 1791334132.7004457
+    },
+    "0x980b9bb5b3163638e0a35f8f26ff40547b16e2a9": {
+      "ath_mc": 4400.2915,
+      "token_count": 518,
+      "added_at": 1791334135.3477685
+    },
+    "0x0caa56f853191217f94397c8d306c058f4a14444": {
+      "ath_mc": 4842.9131,
+      "token_count": 701,
+      "added_at": 1791334143.4668896
+    },
+    "0x76a81077c2ebe341b7e1dc77a73776d7d4a5b402": {
+      "ath_mc": 0,
+      "token_count": 367,
+      "added_at": 1791334146.5728953
+    },
+    "0x6d4e0882d7145e6fc4cb3f71a322a1750b86a7da": {
+      "ath_mc": 4881.7015,
+      "token_count": 272,
+      "added_at": 1791334149.4105208
+    },
+    "0xe3df023b312972a35b3341f8074b763cb9c64444": {
+      "ath_mc": 10218.345,
+      "token_count": 662,
+      "added_at": 1791334155.0575237
+    },
+    "0x9ab3c5dbd93756c4c6a098a3a075e73328af4444": {
+      "ath_mc": 5010.5637,
+      "token_count": 670,
+      "added_at": 1791334157.7017891
+    },
+    "0x7b8d259f0c8a40c2ad6cd4117d62f29d727639b7": {
+      "ath_mc": 4354.3343,
+      "token_count": 39,
+      "added_at": 1791334160.4392996
+    },
+    "0xe26a8a93a803f6dcc9355da3beac69d733ddfd5d": {
+      "ath_mc": 4950.8859,
+      "token_count": 535,
+      "added_at": 1791334163.0663927
+    },
+    "0xa047751310f1215ab64c704710cb795e0c3266f3": {
+      "ath_mc": 5101.1912,
+      "token_count": 367,
+      "added_at": 1791334168.5306635
+    },
+    "0x4e97f514f05859bea0f79ee3d0cc8f3daa874444": {
+      "ath_mc": 5421.847,
+      "token_count": 663,
+      "added_at": 1791334177.0179372
+    },
+    "0x583a1175854d23eb61ad086543af62c0ffbd4444": {
+      "ath_mc": 5830.0382,
+      "token_count": 637,
+      "added_at": 1791334179.8433456
+    },
+    "0x4f6d40378da3874cb49b6834b4c20ada43842691": {
+      "ath_mc": 4459.2068,
+      "token_count": 517,
+      "added_at": 1791334191.44225
+    },
+    "0x6497abb5bbc3fd79da8a3511eb90c549f9ca27b0": {
+      "ath_mc": 6959.8057,
+      "token_count": 275,
+      "added_at": 1791334197.737871
+    },
+    "0xea5c98a6164850f6ace669bd753de6928881b65e": {
+      "ath_mc": 4434.509,
+      "token_count": 517,
+      "added_at": 1791334207.0453448
+    }
+  },
+  "description": "开发者黑名单：经常发币但历史最高市值从未超过 500K 的开发者",
+  "threshold": {
+    "min_tokens": 20,
+    "max_ath_mc": 500000
+  }
+}

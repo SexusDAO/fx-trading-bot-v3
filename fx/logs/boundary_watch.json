@@ -1,0 +1,2204 @@
+{
+  "created": "2026-10-19T08:16Z",
+  "version": 2,
+  "purpose": "边界标的持续观察：ATR 1.0~2.5% 区间，验证周末 ATR 门槛和 bear 市 medium LONG 质量",
+  "observe_until": "2026-11-02T08:00Z",
+  "focus_dimensions": [
+    "LONG pullback 在 bear 市的开仓率 & 胜率（有没有真实开仓，开了之后止盈/止损如何）",
+    "reversal SHORT 降级入场信号的止损触发率（vs 正常入场信号）"
+  ],
+  "atr_range": "1.0~2.5%",
+  "total": 219,
+  "symbols": [
+    {
+      "symbol": "ADAUSDT",
+      "atr_ratio": 1.01,
+      "chg24": 0.5,
+      "vol24m": 122.4,
+      "snapshot_price": 0.2203,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "EWYUSDT",
+      "atr_ratio": 1.01,
+      "chg24": 5.6,
+      "vol24m": 131.2,
+      "snapshot_price": 158.14,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SKYUSDT",
+      "atr_ratio": 1.01,
+      "chg24": 1.3,
+      "vol24m": 3.6,
+      "snapshot_price": 0.07022,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "POLUSDT",
+      "atr_ratio": 1.02,
+      "chg24": 1.1,
+      "vol24m": 11.2,
+      "snapshot_price": 0.09263,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "AXSUSDT",
+      "atr_ratio": 1.02,
+      "chg24": -1.1,
+      "vol24m": 7.1,
+      "snapshot_price": 1.0074,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "TURBOUSDT",
+      "atr_ratio": 1.05,
+      "chg24": -2.6,
+      "vol24m": 3.2,
+      "snapshot_price": 0.000842,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ALLOUSDT",
+      "atr_ratio": 1.07,
+      "chg24": 0.2,
+      "vol24m": 3.1,
+      "snapshot_price": 0.2127,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "INTCUSDT",
+      "atr_ratio": 1.07,
+      "chg24": 4.3,
+      "vol24m": 102.6,
+      "snapshot_price": 93.07,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "atr_ratio": 1.07,
+      "chg24": -0.3,
+      "vol24m": 108.7,
+      "snapshot_price": 9.761,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "DEXEUSDT",
+      "atr_ratio": 1.07,
+      "chg24": -0.8,
+      "vol24m": 4.5,
+      "snapshot_price": 1.729,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "CBRSUSDT",
+      "atr_ratio": 1.09,
+      "chg24": 3.3,
+      "vol24m": 19.3,
+      "snapshot_price": 129.49,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "GRTUSDT",
+      "atr_ratio": 1.09,
+      "chg24": 0.3,
+      "vol24m": 3.1,
+      "snapshot_price": 0.02388,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "JUPUSDT",
+      "atr_ratio": 1.09,
+      "chg24": 2.5,
+      "vol24m": 12.9,
+      "snapshot_price": 0.2962,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "COHRUSDT",
+      "atr_ratio": 1.09,
+      "chg24": 3.5,
+      "vol24m": 7.1,
+      "snapshot_price": 240.24,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "LITEUSDT",
+      "atr_ratio": 1.1,
+      "chg24": 4.3,
+      "vol24m": 32.0,
+      "snapshot_price": 850.94,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "PNUTUSDT",
+      "atr_ratio": 1.1,
+      "chg24": -0.8,
+      "vol24m": 3.3,
+      "snapshot_price": 0.04343,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ENSUSDT",
+      "atr_ratio": 1.1,
+      "chg24": 1.0,
+      "vol24m": 3.4,
+      "snapshot_price": 5.547,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ORCAUSDT",
+      "atr_ratio": 1.11,
+      "chg24": -0.2,
+      "vol24m": 5.1,
+      "snapshot_price": 1.777,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "WDCUSDT",
+      "atr_ratio": 1.11,
+      "chg24": 6.0,
+      "vol24m": 18.0,
+      "snapshot_price": 337.76,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "TRUMPUSDT",
+      "atr_ratio": 1.12,
+      "chg24": -1.1,
+      "vol24m": 66.9,
+      "snapshot_price": 1.716,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ORDIUSDT",
+      "atr_ratio": 1.12,
+      "chg24": 0.0,
+      "vol24m": 8.2,
+      "snapshot_price": 3.74,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "1000BONKUSDT",
+      "atr_ratio": 1.12,
+      "chg24": -0.1,
+      "vol24m": 10.6,
+      "snapshot_price": 0.002951,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "1000FLOKIUSDT",
+      "atr_ratio": 1.13,
+      "chg24": 0.8,
+      "vol24m": 3.7,
+      "snapshot_price": 0.02355,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "BIOUSDT",
+      "atr_ratio": 1.13,
+      "chg24": -0.0,
+      "vol24m": 3.9,
+      "snapshot_price": 0.02371,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "RAVEUSDT",
+      "atr_ratio": 1.13,
+      "chg24": -1.4,
+      "vol24m": 3.5,
+      "snapshot_price": 0.1503,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "OPENUSDT",
+      "atr_ratio": 1.13,
+      "chg24": -2.5,
+      "vol24m": 3.9,
+      "snapshot_price": 0.0894,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "BANKUSDT",
+      "atr_ratio": 1.13,
+      "chg24": 1.3,
+      "vol24m": 5.6,
+      "snapshot_price": 0.02666,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ZENUSDT",
+      "atr_ratio": 1.14,
+      "chg24": 2.0,
+      "vol24m": 6.9,
+      "snapshot_price": 5.986,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "STXXUSDT",
+      "atr_ratio": 1.14,
+      "chg24": 7.0,
+      "vol24m": 10.8,
+      "snapshot_price": 651.49,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ATOMUSDT",
+      "atr_ratio": 1.14,
+      "chg24": 2.0,
+      "vol24m": 16.6,
+      "snapshot_price": 1.744,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "BEATUSDT",
+      "atr_ratio": 1.15,
+      "chg24": -0.7,
+      "vol24m": 5.6,
+      "snapshot_price": 0.07338,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ICPUSDT",
+      "atr_ratio": 1.15,
+      "chg24": -0.1,
+      "vol24m": 20.1,
+      "snapshot_price": 2.918,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "LAUSDT",
+      "atr_ratio": 1.15,
+      "chg24": -1.9,
+      "vol24m": 3.1,
+      "snapshot_price": 0.05307,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "2ZUSDT",
+      "atr_ratio": 1.16,
+      "chg24": -2.6,
+      "vol24m": 3.0,
+      "snapshot_price": 0.02983,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "CRWVUSDT",
+      "atr_ratio": 1.16,
+      "chg24": 3.3,
+      "vol24m": 24.5,
+      "snapshot_price": 62.54,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "TRBUSDT",
+      "atr_ratio": 1.16,
+      "chg24": 1.0,
+      "vol24m": 4.0,
+      "snapshot_price": 17.84,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "atr_ratio": 1.16,
+      "chg24": 0.8,
+      "vol24m": 10.2,
+      "snapshot_price": 0.11126,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "EGLDUSDT",
+      "atr_ratio": 1.17,
+      "chg24": 1.9,
+      "vol24m": 3.0,
+      "snapshot_price": 3.607,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "CHZUSDT",
+      "atr_ratio": 1.17,
+      "chg24": 0.7,
+      "vol24m": 4.7,
+      "snapshot_price": 0.01385,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SNDKUSDT",
+      "atr_ratio": 1.17,
+      "chg24": 5.4,
+      "vol24m": 717.9,
+      "snapshot_price": 1342.28,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "VIRTUALUSDT",
+      "atr_ratio": 1.18,
+      "chg24": 1.7,
+      "vol24m": 14.2,
+      "snapshot_price": 0.6608,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SKLUSDT",
+      "atr_ratio": 1.18,
+      "chg24": -3.6,
+      "vol24m": 3.8,
+      "snapshot_price": 0.004407,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "NEIROUSDT",
+      "atr_ratio": 1.18,
+      "chg24": -2.5,
+      "vol24m": 6.1,
+      "snapshot_price": 7.1e-05,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "atr_ratio": 1.18,
+      "chg24": 0.6,
+      "vol24m": 67.2,
+      "snapshot_price": 152.83,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "TUTUSDT",
+      "atr_ratio": 1.19,
+      "chg24": 0.2,
+      "vol24m": 3.2,
+      "snapshot_price": 0.01879,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "TAOUSDT",
+      "atr_ratio": 1.19,
+      "chg24": 2.1,
+      "vol24m": 116.7,
+      "snapshot_price": 272.8,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "MANAUSDT",
+      "atr_ratio": 1.19,
+      "chg24": -1.9,
+      "vol24m": 5.7,
+      "snapshot_price": 0.08361,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "GALAUSDT",
+      "atr_ratio": 1.19,
+      "chg24": -1.1,
+      "vol24m": 9.6,
+      "snapshot_price": 0.00191,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "WIFUSDT",
+      "atr_ratio": 1.19,
+      "chg24": 1.9,
+      "vol24m": 14.4,
+      "snapshot_price": 0.1998,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ESPORTSUSDT",
+      "atr_ratio": 1.19,
+      "chg24": -3.1,
+      "vol24m": 3.0,
+      "snapshot_price": 0.00825,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "KAITOUSDT",
+      "atr_ratio": 1.2,
+      "chg24": -0.6,
+      "vol24m": 6.8,
+      "snapshot_price": 0.2788,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "DASHUSDT",
+      "atr_ratio": 1.2,
+      "chg24": 1.0,
+      "vol24m": 23.8,
+      "snapshot_price": 48.99,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "DODOXUSDT",
+      "atr_ratio": 1.21,
+      "chg24": 0.3,
+      "vol24m": 4.1,
+      "snapshot_price": 0.021206,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "IOTAUSDT",
+      "atr_ratio": 1.21,
+      "chg24": -0.8,
+      "vol24m": 3.9,
+      "snapshot_price": 0.04519,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "PENGUUSDT",
+      "atr_ratio": 1.22,
+      "chg24": 2.3,
+      "vol24m": 33.0,
+      "snapshot_price": 0.007573,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "DRAMUSDT",
+      "atr_ratio": 1.23,
+      "chg24": 4.9,
+      "vol24m": 100.5,
+      "snapshot_price": 48.29,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "NMRUSDT",
+      "atr_ratio": 1.23,
+      "chg24": -4.6,
+      "vol24m": 7.6,
+      "snapshot_price": 11.127,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "MRNAUSDT",
+      "atr_ratio": 1.23,
+      "chg24": 0.5,
+      "vol24m": 5.4,
+      "snapshot_price": 215.28,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "DYDXUSDT",
+      "atr_ratio": 1.23,
+      "chg24": -0.9,
+      "vol24m": 3.4,
+      "snapshot_price": 0.1151,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "HBARUSDT",
+      "atr_ratio": 1.23,
+      "chg24": -2.8,
+      "vol24m": 99.5,
+      "snapshot_price": 0.08449,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "HOMEUSDT",
+      "atr_ratio": 1.24,
+      "chg24": 2.5,
+      "vol24m": 3.0,
+      "snapshot_price": 0.00491,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "LPTUSDT",
+      "atr_ratio": 1.24,
+      "chg24": -1.6,
+      "vol24m": 3.3,
+      "snapshot_price": 1.63,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SAGAUSDT",
+      "atr_ratio": 1.24,
+      "chg24": 0.7,
+      "vol24m": 4.0,
+      "snapshot_price": 0.0189,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "LUNA2USDT",
+      "atr_ratio": 1.24,
+      "chg24": -0.9,
+      "vol24m": 3.9,
+      "snapshot_price": 0.04249,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "IOUSDT",
+      "atr_ratio": 1.25,
+      "chg24": 1.0,
+      "vol24m": 3.3,
+      "snapshot_price": 0.1531,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SOPHUSDT",
+      "atr_ratio": 1.25,
+      "chg24": -0.8,
+      "vol24m": 3.7,
+      "snapshot_price": 0.002113,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "COTIUSDT",
+      "atr_ratio": 1.26,
+      "chg24": -0.2,
+      "vol24m": 6.1,
+      "snapshot_price": 0.010877,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "VETUSDT",
+      "atr_ratio": 1.27,
+      "chg24": 1.9,
+      "vol24m": 5.4,
+      "snapshot_price": 0.006845,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "BOMEUSDT",
+      "atr_ratio": 1.27,
+      "chg24": -2.4,
+      "vol24m": 11.7,
+      "snapshot_price": 0.000613,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ACEUSDT",
+      "atr_ratio": 1.27,
+      "chg24": -2.4,
+      "vol24m": 7.6,
+      "snapshot_price": 0.15244,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "JTOUSDT",
+      "atr_ratio": 1.28,
+      "chg24": 0.2,
+      "vol24m": 12.1,
+      "snapshot_price": 0.4433,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "OPNUSDT",
+      "atr_ratio": 1.28,
+      "chg24": -3.1,
+      "vol24m": 4.2,
+      "snapshot_price": 0.04933,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "PENDLEUSDT",
+      "atr_ratio": 1.28,
+      "chg24": 2.2,
+      "vol24m": 15.8,
+      "snapshot_price": 2.08,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "CCUSDT",
+      "atr_ratio": 1.29,
+      "chg24": 2.0,
+      "vol24m": 5.8,
+      "snapshot_price": 0.10287,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "PEOPLEUSDT",
+      "atr_ratio": 1.29,
+      "chg24": 0.5,
+      "vol24m": 4.2,
+      "snapshot_price": 0.007576,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SUIUSDT",
+      "atr_ratio": 1.29,
+      "chg24": 2.9,
+      "vol24m": 192.0,
+      "snapshot_price": 1.008,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SOONUSDT",
+      "atr_ratio": 1.29,
+      "chg24": -2.3,
+      "vol24m": 4.8,
+      "snapshot_price": 0.3059,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "RENDERUSDT",
+      "atr_ratio": 1.3,
+      "chg24": -0.4,
+      "vol24m": 16.7,
+      "snapshot_price": 1.818,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "GIGGLEUSDT",
+      "atr_ratio": 1.31,
+      "chg24": -2.2,
+      "vol24m": 6.2,
+      "snapshot_price": 32.07,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "PENGUSDT",
+      "atr_ratio": 1.31,
+      "chg24": 5.3,
+      "vol24m": 14.5,
+      "snapshot_price": 58.93,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "RVNUSDT",
+      "atr_ratio": 1.31,
+      "chg24": 0.6,
+      "vol24m": 5.5,
+      "snapshot_price": 0.001452,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "DOTUSDT",
+      "atr_ratio": 1.32,
+      "chg24": 1.6,
+      "vol24m": 48.1,
+      "snapshot_price": 1.1208,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "BBUSDT",
+      "atr_ratio": 1.32,
+      "chg24": -0.5,
+      "vol24m": 3.1,
+      "snapshot_price": 0.007904,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "AIAUSDT",
+      "atr_ratio": 1.32,
+      "chg24": -1.3,
+      "vol24m": 3.1,
+      "snapshot_price": 0.07644,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "XMRUSDT",
+      "atr_ratio": 1.32,
+      "chg24": 3.2,
+      "vol24m": 90.1,
+      "snapshot_price": 596.17,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "XPLUSDT",
+      "atr_ratio": 1.33,
+      "chg24": -0.5,
+      "vol24m": 32.7,
+      "snapshot_price": 0.07784,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "IRENUSDT",
+      "atr_ratio": 1.34,
+      "chg24": 5.7,
+      "vol24m": 12.3,
+      "snapshot_price": 27.87,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "AAOIUSDT",
+      "atr_ratio": 1.34,
+      "chg24": 5.4,
+      "vol24m": 27.0,
+      "snapshot_price": 78.11,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "DATAIPUSDT",
+      "atr_ratio": 1.34,
+      "chg24": -5.4,
+      "vol24m": 3.6,
+      "snapshot_price": 0.158,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "WUSDT",
+      "atr_ratio": 1.34,
+      "chg24": -4.0,
+      "vol24m": 14.3,
+      "snapshot_price": 0.012772,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "CFXUSDT",
+      "atr_ratio": 1.34,
+      "chg24": -0.1,
+      "vol24m": 7.1,
+      "snapshot_price": 0.05314,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "STABLEUSDT",
+      "atr_ratio": 1.35,
+      "chg24": -4.5,
+      "vol24m": 3.1,
+      "snapshot_price": 0.02419,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ONDOUSDT",
+      "atr_ratio": 1.36,
+      "chg24": 0.4,
+      "vol24m": 69.1,
+      "snapshot_price": 0.4382,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "METUSDT",
+      "atr_ratio": 1.36,
+      "chg24": 0.1,
+      "vol24m": 12.6,
+      "snapshot_price": 0.3379,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "FFUSDT",
+      "atr_ratio": 1.37,
+      "chg24": 1.7,
+      "vol24m": 3.9,
+      "snapshot_price": 0.1053,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "AEROUSDT",
+      "atr_ratio": 1.37,
+      "chg24": -4.6,
+      "vol24m": 30.7,
+      "snapshot_price": 0.7966,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "GPSUSDT",
+      "atr_ratio": 1.38,
+      "chg24": 3.2,
+      "vol24m": 4.5,
+      "snapshot_price": 0.008315,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "PROMUSDT",
+      "atr_ratio": 1.39,
+      "chg24": 4.6,
+      "vol24m": 10.3,
+      "snapshot_price": 4.829,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "MORPHOUSDT",
+      "atr_ratio": 1.39,
+      "chg24": 3.1,
+      "vol24m": 12.0,
+      "snapshot_price": 2.4723,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "NBISUSDT",
+      "atr_ratio": 1.39,
+      "chg24": 4.2,
+      "vol24m": 42.0,
+      "snapshot_price": 171.19,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "FILUSDT",
+      "atr_ratio": 1.4,
+      "chg24": 0.2,
+      "vol24m": 140.7,
+      "snapshot_price": 1.0489,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "MOVRUSDT",
+      "atr_ratio": 1.41,
+      "chg24": -0.8,
+      "vol24m": 5.9,
+      "snapshot_price": 1.3327,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SEIUSDT",
+      "atr_ratio": 1.41,
+      "chg24": -1.5,
+      "vol24m": 17.5,
+      "snapshot_price": 0.06137,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "UNIUSDT",
+      "atr_ratio": 1.42,
+      "chg24": 2.3,
+      "vol24m": 166.7,
+      "snapshot_price": 7.409,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "CYSUSDT",
+      "atr_ratio": 1.42,
+      "chg24": -5.9,
+      "vol24m": 3.8,
+      "snapshot_price": 0.1136,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SKHYUSDT",
+      "atr_ratio": 1.43,
+      "chg24": 5.1,
+      "vol24m": 328.1,
+      "snapshot_price": 141.7,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "BEUSDT",
+      "atr_ratio": 1.43,
+      "chg24": 5.9,
+      "vol24m": 17.2,
+      "snapshot_price": 229.72,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ARUSDT",
+      "atr_ratio": 1.44,
+      "chg24": 2.6,
+      "vol24m": 8.4,
+      "snapshot_price": 3.872,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "APEUSDT",
+      "atr_ratio": 1.44,
+      "chg24": -0.1,
+      "vol24m": 9.4,
+      "snapshot_price": 0.1429,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "AVAAIUSDT",
+      "atr_ratio": 1.46,
+      "chg24": 2.3,
+      "vol24m": 3.7,
+      "snapshot_price": 0.00725,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "BABYUSDT",
+      "atr_ratio": 1.46,
+      "chg24": 3.8,
+      "vol24m": 3.1,
+      "snapshot_price": 0.01239,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "1000PEPEUSDT",
+      "atr_ratio": 1.46,
+      "chg24": 6.0,
+      "vol24m": 189.2,
+      "snapshot_price": 0.004104,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "MANTAUSDT",
+      "atr_ratio": 1.46,
+      "chg24": -0.8,
+      "vol24m": 3.3,
+      "snapshot_price": 0.0662,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "RLCUSDT",
+      "atr_ratio": 1.46,
+      "chg24": -5.1,
+      "vol24m": 15.2,
+      "snapshot_price": 0.7198,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "NIGHTUSDT",
+      "atr_ratio": 1.47,
+      "chg24": -0.2,
+      "vol24m": 6.9,
+      "snapshot_price": 0.03999,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "KAIAUSDT",
+      "atr_ratio": 1.47,
+      "chg24": -2.3,
+      "vol24m": 7.9,
+      "snapshot_price": 0.04147,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ROSEUSDT",
+      "atr_ratio": 1.47,
+      "chg24": -1.1,
+      "vol24m": 3.2,
+      "snapshot_price": 0.007354,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ONEUSDT",
+      "atr_ratio": 1.47,
+      "chg24": -0.0,
+      "vol24m": 7.7,
+      "snapshot_price": 0.001421,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SYRUPUSDT",
+      "atr_ratio": 1.48,
+      "chg24": -3.0,
+      "vol24m": 5.1,
+      "snapshot_price": 0.19075,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "MINAUSDT",
+      "atr_ratio": 1.49,
+      "chg24": -0.7,
+      "vol24m": 9.4,
+      "snapshot_price": 0.07223,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "OGNUSDT",
+      "atr_ratio": 1.5,
+      "chg24": -1.5,
+      "vol24m": 20.5,
+      "snapshot_price": 0.02963,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "OPUSDT",
+      "atr_ratio": 1.5,
+      "chg24": 0.6,
+      "vol24m": 32.2,
+      "snapshot_price": 0.12686,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "MEGAUSDT",
+      "atr_ratio": 1.51,
+      "chg24": 0.0,
+      "vol24m": 5.9,
+      "snapshot_price": 0.0439,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "PLUMEUSDT",
+      "atr_ratio": 1.52,
+      "chg24": -0.8,
+      "vol24m": 6.3,
+      "snapshot_price": 0.01781,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "AXTIUSDT",
+      "atr_ratio": 1.52,
+      "chg24": 7.5,
+      "vol24m": 13.7,
+      "snapshot_price": 53.83,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "FETUSDT",
+      "atr_ratio": 1.54,
+      "chg24": -0.5,
+      "vol24m": 56.7,
+      "snapshot_price": 0.1915,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "KASUSDT",
+      "atr_ratio": 1.54,
+      "chg24": 3.6,
+      "vol24m": 4.5,
+      "snapshot_price": 0.03586,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ZILUSDT",
+      "atr_ratio": 1.54,
+      "chg24": 0.3,
+      "vol24m": 8.3,
+      "snapshot_price": 0.002246,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "RIVERUSDT",
+      "atr_ratio": 1.55,
+      "chg24": 0.8,
+      "vol24m": 10.0,
+      "snapshot_price": 1.044,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "OPGUSDT",
+      "atr_ratio": 1.56,
+      "chg24": 2.9,
+      "vol24m": 3.4,
+      "snapshot_price": 0.1292,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "BEAMXUSDT",
+      "atr_ratio": 1.56,
+      "chg24": -1.6,
+      "vol24m": 4.7,
+      "snapshot_price": 0.002803,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "BERAUSDT",
+      "atr_ratio": 1.59,
+      "chg24": -3.9,
+      "vol24m": 7.9,
+      "snapshot_price": 0.1675,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "INITUSDT",
+      "atr_ratio": 1.59,
+      "chg24": 2.3,
+      "vol24m": 5.3,
+      "snapshot_price": 0.12626,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SPXUSDT",
+      "atr_ratio": 1.6,
+      "chg24": -0.2,
+      "vol24m": 12.0,
+      "snapshot_price": 0.3597,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "METISUSDT",
+      "atr_ratio": 1.6,
+      "chg24": -4.0,
+      "vol24m": 3.4,
+      "snapshot_price": 3.703,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ZKUSDT",
+      "atr_ratio": 1.6,
+      "chg24": -0.8,
+      "vol24m": 14.5,
+      "snapshot_price": 0.014682,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ZAMAUSDT",
+      "atr_ratio": 1.6,
+      "chg24": 2.7,
+      "vol24m": 8.6,
+      "snapshot_price": 0.0731,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SYNUSDT",
+      "atr_ratio": 1.61,
+      "chg24": 1.7,
+      "vol24m": 3.9,
+      "snapshot_price": 0.18572,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "APTUSDT",
+      "atr_ratio": 1.63,
+      "chg24": -1.7,
+      "vol24m": 60.6,
+      "snapshot_price": 0.779,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "CRVUSDT",
+      "atr_ratio": 1.63,
+      "chg24": 4.3,
+      "vol24m": 26.1,
+      "snapshot_price": 0.3557,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "MUBARAKUSDT",
+      "atr_ratio": 1.63,
+      "chg24": -4.0,
+      "vol24m": 12.0,
+      "snapshot_price": 0.05347,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SAMSUNGUSDT",
+      "atr_ratio": 1.64,
+      "chg24": 5.7,
+      "vol24m": 180.5,
+      "snapshot_price": 164.46,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "CVXUSDT",
+      "atr_ratio": 1.64,
+      "chg24": 4.6,
+      "vol24m": 4.5,
+      "snapshot_price": 2.052,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "MONUSDT",
+      "atr_ratio": 1.64,
+      "chg24": 0.7,
+      "vol24m": 20.8,
+      "snapshot_price": 0.02145,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "EDUUSDT",
+      "atr_ratio": 1.65,
+      "chg24": -12.3,
+      "vol24m": 4.2,
+      "snapshot_price": 0.06818,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "UAIUSDT",
+      "atr_ratio": 1.65,
+      "chg24": -5.5,
+      "vol24m": 6.4,
+      "snapshot_price": 0.298,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "PYTHUSDT",
+      "atr_ratio": 1.67,
+      "chg24": -3.2,
+      "vol24m": 27.2,
+      "snapshot_price": 0.07511,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "BUSDT",
+      "atr_ratio": 1.67,
+      "chg24": -2.0,
+      "vol24m": 3.3,
+      "snapshot_price": 0.1292,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "TRUTHUSDT",
+      "atr_ratio": 1.67,
+      "chg24": -8.2,
+      "vol24m": 10.0,
+      "snapshot_price": 0.017237,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "BLURUSDT",
+      "atr_ratio": 1.68,
+      "chg24": -0.5,
+      "vol24m": 7.1,
+      "snapshot_price": 0.00982,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "JASMYUSDT",
+      "atr_ratio": 1.68,
+      "chg24": 6.2,
+      "vol24m": 7.1,
+      "snapshot_price": 0.004751,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "LUMIAUSDT",
+      "atr_ratio": 1.68,
+      "chg24": -7.1,
+      "vol24m": 5.0,
+      "snapshot_price": 0.088,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "BASEDUSDT",
+      "atr_ratio": 1.7,
+      "chg24": -3.2,
+      "vol24m": 5.7,
+      "snapshot_price": 0.04908,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "PARTIUSDT",
+      "atr_ratio": 1.72,
+      "chg24": -2.8,
+      "vol24m": 7.4,
+      "snapshot_price": 0.0291,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "MUUUSDT",
+      "atr_ratio": 1.74,
+      "chg24": 7.1,
+      "vol24m": 29.6,
+      "snapshot_price": 25.38,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SUSDT",
+      "atr_ratio": 1.75,
+      "chg24": 1.8,
+      "vol24m": 22.7,
+      "snapshot_price": 0.0542,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "NEARUSDT",
+      "atr_ratio": 1.75,
+      "chg24": 1.8,
+      "vol24m": 646.3,
+      "snapshot_price": 5.043,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ETHFIUSDT",
+      "atr_ratio": 1.76,
+      "chg24": 6.1,
+      "vol24m": 27.3,
+      "snapshot_price": 0.7119,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "BILLUSDT",
+      "atr_ratio": 1.77,
+      "chg24": -4.4,
+      "vol24m": 7.3,
+      "snapshot_price": 0.0059,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "PHAUSDT",
+      "atr_ratio": 1.77,
+      "chg24": 0.4,
+      "vol24m": 5.5,
+      "snapshot_price": 0.05093,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ARXUSDT",
+      "atr_ratio": 1.78,
+      "chg24": 0.2,
+      "vol24m": 3.2,
+      "snapshot_price": 0.2363,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "GRASSUSDT",
+      "atr_ratio": 1.78,
+      "chg24": -1.9,
+      "vol24m": 16.4,
+      "snapshot_price": 0.6016,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "CHIPUSDT",
+      "atr_ratio": 1.79,
+      "chg24": 0.8,
+      "vol24m": 13.7,
+      "snapshot_price": 0.04277,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "AINUSDT",
+      "atr_ratio": 1.8,
+      "chg24": 2.8,
+      "vol24m": 3.7,
+      "snapshot_price": 0.0411,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "MVLLUSDT",
+      "atr_ratio": 1.81,
+      "chg24": 9.1,
+      "vol24m": 10.8,
+      "snapshot_price": 27.53,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ZECUSDT",
+      "atr_ratio": 1.81,
+      "chg24": 3.5,
+      "vol24m": 1724.9,
+      "snapshot_price": 1162.82,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "EIGENUSDT",
+      "atr_ratio": 1.82,
+      "chg24": -4.2,
+      "vol24m": 20.2,
+      "snapshot_price": 0.2369,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "1000RATSUSDT",
+      "atr_ratio": 1.82,
+      "chg24": -3.6,
+      "vol24m": 3.5,
+      "snapshot_price": 0.01628,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "WLDUSDT",
+      "atr_ratio": 1.82,
+      "chg24": 2.5,
+      "vol24m": 249.1,
+      "snapshot_price": 0.5048,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ARBUSDT",
+      "atr_ratio": 1.83,
+      "chg24": 9.7,
+      "vol24m": 84.1,
+      "snapshot_price": 0.19912,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "QNTUSDT",
+      "atr_ratio": 1.84,
+      "chg24": 2.8,
+      "vol24m": 89.5,
+      "snapshot_price": 199.32,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ENSOUSDT",
+      "atr_ratio": 1.85,
+      "chg24": -3.3,
+      "vol24m": 5.0,
+      "snapshot_price": 0.6506,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "STXUSDT",
+      "atr_ratio": 1.86,
+      "chg24": -0.2,
+      "vol24m": 13.9,
+      "snapshot_price": 0.3662,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "HUMAUSDT",
+      "atr_ratio": 1.86,
+      "chg24": 4.8,
+      "vol24m": 5.8,
+      "snapshot_price": 0.02923,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ZROUSDT",
+      "atr_ratio": 1.86,
+      "chg24": 4.5,
+      "vol24m": 56.3,
+      "snapshot_price": 1.9108,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "RSRUSDT",
+      "atr_ratio": 1.86,
+      "chg24": -7.3,
+      "vol24m": 13.9,
+      "snapshot_price": 0.001834,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "FARTCOINUSDT",
+      "atr_ratio": 1.87,
+      "chg24": -0.1,
+      "vol24m": 27.1,
+      "snapshot_price": 0.1463,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SKHYNIXUSDT",
+      "atr_ratio": 1.88,
+      "chg24": 7.3,
+      "vol24m": 1296.3,
+      "snapshot_price": 971.88,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "DOSUSDT",
+      "atr_ratio": 1.92,
+      "chg24": 1.6,
+      "vol24m": 5.1,
+      "snapshot_price": 0.1856,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "RAYSOLUSDT",
+      "atr_ratio": 1.92,
+      "chg24": 6.2,
+      "vol24m": 17.5,
+      "snapshot_price": 1.9001,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "STRKUSDT",
+      "atr_ratio": 1.93,
+      "chg24": -6.4,
+      "vol24m": 109.4,
+      "snapshot_price": 0.05969,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "LDOUSDT",
+      "atr_ratio": 1.93,
+      "chg24": 2.5,
+      "vol24m": 29.0,
+      "snapshot_price": 0.3948,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "USELESSUSDT",
+      "atr_ratio": 1.94,
+      "chg24": -2.9,
+      "vol24m": 22.0,
+      "snapshot_price": 0.14433,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SOXLUSDT",
+      "atr_ratio": 1.94,
+      "chg24": 9.6,
+      "vol24m": 1074.2,
+      "snapshot_price": 100.76,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "LITUSDT",
+      "atr_ratio": 1.94,
+      "chg24": 3.1,
+      "vol24m": 49.0,
+      "snapshot_price": 3.1325,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "KMNOUSDT",
+      "atr_ratio": 1.95,
+      "chg24": -0.8,
+      "vol24m": 5.9,
+      "snapshot_price": 0.03961,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SQDUSDT",
+      "atr_ratio": 1.95,
+      "chg24": -8.7,
+      "vol24m": 3.1,
+      "snapshot_price": 0.01813,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "UVXYUSDT",
+      "atr_ratio": 1.99,
+      "chg24": -5.3,
+      "vol24m": 8.9,
+      "snapshot_price": 17.69,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ZHONGJIUSDT",
+      "atr_ratio": 1.99,
+      "chg24": 4.1,
+      "vol24m": 10.1,
+      "snapshot_price": 97.93,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "INTWUSDT",
+      "atr_ratio": 2.0,
+      "chg24": 8.8,
+      "vol24m": 10.4,
+      "snapshot_price": 18.36,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "CXMTUSDT",
+      "atr_ratio": 2.02,
+      "chg24": -3.3,
+      "vol24m": 28.2,
+      "snapshot_price": 6.219,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "STBLUSDT",
+      "atr_ratio": 2.04,
+      "chg24": -9.4,
+      "vol24m": 17.1,
+      "snapshot_price": 0.02218,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "MAGICUSDT",
+      "atr_ratio": 2.05,
+      "chg24": -4.2,
+      "vol24m": 16.9,
+      "snapshot_price": 0.09792,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "LYNUSDT",
+      "atr_ratio": 2.05,
+      "chg24": -3.0,
+      "vol24m": 5.7,
+      "snapshot_price": 0.01264,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ENAUSDT",
+      "atr_ratio": 2.06,
+      "chg24": 1.8,
+      "vol24m": 215.6,
+      "snapshot_price": 0.19058,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "WALUSDT",
+      "atr_ratio": 2.06,
+      "chg24": -2.1,
+      "vol24m": 24.1,
+      "snapshot_price": 0.0394,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "RUNEUSDT",
+      "atr_ratio": 2.1,
+      "chg24": 2.4,
+      "vol24m": 10.7,
+      "snapshot_price": 0.652,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "PONSUSDT",
+      "atr_ratio": 2.13,
+      "chg24": -4.4,
+      "vol24m": 38.4,
+      "snapshot_price": 0.2632,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ONUSDT",
+      "atr_ratio": 2.14,
+      "chg24": 2.0,
+      "vol24m": 3.8,
+      "snapshot_price": 0.1296,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "NILUSDT",
+      "atr_ratio": 2.16,
+      "chg24": -1.7,
+      "vol24m": 11.9,
+      "snapshot_price": 0.07755,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "AXLUSDT",
+      "atr_ratio": 2.16,
+      "chg24": -1.5,
+      "vol24m": 13.8,
+      "snapshot_price": 0.05801,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "LABUSDT",
+      "atr_ratio": 2.19,
+      "chg24": -3.6,
+      "vol24m": 9.1,
+      "snapshot_price": 0.04232,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "TAUSDT",
+      "atr_ratio": 2.19,
+      "chg24": -4.3,
+      "vol24m": 6.7,
+      "snapshot_price": 0.03962,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "AUSDT",
+      "atr_ratio": 2.22,
+      "chg24": -11.6,
+      "vol24m": 22.1,
+      "snapshot_price": 0.09006,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "CKBUSDT",
+      "atr_ratio": 2.23,
+      "chg24": 0.5,
+      "vol24m": 3.5,
+      "snapshot_price": 0.001489,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "MARSCOINUSDT",
+      "atr_ratio": 2.24,
+      "chg24": 7.6,
+      "vol24m": 15.1,
+      "snapshot_price": 0.08013,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SOXSUSDT",
+      "atr_ratio": 2.25,
+      "chg24": -9.4,
+      "vol24m": 218.9,
+      "snapshot_price": 45.66,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SNXXUSDT",
+      "atr_ratio": 2.25,
+      "chg24": 11.0,
+      "vol24m": 129.9,
+      "snapshot_price": 9.7,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "AKTUSDT",
+      "atr_ratio": 2.28,
+      "chg24": 5.0,
+      "vol24m": 6.4,
+      "snapshot_price": 0.7017,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "牛来USDT",
+      "atr_ratio": 2.3,
+      "chg24": 0.8,
+      "vol24m": 14.4,
+      "snapshot_price": 0.0593,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "TIAUSDT",
+      "atr_ratio": 2.31,
+      "chg24": -4.5,
+      "vol24m": 150.8,
+      "snapshot_price": 0.6103,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "UNITREEUSDT",
+      "atr_ratio": 2.32,
+      "chg24": 16.0,
+      "vol24m": 73.7,
+      "snapshot_price": 73.16,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "NXPCUSDT",
+      "atr_ratio": 2.35,
+      "chg24": -2.9,
+      "vol24m": 12.3,
+      "snapshot_price": 0.164,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SENTUSDT",
+      "atr_ratio": 2.38,
+      "chg24": 5.2,
+      "vol24m": 17.8,
+      "snapshot_price": 0.02264,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "INJUSDT",
+      "atr_ratio": 2.38,
+      "chg24": 1.0,
+      "vol24m": 127.5,
+      "snapshot_price": 8.601,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "PUMPUSDT",
+      "atr_ratio": 2.38,
+      "chg24": 4.3,
+      "vol24m": 266.5,
+      "snapshot_price": 0.004468,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "ARCUSDT",
+      "atr_ratio": 2.39,
+      "chg24": 7.9,
+      "vol24m": 9.6,
+      "snapshot_price": 0.0436,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "COLLECTUSDT",
+      "atr_ratio": 2.43,
+      "chg24": 1.1,
+      "vol24m": 7.4,
+      "snapshot_price": 0.023,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    },
+    {
+      "symbol": "SANDUSDT",
+      "atr_ratio": 2.49,
+      "chg24": -6.5,
+      "vol24m": 150.4,
+      "snapshot_price": 0.0589,
+      "snapshot_time": "2026-10-19T08:16Z",
+      "obs_long_pullback_bear": null,
+      "obs_reversal_short_sl": null
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "trades": [],
+  "stats": {
+    "symbol": "XAUUSDT",
+    "days": 30,
+    "total_trades": 0,
+    "win_trades": 0,
+    "loss_trades": 0,
+    "win_rate_pct": 0,
+    "total_pnl_u": 0.0,
+    "total_win_u": 0,
+    "total_loss_u": 0,
+    "profit_factor": 999,
+    "max_drawdown_u": 0.0,
+    "max_single_loss": 0,
+    "avg_hold_min": 0,
+    "by_mode": {}
+  }
+}
