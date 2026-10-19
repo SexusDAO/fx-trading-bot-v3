@@ -121,7 +121,9 @@ def _round_qty(qty: float, step: float) -> float:
     if step <= 0:
         return round(qty, 3)
     prec = max(0, -int(math.floor(math.log10(step))))
-    return round(math.floor(qty / step) * step, prec)
+    # [v3.87 STEP6-5] 原写法 floor(qty/step)*step：浮点除法会多丢一个步长（0.3/0.1=2.9999999999999996，floor 得 2，数量变成 0.2）。
+    #   现在先 round(qty/step, 10) 消除浮点噪声，再 floor 保证不超过实际数量。影响开仓数量和止盈数量。
+    return round(math.floor(round(qty / step, 10)) * step, prec)
 
 
 def _get_max_leverage(symbol: str) -> int:
