@@ -37,7 +37,7 @@ COINGLASS_CACHE_TTL = 300   # 清算图缓存，秒，5 分钟（供 clawby_adap
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")  # 保留兼容
 # TELEGRAM_CHAT_ID — 同上
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")  # 保留兼容
-TELEGRAM_DAILY_REPORT_HOUR = 2   # UTC，对应北京时间 10:00
+TELEGRAM_DAILY_REPORT_HOUR = 2   # UTC，对应北京时间 10:00  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 第二组：候选池参数
@@ -70,15 +70,15 @@ FUNDING_WINDOW_NORMAL_BEFORE   = 900    # 普通费率结算前，秒
 FUNDING_WINDOW_NORMAL_AFTER    = 300    # 普通费率结算后，秒
 FUNDING_WINDOW_EXTREME_BEFORE  = 1200   # 极端费率结算前，秒
 FUNDING_WINDOW_EXTREME_AFTER   = 600    # 极端费率结算后，秒
-FUNDING_EXTREME_THRESHOLD      = 0.005  # 资金费率极端阈值，0.5%
+FUNDING_EXTREME_THRESHOLD      = 0.005  # 资金费率极端阈值，0.5%  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 
 # BTC 异常波动拦截
-BTC_SHOCK_THRESHOLD = 0.03   # BTC 15 分钟涨跌超过 3% 暂停扫描
+BTC_SHOCK_THRESHOLD = 0.03   # BTC 15 分钟涨跌超过 3% 暂停扫描  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 BTC_SHOCK_WINDOW    = 900    # 检查窗口，秒  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 
 # OI 背离拦截
-OI_DIVERGENCE_PRICE_PCT = 0.98   # 价格达到 24H 高点 98% 触发检查
-OI_DIVERGENCE_DROP_PCT  = 0.20   # OI 同期下降超过 20% 触发拦截
+OI_DIVERGENCE_PRICE_PCT = 0.98   # 价格达到 24H 高点 98% 触发检查  # [v3.85 DOC-2] 代码未引用此常量，修改无效
+OI_DIVERGENCE_DROP_PCT  = 0.20   # OI 同期下降超过 20% 触发拦截  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 
 # pending confirm
 PENDING_CONFIRM_FILE    = "logs/pending_confirm_state.json"
@@ -126,9 +126,9 @@ REVERSAL_FUNDING_MIN_SHORT    = 0.0025  # 做空资金费率门槛  # [v3.85 DOC
 REVERSAL_FUNDING_STRONG_SHORT = 0.004   # 做空强信号费率  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 # 以下 REVERSAL_RSI4H_* 为历史遗留占位值，judge_reversal 实际用 chg24<=-8%+rsi4h<55 逻辑
 # 代码实际值与此不同，调参请直接修改 _judge_reversal_impl 内的门槛
-REVERSAL_RSI4H_MAX_LONG       = 55      # 实际用值（原25已废弃，代码用55）
+REVERSAL_RSI4H_MAX_LONG       = 55      # 实际用值（原25已废弃，代码用55）  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 REVERSAL_RSI4H_STRONG_LONG    = 20  # [v3.85 DOC-2] 代码未引用此常量，修改无效
-REVERSAL_RSI4H_MIN_SHORT      = 55      # 实际用值（原78已废弃，代码用55）
+REVERSAL_RSI4H_MIN_SHORT      = 55      # 实际用值（原78已废弃，代码用55）  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 REVERSAL_RSI4H_STRONG_SHORT   = 85  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 REVERSAL_CRASH_ACCEL_BARS     = 3       # 连续崩盘检测：连续阴线根数  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 REVERSAL_CRASH_DROP_PER_BAR   = 0.03    # 每根跌幅门槛  # [v3.85 DOC-2] 代码未引用此常量，修改无效
@@ -508,7 +508,7 @@ FUNDING_ARB_RATE_HIST_MIN_LONG   = -0.0005  # 近3期均值门槛（负值）
 FUNDING_ARB_RATE_DECAY_THRESH    = 0.80   # 费率衰减超过80%触发退出
 FUNDING_ARB_ENTRY_WINDOW_MIN_H   = 0.083  # 距结算最少时间（5分钟），改用限价单后可以临近结算才挂
 # FUNDING_ARB_ENTRY_WINDOW_MAX_H 已废弃，动态上限 = 结算周期×90%（judge_funding_arb 内部计算）
-FUNDING_ARB_ENTRY_WINDOW_MAX_H   = 99     # 占位，实际不用此值
+FUNDING_ARB_ENTRY_WINDOW_MAX_H   = 99     # 占位，实际不用此值  # [v3.87 DOC] 占位值，不接入任何业务逻辑，修改无效（刻意保留，勿当作可调参数）
 FUNDING_ARB_CANCEL_BEFORE_MIN    = 5      # 结算前多少分钟撤销未成交的限价单  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 FUNDING_ARB_COOLDOWN_SETTLE_MIN  = 30     # 结算后冷却多少分钟不重新挂单  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 FUNDING_ARB_RSI4H_SHORT_MIN      = 50     # 做空 RSI4H 下限
@@ -698,7 +698,7 @@ STOP_HUNT_EXPIRE_MIN_WKND    = 20      # 周末信号有效期（分钟，假突
 STOP_HUNT_BASE_STRONG        = 70      # strong 信号 base score（与 reversal 对齐）
 STOP_HUNT_BASE_MEDIUM        = 60      # medium 信号 base score
 STOP_HUNT_MIN_SCORE_WEEKDAY  = 50      # 工作日最低评分门槛  # [v3.85 DOC-2] 代码未引用此常量，修改无效
-STOP_HUNT_MIN_SCORE_WEEKEND  = 65      # 周末最低评分门槛  # [v3.85 DOC-2] 代码未引用此常量，修改无效
+STOP_HUNT_MIN_SCORE_WEEKEND  = 65      # 周末最低评分门槛  # [v3.87 DOC] 仅回测脚本 backtest_btw.py 使用；实盘代码不读此常量（撤销此前 DOC-2 误标）
 
 # 信号优先级（加入 SIGNAL_PRIORITY 时用）
 STOP_HUNT_PRIORITY           = 0       # 与 reversal 同优先级（都是逆势）  # [v3.85 DOC-2] 代码未引用此常量，修改无效
