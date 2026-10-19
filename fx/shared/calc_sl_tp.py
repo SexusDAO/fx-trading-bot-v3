@@ -203,9 +203,24 @@ def _check_sl_distance(entry: float, sl: float, direction: str, tier: str = "mid
 # ─────────────────────────────────────────────────────────────────────────────
 # 入场价计算
 # ─────────────────────────────────────────────────────────────────────────────
+def _liq_rel_cfg():
+    """[v3.88 OPT-14] 读取清算区相对强度相关配置；开关关闭或读取失败时返回 None（走原逻辑）。"""
+    try:
+        import config as _c
+        if not getattr(_c, "OPT_LIQ_RELATIVE_STRENGTH", False):
+            return None
+        return {
+            "strong": _c.LIQ_RELATIVE_STRONG, "mid": _c.LIQ_RELATIVE_MID,
+            "ref": _c.LIQ_WEIGHT_REF_RATIO, "w_min": _c.LIQ_WEIGHT_MIN, "w_max": _c.LIQ_WEIGHT_MAX,
+            "b_strong": _c.TP1_LIQ_BUFFER_STRONG, "b_mid": _c.TP1_LIQ_BUFFER_MID, "b_weak": _c.TP1_LIQ_BUFFER_WEAK,
+        }
+    except Exception:
+        return None
+
+
 def _entry_pullback(mark: float, atr: float, ema20: float,
                      liq_long: list, liq_short: list,
-                     direction: str, k1h: list) -> tuple[float, str]:
+                     direction: str, k1h: list, vol24_usd: float = 0.0) -> tuple[float, str]:
     """结构回踩入场价 — 三点加权均价
     v3.14: 加清算区距离上限保护——清算区上/下沿距 mark 超过 MAX_PULLBACK_LIQ_DIST_ATR 时降级
     """
@@ -248,7 +263,15 @@ def _entry_pullback(mark: float, atr: float, ema20: float,
                 z = None
         if z:
             liq_edge = z["price_high"]           # 清算区上沿（权重2）
-            weighted = (liq_edge * 2 + ema20 * 1 + vol_mid * 1) / 4
+            # [v3.88 OPT-14] 清算区锚点权重按「相对强度」（清算区金额 / 24H 成交额）动态化：
+            #   原权重固定为 2，不区分清算区对该币的实际影响力。开启后权重 = 2 × 相对强度 / 10%，截断到 [0.5, 3.0]；
+            #   成交额或清算金额缺失时权重回到 2，与原公式完全一致。开关 OPT_LIQ_RELATIVE_STRENGTH。
+            _w = 2.0
+            _rcfg = _liq_rel_cfg()
+            if _rcfg:
+                from shared.opt_v388 import liq_relative_strength as _lrs, liq_weight as _lw
+                _w = _lw(_lrs(_zone_size(z), vol24_usd), _rcfg["ref"], _rcfg["w_min"], _rcfg["w_max"])
+            weighted = (liq_edge * _w + ema20 * 1 + vol_mid * 1) / (_w + 2)
             entry = weighted
         else:
             entry = mark - atr * _pp["long_deg"]   # 无清算区降级（OPT-3 参数化）
@@ -288,7 +311,15 @@ def _entry_pullback(mark: float, atr: float, ema20: float,
                 z = None
         if z:
             liq_edge = z["price_low"]
-            weighted = (liq_edge * 2 + ema20 * 1 + vol_mid * 1) / 4
+            # [v3.88 OPT-14] 清算区锚点权重按「相对强度」（清算区金额 / 24H 成交额）动态化：
+            #   原权重固定为 2，不区分清算区对该币的实际影响力。开启后权重 = 2 × 相对强度 / 10%，截断到 [0.5, 3.0]；
+            #   成交额或清算金额缺失时权重回到 2，与原公式完全一致。开关 OPT_LIQ_RELATIVE_STRENGTH。
+            _w = 2.0
+            _rcfg = _liq_rel_cfg()
+            if _rcfg:
+                from shared.opt_v388 import liq_relative_strength as _lrs, liq_weight as _lw
+                _w = _lw(_lrs(_zone_size(z), vol24_usd), _rcfg["ref"], _rcfg["w_min"], _rcfg["w_max"])
+            weighted = (liq_edge * _w + ema20 * 1 + vol_mid * 1) / (_w + 2)
             entry = weighted
         else:
             entry = mark + atr * _pp["short_deg"]  # v3.20: 0.3→0.8 ATR（v3.84 OPT-3 起由开关参数化）
@@ -688,7 +719,7 @@ def _orderbook_tp(entry: float, atr: float, direction: str, symbol: str) -> floa
 
 def _calc_tp(entry: float, sl: float, atr: float, direction: str,
               liq_long: list, liq_short: list,
-              symbol: str = "", tier: str = "mid") -> tuple[float, float | None, bool]:
+              symbol: str = "", tier: str = "mid", vol24_usd: float = 0.0) -> tuple[float, float | None, bool]:
     """
     TP 计算策略：
       有清算图且 2 处以上密集区 → TP1 + TP2 分批止盈
@@ -718,13 +749,23 @@ def _calc_tp(entry: float, sl: float, atr: float, direction: str,
     if has_liq:
         # TP1：最近的满足 RR≥1.5 的清算区前沿
         tp1 = None
+        # [v3.88 OPT-14] TP1 距清算区前沿的缓冲按「相对强度」分档：≥20% 用 0.2ATR、5%~20% 用 0.35ATR、<5% 用 0.5ATR。
+        #   原缓冲固定 0.3ATR。成交额或清算金额缺失时仍用 0.3ATR。TP2 缓冲（0.5ATR）不变。开关 OPT_LIQ_RELATIVE_STRENGTH。
+        _rcfg_tp = _liq_rel_cfg()
+
+        def _tp1_buf(_z):
+            if not _rcfg_tp:
+                return 0.3
+            from shared.opt_v388 import liq_relative_strength as _lrs, tp1_buffer_atr as _tb
+            return _tb(_lrs(_zone_size(_z), vol24_usd), _rcfg_tp["strong"], _rcfg_tp["mid"],
+                       _rcfg_tp["b_strong"], _rcfg_tp["b_mid"], _rcfg_tp["b_weak"], 0.3)
         for z in liq_candidates:
             if direction == "LONG":
-                candidate = z["price_low"] - atr * 0.3
+                candidate = z["price_low"] - atr * _tp1_buf(z)
                 if (candidate - entry) >= sl_dist * _TP1_MIN_RR:
                     tp1 = candidate; break
             else:
-                candidate = z["price_high"] + atr * 0.3
+                candidate = z["price_high"] + atr * _tp1_buf(z)
                 if (entry - candidate) >= sl_dist * _TP1_MIN_RR:
                     tp1 = candidate; break
 
@@ -842,7 +883,8 @@ def calc_sl_tp(
         e_mode = "fixed"
     elif mode == "pullback":
         entry, e_mode = _entry_pullback(mark_price, atr, ema20,
-                                         liq_long, liq_short, direction, k1h)
+                                         liq_long, liq_short, direction, k1h,
+                                         vol24_usd=(signal.get("ind") or {}).get("vol24_usd", 0.0))
     elif mode == "breakout":
         entry, e_mode = _entry_breakout(mark_price, atr,
                                          liq_long, liq_short, direction)
@@ -1090,7 +1132,8 @@ def calc_sl_tp(
             # TP2：清算图找更远目标（RR>=1.5，在 TP1 更远侧）
             _, tp2, tp_degraded = _calc_tp(entry, sl, atr, direction,
                                             liq_long, liq_short,
-                                            symbol=signal.get("symbol",""), tier=tier)
+                                            symbol=signal.get("symbol",""), tier=tier,
+                                            vol24_usd=(signal.get("ind") or {}).get("vol24_usd", 0.0))
             if tp2 is not None:
                 _rr2     = abs(tp2 - entry) / _sl_dist_sh
                 _tp2_far = (tp2 > tp1) if direction == "LONG" else (tp2 < tp1)
@@ -1179,11 +1222,13 @@ def calc_sl_tp(
             # 区间上沿太近，RR不足，降级用通用逻辑
             tp1, tp2, tp_degraded = _calc_tp(entry, sl, atr, direction,
                                               liq_long, liq_short,
-                                              symbol=symbol_hint, tier=tier)
+                                              symbol=symbol_hint, tier=tier,
+                                              vol24_usd=(signal.get("ind") or {}).get("vol24_usd", 0.0))
     else:
         tp1, tp2, tp_degraded = _calc_tp(entry, sl, atr, direction,
                                           liq_long, liq_short,
-                                          symbol=symbol_hint, tier=tier)
+                                          symbol=symbol_hint, tier=tier,
+                                          vol24_usd=(signal.get("ind") or {}).get("vol24_usd", 0.0))
 
     # v3.62: VP TP1 增强——tp_degraded 时（无清算图 TP 锚点）用 VP vah/val 作为候选
     # LONG：vah（价值区上沿）在入场价上方 + RR >= 1.2 时，替换 tp_degraded TP1

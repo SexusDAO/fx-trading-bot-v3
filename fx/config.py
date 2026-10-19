@@ -908,3 +908,16 @@ OPT_BREAKOUT_RSI_STRONG_RELAX = False   # OPT-12 放量(量比≥强量阈值)�
 BREAKOUT_RSI_MAX_LONG_STRONG  = 75     # 强量突破做多 RSI1H 上限
 BREAKOUT_RSI_MIN_SHORT_STRONG = 25     # 强量突破做空 RSI1H 下限
 OPT_BREAKOUT_MOMENTUM_ENTRY   = False   # OPT-13 距突破位≤0.5ATR 时延续入场，不再强制等回踩  # [v3.87 合并决策] 默认 False：OPT-13 按评审：暂缓，待对比成交率与止损率
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# v3.88 OPT-14 清算区相对强度（清算区金额 / 24H 成交额）——False 即回到原行为
+# ═══════════════════════════════════════════════════════════════════════════════
+OPT_LIQ_RELATIVE_STRENGTH = False  # 总开关：回踩入场清算区权重 + TP1 缓冲按相对强度动态化
+LIQ_RELATIVE_STRONG   = 0.20   # >= 20% → 强
+LIQ_RELATIVE_MID      = 0.05   # 5%~20% → 中；< 5% → 弱
+LIQ_WEIGHT_REF_RATIO  = 0.10   # 10% 相对强度 = 权重 2.0（原固定权重）
+LIQ_WEIGHT_MIN        = 0.5
+LIQ_WEIGHT_MAX        = 3.0
+TP1_LIQ_BUFFER_STRONG = 0.20   # TP1 距清算区前沿缓冲（ATR 倍数）
+TP1_LIQ_BUFFER_MID    = 0.35
+TP1_LIQ_BUFFER_WEAK   = 0.50
