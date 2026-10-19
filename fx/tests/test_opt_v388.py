@@ -59,3 +59,87 @@ class TestFlagOffUnchanged(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDenominators(unittest.TestCase):
+    """[v3.88 OPT-14d] 三种分母与记录字段。"""
+    def test_concentration(self):
+        from shared.opt_v388 import liq_concentration
+        zones = [{"liq_usd": 3e6}, {"liq_usd": 1e6}]
+        self.assertAlmostEqual(liq_concentration(3e6, zones), 0.75)
+        self.assertEqual(liq_concentration(5e4, [{"liq_usd": 5e4}]), 1.0)   # 单区恒为 1，已在文档注明
+        self.assertIsNone(liq_concentration(1e6, []))
+
+    def test_oi_requires_usd(self):
+        from shared.opt_v388 import oi_relative
+        self.assertAlmostEqual(oi_relative(1e6, 2e7), 0.05)
+        self.assertIsNone(oi_relative(1e6, 0))
+
+    def test_relative_by_denom(self):
+        from shared.opt_v388 import relative_by_denom
+        z = [{"liq_usd": 1e6}, {"liq_usd": 1e6}]
+        self.assertAlmostEqual(relative_by_denom("vol24", 1e6, z, 1e7, 4e7), 0.1)
+        self.assertAlmostEqual(relative_by_denom("oi", 1e6, z, 1e7, 4e7), 0.025)
+        self.assertAlmostEqual(relative_by_denom("concentration", 1e6, z, 1e7, 4e7), 0.5)
+
+    def test_metrics_record(self):
+        from shared.opt_v388 import liq_metrics
+        z = {"liq_usd": 2e6}
+        r = liq_metrics(z, [z, {"liq_usd": 2e6}], 1e7, 4e7)
+        self.assertEqual(r["rel_vol24"], 0.2)
+        self.assertEqual(r["rel_oi"], 0.05)
+        self.assertEqual(r["concentration"], 0.5)
+        self.assertEqual(liq_metrics(None, [], 1, 1), {})
+
+
+class TestTp1Lock(unittest.TestCase):
+    """[v3.88 OPT-14e] 开关开启时，重算带入锁定缓冲则沿用；记录实际采用的缓冲。"""
+    def setUp(self):
+        import config
+        self.cfg = config
+        self.orig = config.OPT_LIQ_RELATIVE_STRENGTH
+        config.OPT_LIQ_RELATIVE_STRENGTH = True
+
+    def tearDown(self):
+        self.cfg.OPT_LIQ_RELATIVE_STRENGTH = self.orig
+
+    def test_locked_buffer_used(self):
+        liq_short = [{"price_low": 110.0, "price_high": 111.0, "liq_usd": 9e6}]
+        ctx = {"tp1_buffer_locked": 0.2}
+        tp1, _, deg = cst._calc_tp(100.0, 96.0, 2.0, "LONG", [], liq_short, liq_ctx=ctx)
+        self.assertAlmostEqual(tp1, 110.0 - 0.4)
+        self.assertFalse(deg)
+        self.assertEqual(ctx["tp1_buffer_used"], 0.2)
+
+    def test_dynamic_buffer_recorded(self):
+        liq_short = [{"price_low": 110.0, "price_high": 111.0, "liq_usd": 3e6}]
+        ctx = {"vol24_usd": 1e7, "oi_usd": 0.0}           # 相对强度 30% → 强档 0.2ATR
+        tp1, _, _ = cst._calc_tp(100.0, 96.0, 2.0, "LONG", [], liq_short, liq_ctx=ctx)
+        self.assertAlmostEqual(tp1, 110.0 - 0.4)
+        self.assertEqual(ctx["tp1_buffer_used"], 0.2)
+
+    def test_missing_data_falls_back(self):
+        liq_short = [{"price_low": 110.0, "price_high": 111.0, "liq_usd": 3e6}]
+        ctx = {}
+        tp1, _, _ = cst._calc_tp(100.0, 96.0, 2.0, "LONG", [], liq_short, liq_ctx=ctx)
+        self.assertAlmostEqual(tp1, 110.0 - 0.6)
+
+
+class TestSingleZoneFlag(unittest.TestCase):
+    """[v3.88 OPT-14d] 单区标记，且三种分母互相独立。"""
+    def test_flag(self):
+        from shared.opt_v388 import liq_metrics
+        z = {"liq_usd": 1e6}
+        self.assertFalse(liq_metrics(z, [z], 1e7, 4e7)["concentration_valid"])
+        self.assertTrue(liq_metrics(z, [z, z], 1e7, 4e7)["concentration_valid"])
+
+    def test_independent(self):
+        from shared.opt_v388 import liq_metrics
+        z = {"liq_usd": 1e6}
+        r = liq_metrics(z, [z, z], 0, 4e7)        # 成交额缺失
+        self.assertIsNone(r["rel_vol24"])
+        self.assertEqual(r["rel_oi"], 0.025)
+        self.assertEqual(r["concentration"], 0.5)
+        r = liq_metrics(z, [z, z], 1e7, 0)        # OI 缺失
+        self.assertIsNone(r["rel_oi"])
+        self.assertEqual(r["rel_vol24"], 0.1)

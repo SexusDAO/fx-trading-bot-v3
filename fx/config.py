@@ -921,3 +921,7 @@ LIQ_WEIGHT_MAX        = 3.0
 TP1_LIQ_BUFFER_STRONG = 0.20   # TP1 距清算区前沿缓冲（ATR 倍数）
 TP1_LIQ_BUFFER_MID    = 0.35
 TP1_LIQ_BUFFER_WEAK   = 0.50
+# [v3.88 OPT-14d] 相对强度分母：vol24（24H 成交额）/ oi（持仓名义价值）/ concentration（同方向清算图集中度）。
+#   三种分母的数值都会写进 params / 持仓 / trade_log 的 liq_metrics 字段，积累数据后再决定用哪个、阈值定多少。
+#   注意 concentration 在只有一个清算区时恒为 1.0，且随清算图拉取范围变化。
+LIQ_REL_DENOM = "vol24"

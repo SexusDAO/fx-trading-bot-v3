@@ -3066,6 +3066,9 @@ async def _adjust_sl_tp_once(pos: dict, force: bool = False) -> dict | None:
             # 传入实际成交价，让 calc_sl_tp 跳过重新估算 entry
             # 保证 SL/TP 的 RR 基准始终锁定在原始开仓价，不随当前价滨漂移
             "fill_price":     pos.get("fill_price") or pos.get("entry_price"),
+            # [v3.88 OPT-14e] 入场时锁定 TP1 清算区缓冲：沿用开仓时写入的值，不按最新清算图重算。
+            #   仅在 OPT_LIQ_RELATIVE_STRENGTH 开启时生效；旧仓位没有该字段时为 None，回到原 0.3ATR。
+            "tp1_buffer_locked": pos.get("tp1_liq_buffer_atr"),
         }
         # 止损/止盈调整参考大级别清算区（7d），不容易被短期波动穿透
         _adj_sig_type = pos.get("sig_type", pos.get("mode", "pullback"))

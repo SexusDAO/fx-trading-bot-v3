@@ -1091,6 +1091,8 @@ def _write_position(
         "dynamic_target":        params.get("dynamic_target"),
         "consistency_score":     params.get("consistency_score"),
         "tp_vs_dynamic_atr":     params.get("tp_vs_dynamic_atr"),
+        "liq_metrics":           params.get("liq_metrics"),         # [v3.88 OPT-14d] 只记录
+        "tp1_liq_buffer_atr":    params.get("tp1_liq_buffer_atr"),  # [v3.88 OPT-14e] 重算时锁定
         # ── 问题一修复：atr_at_entry，_calc_trail_sl 动态止损依赖此字段 ──────
         "atr_at_entry":          atr,
         # ── funding_arb 专属字段（pos_state 里必须有，_patrol_funding_arb 会读这些字段）
@@ -1158,6 +1160,8 @@ def _append_trade_log(
             "consistency_score":  params.get("consistency_score"),
             "consistency_note":   params.get("consistency_note"),
             "tp_vs_dynamic_atr":  params.get("tp_vs_dynamic_atr"),
+            "liq_metrics":           params.get("liq_metrics"),         # [v3.88 OPT-14d] 只记录
+            "tp1_liq_buffer_atr":    params.get("tp1_liq_buffer_atr"),  # [v3.88 OPT-14e] 重算时锁定
             # funding_arb 专属字段
             "funding_rate_at_entry":     signal.get("funding_rate"),
             "funding_arb_target_ts":     signal.get("next_settle_ts"),

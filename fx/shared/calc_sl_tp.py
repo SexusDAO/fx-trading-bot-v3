@@ -203,6 +203,32 @@ def _check_sl_distance(entry: float, sl: float, direction: str, tier: str = "mid
 # ─────────────────────────────────────────────────────────────────────────────
 # 入场价计算
 # ─────────────────────────────────────────────────────────────────────────────
+def _collect_liq_metrics(entry: float, atr: float, direction: str,
+                         liq_long: list, liq_short: list, ctx: dict) -> dict:
+    """[v3.88 OPT-14d] 记录用：入场侧（止损方向）最近清算区、TP1 侧最近清算区的相对强度。失败返回 {}。"""
+    try:
+        from shared.opt_v388 import liq_metrics
+        if direction == "LONG":
+            ez = _nearest_liq_below(entry, atr, liq_long)
+            tps = sorted([z for z in liq_short if (z["price_low"] + z["price_high"]) / 2 > entry],
+                         key=lambda z: z["price_low"])
+            e_zones, t_zones = liq_long, liq_short
+        else:
+            ez = _nearest_liq_above(entry, atr, liq_short)
+            tps = sorted([z for z in liq_long if (z["price_low"] + z["price_high"]) / 2 < entry],
+                         key=lambda z: z["price_high"], reverse=True)
+            e_zones, t_zones = liq_short, liq_long
+        v, oi = ctx.get("vol24_usd", 0.0), ctx.get("oi_usd", 0.0)
+        return {
+            "entry_side": liq_metrics(ez, e_zones, v, oi),
+            "tp_side":    liq_metrics(tps[0] if tps else None, t_zones, v, oi),
+            "vol24_usd":  round(v, 0),
+            "oi_usd":     round(oi, 0),
+        }
+    except Exception:
+        return {}
+
+
 def _liq_rel_cfg():
     """[v3.88 OPT-14] 读取清算区相对强度相关配置；开关关闭或读取失败时返回 None（走原逻辑）。"""
     try:
@@ -218,9 +244,23 @@ def _liq_rel_cfg():
         return None
 
 
+def _liq_rel(z: dict, zones: list, ctx: dict | None) -> float | None:
+    """[v3.88 OPT-14d] 按 config.LIQ_REL_DENOM 选择分母计算相对强度；数据缺失返回 None（调用方回退原逻辑）。"""
+    from shared.opt_v388 import relative_by_denom
+    try:
+        import config as _c
+        denom = getattr(_c, "LIQ_REL_DENOM", "vol24")
+    except Exception:
+        denom = "vol24"
+    ctx = ctx or {}
+    return relative_by_denom(denom, _zone_size(z), zones,
+                             ctx.get("vol24_usd", 0.0), ctx.get("oi_usd", 0.0))
+
+
 def _entry_pullback(mark: float, atr: float, ema20: float,
                      liq_long: list, liq_short: list,
-                     direction: str, k1h: list, vol24_usd: float = 0.0) -> tuple[float, str]:
+                     direction: str, k1h: list, vol24_usd: float = 0.0,
+                     liq_ctx: dict | None = None) -> tuple[float, str]:
     """结构回踩入场价 — 三点加权均价
     v3.14: 加清算区距离上限保护——清算区上/下沿距 mark 超过 MAX_PULLBACK_LIQ_DIST_ATR 时降级
     """
@@ -269,8 +309,10 @@ def _entry_pullback(mark: float, atr: float, ema20: float,
             _w = 2.0
             _rcfg = _liq_rel_cfg()
             if _rcfg:
-                from shared.opt_v388 import liq_relative_strength as _lrs, liq_weight as _lw
-                _w = _lw(_lrs(_zone_size(z), vol24_usd), _rcfg["ref"], _rcfg["w_min"], _rcfg["w_max"])
+                from shared.opt_v388 import liq_weight as _lw
+                _ctx_e = liq_ctx or {"vol24_usd": vol24_usd}
+                _w = _lw(_liq_rel(z, liq_long if direction == "LONG" else liq_short, _ctx_e),
+                         _rcfg["ref"], _rcfg["w_min"], _rcfg["w_max"])
             weighted = (liq_edge * _w + ema20 * 1 + vol_mid * 1) / (_w + 2)
             entry = weighted
         else:
@@ -317,8 +359,10 @@ def _entry_pullback(mark: float, atr: float, ema20: float,
             _w = 2.0
             _rcfg = _liq_rel_cfg()
             if _rcfg:
-                from shared.opt_v388 import liq_relative_strength as _lrs, liq_weight as _lw
-                _w = _lw(_lrs(_zone_size(z), vol24_usd), _rcfg["ref"], _rcfg["w_min"], _rcfg["w_max"])
+                from shared.opt_v388 import liq_weight as _lw
+                _ctx_e = liq_ctx or {"vol24_usd": vol24_usd}
+                _w = _lw(_liq_rel(z, liq_long if direction == "LONG" else liq_short, _ctx_e),
+                         _rcfg["ref"], _rcfg["w_min"], _rcfg["w_max"])
             weighted = (liq_edge * _w + ema20 * 1 + vol_mid * 1) / (_w + 2)
             entry = weighted
         else:
@@ -719,7 +763,8 @@ def _orderbook_tp(entry: float, atr: float, direction: str, symbol: str) -> floa
 
 def _calc_tp(entry: float, sl: float, atr: float, direction: str,
               liq_long: list, liq_short: list,
-              symbol: str = "", tier: str = "mid", vol24_usd: float = 0.0) -> tuple[float, float | None, bool]:
+              symbol: str = "", tier: str = "mid", vol24_usd: float = 0.0,
+              liq_ctx: dict | None = None) -> tuple[float, float | None, bool]:
     """
     TP 计算策略：
       有清算图且 2 处以上密集区 → TP1 + TP2 分批止盈
@@ -753,12 +798,22 @@ def _calc_tp(entry: float, sl: float, atr: float, direction: str,
         #   原缓冲固定 0.3ATR。成交额或清算金额缺失时仍用 0.3ATR。TP2 缓冲（0.5ATR）不变。开关 OPT_LIQ_RELATIVE_STRENGTH。
         _rcfg_tp = _liq_rel_cfg()
 
+        _ctx_tp = liq_ctx if liq_ctx is not None else {"vol24_usd": vol24_usd}
+
         def _tp1_buf(_z):
             if not _rcfg_tp:
                 return 0.3
-            from shared.opt_v388 import liq_relative_strength as _lrs, tp1_buffer_atr as _tb
-            return _tb(_lrs(_zone_size(_z), vol24_usd), _rcfg_tp["strong"], _rcfg_tp["mid"],
-                       _rcfg_tp["b_strong"], _rcfg_tp["b_mid"], _rcfg_tp["b_weak"], 0.3)
+            # [v3.88 OPT-14e] 入场时锁定：持仓重算时若带入开仓时的缓冲值，直接沿用，不按最新清算图重算，
+            #   保证 TP1 依据与开仓时一致、便于归因。
+            if _ctx_tp.get("tp1_buffer_locked") is not None:
+                _b = float(_ctx_tp["tp1_buffer_locked"])
+            else:
+                from shared.opt_v388 import tp1_buffer_atr as _tb
+                _zones_tp = liq_short if direction == "LONG" else liq_long
+                _b = _tb(_liq_rel(_z, _zones_tp, _ctx_tp), _rcfg_tp["strong"], _rcfg_tp["mid"],
+                         _rcfg_tp["b_strong"], _rcfg_tp["b_mid"], _rcfg_tp["b_weak"], 0.3)
+            _ctx_tp["tp1_buffer_used"] = _b   # 循环 break 前最后一次调用即被选中的区
+            return _b
         for z in liq_candidates:
             if direction == "LONG":
                 candidate = z["price_low"] - atr * _tp1_buf(z)
@@ -770,6 +825,7 @@ def _calc_tp(entry: float, sl: float, atr: float, direction: str,
                     tp1 = candidate; break
 
         if tp1 is None:
+            _ctx_tp.pop("tp1_buffer_used", None)   # [v3.88] 未锚定清算区，不记录缓冲
             tp1 = (entry + sl_dist * _TP1_MIN_RR) if direction == "LONG"                   else (entry - sl_dist * _TP1_MIN_RR)
             degraded = True
 
@@ -874,6 +930,19 @@ def calc_sl_tp(
     liq_short = liq_zones.get("short", [])
     liq_data_available = bool(liq_long or liq_short)
 
+    # [v3.88 OPT-14d] 清算区相对强度的分母上下文。oi_now 是合约张数，乘以标记价换算成 USDT 名义价值。
+    _ind_ctx = signal.get("ind") or {}
+    try:
+        _oi_qty = float(_ind_ctx.get("oi_now") or signal.get("oi_now") or 0)
+    except (TypeError, ValueError):
+        _oi_qty = 0.0
+    _liq_ctx = {
+        "vol24_usd": float(_ind_ctx.get("vol24_usd", 0) or 0),
+        "oi_usd":    _oi_qty * float(mark_price or 0),
+    }
+    if signal.get("tp1_buffer_locked") is not None:
+        _liq_ctx["tp1_buffer_locked"] = float(signal["tp1_buffer_locked"])
+
     # ── 1. 入场价 ─────────────────────────────────────────────────────────────
     # 仓位维护场景：若 signal 里已携带实际成交价（fill_price/entry_price），
     # 直接用作 entry 基准，跳过重新估算——保证 SL/TP 的 RR 与原始开仓一致
@@ -884,7 +953,7 @@ def calc_sl_tp(
     elif mode == "pullback":
         entry, e_mode = _entry_pullback(mark_price, atr, ema20,
                                          liq_long, liq_short, direction, k1h,
-                                         vol24_usd=(signal.get("ind") or {}).get("vol24_usd", 0.0))
+                                         vol24_usd=(signal.get("ind") or {}).get("vol24_usd", 0.0), liq_ctx=_liq_ctx)
     elif mode == "breakout":
         entry, e_mode = _entry_breakout(mark_price, atr,
                                          liq_long, liq_short, direction)
@@ -1133,7 +1202,7 @@ def calc_sl_tp(
             _, tp2, tp_degraded = _calc_tp(entry, sl, atr, direction,
                                             liq_long, liq_short,
                                             symbol=signal.get("symbol",""), tier=tier,
-                                            vol24_usd=(signal.get("ind") or {}).get("vol24_usd", 0.0))
+                                            vol24_usd=(signal.get("ind") or {}).get("vol24_usd", 0.0), liq_ctx=_liq_ctx)
             if tp2 is not None:
                 _rr2     = abs(tp2 - entry) / _sl_dist_sh
                 _tp2_far = (tp2 > tp1) if direction == "LONG" else (tp2 < tp1)
@@ -1223,12 +1292,12 @@ def calc_sl_tp(
             tp1, tp2, tp_degraded = _calc_tp(entry, sl, atr, direction,
                                               liq_long, liq_short,
                                               symbol=symbol_hint, tier=tier,
-                                              vol24_usd=(signal.get("ind") or {}).get("vol24_usd", 0.0))
+                                              vol24_usd=(signal.get("ind") or {}).get("vol24_usd", 0.0), liq_ctx=_liq_ctx)
     else:
         tp1, tp2, tp_degraded = _calc_tp(entry, sl, atr, direction,
                                           liq_long, liq_short,
                                           symbol=symbol_hint, tier=tier,
-                                          vol24_usd=(signal.get("ind") or {}).get("vol24_usd", 0.0))
+                                          vol24_usd=(signal.get("ind") or {}).get("vol24_usd", 0.0), liq_ctx=_liq_ctx)
 
     # v3.62: VP TP1 增强——tp_degraded 时（无清算图 TP 锚点）用 VP vah/val 作为候选
     # LONG：vah（价值区上沿）在入场价上方 + RR >= 1.2 时，替换 tp_degraded TP1
@@ -1353,4 +1422,8 @@ def calc_sl_tp(
         "consistency_score":  consistency_data.get("consistency_score"),
         "consistency_note":   consistency_data.get("consistency_note"),
         "tp_vs_dynamic_atr":  consistency_data.get("tp_vs_dynamic_atr"),
+        # [v3.88 OPT-14d] 只记录、不参与决策：入场侧最近清算区与 TP1 侧最近清算区在三种分母下的相对强度
+        "liq_metrics":        _collect_liq_metrics(entry, atr, direction, liq_long, liq_short, _liq_ctx),
+        # [v3.88 OPT-14e] 本次 TP1 实际采用的清算区缓冲（ATR 倍数），写入持仓供重算时锁定；None=未锚定清算区
+        "tp1_liq_buffer_atr": _liq_ctx.get("tp1_buffer_used"),
     }

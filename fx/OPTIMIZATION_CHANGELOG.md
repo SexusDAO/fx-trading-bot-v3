@@ -359,3 +359,15 @@
 | 流动性下限：`judges`（128、1114 行）100 万 U、`scanner`（774 行）50 万 U、`config.UNIVERSE_MIN_VOLUME_24H` 300 万 U | — | 准入门槛，本身就是以成交额衡量，**建议保持绝对值** |
 | `executor` 流动性深度 `LIQUIDITY_GATE_MIN_U` 1 万 U | — | 盘口深度下限，与名义仓位挂钩，**建议保持** |
 | `risk_manager._SHOCK_LIQ_THRESH` 5 亿 U | — | 全市场强平量，非单币指标，**建议保持** |
+
+## 第 13 轮（v3.88 续：相对强度分母对比 + TP1 入场锁定，分支 opt/liq-relative-v388）
+
+| 编号 | 在哪里 | 改了什么 | 为什么改 | 开关 |
+|---|---|---|---|---|
+| OPT-14d | `shared/opt_v388.liq_metrics`、`calc_sl_tp._collect_liq_metrics`、`executor`（持仓记录 + `trade_log.jsonl`） | 每次 `calc_sl_tp` 计算时，记录入场侧、止盈侧最近清算区的：绝对金额、`rel_vol24`（÷24H 成交额）、`rel_oi`（÷持仓名义价值 USDT）、`concentration`（÷同方向清算图总量）、`zone_count`、`concentration_valid` | **为什么三种分母都记**：三者语义不同（流动性背景 / 杠杆脆弱度 / 清算图内部拥挤度），现有数据无法判断哪个与胜率相关，先同时记录，积累 2~4 周后用自己的实盘结果对比再定分母和阈值，避免拍脑袋。三者独立计算，任一缺数据只让对应字段为 None | 只记录，不参与决策；无独立开关 |
+| OPT-14d-说明 | 同上 | `oi_now` 是合约张数，记录前乘以标记价换算成 USDT；单区时 `concentration` 恒为 1.0，已用 `concentration_valid=False` 显式标记，分析时应剔除 | 避免量级错误和无区分度样本污染结论 | — |
+| OPT-14d-频率 | 同上 | 写入频率：每次 `calc_sl_tp` 调用产生一次（含开仓前计算与 30 分钟重算），但只有开仓时的值随持仓和成交日志落盘（字段 `liq_metrics`、`tp1_liq_buffer_atr`）；重算结果不覆盖 | 一笔交易一条记录，便于与结果（止盈/止损/超时）对应 | — |
+| OPT-14e | `calc_sl_tp._calc_tp`、`position_manager._adjust_sl_tp_once`、`executor` | 开仓时把实际采用的 TP1 清算区缓冲（ATR 倍数）存入持仓；30 分钟重算时直接沿用，不按最新清算图重算 | **为什么 TP1 锁定**：TP1 是开仓时风险收益评估的一部分，中途跟随清算图变化等于改变入场依据，行为前后不一致且难以归因；同时补上上一版“重算缺少成交额、缓冲退回 0.3ATR”的不一致。旧仓位无该字段时回到原逻辑 | `OPT_LIQ_RELATIVE_STRENGTH`（默认 False）；分母选择 `LIQ_REL_DENOM`（默认 vol24） |
+
+验证：pyflakes 无新增问题；`tests/test_opt_v388.py` 16 项通过；全量 pytest 仅剩已知 9 个过期旧测试失败。未回测、未实盘。
+合并时机：等拿到 2~4 周 `liq_metrics` 数据、确定分母与阈值之后再合并 main。

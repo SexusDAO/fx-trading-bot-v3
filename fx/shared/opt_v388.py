@@ -38,3 +38,55 @@ def tp1_buffer_atr(rel: float | None, strong: float = 0.20, mid: float = 0.05,
     if rel >= mid:
         return buf_mid
     return buf_weak
+
+
+def _zsize(z: dict) -> float:
+    return float(z.get("liq_usd") or z.get("amount") or 0.0)
+
+
+def liq_concentration(amount: float, zones: list) -> float | None:
+    """[v3.88 OPT-14d] 清算集中度 = 单区金额 / 同方向清算图总量。
+    注意：只有一个区时恒为 1.0，且随清算图拉取范围（24h/3d/7d）变化，需结合金额一起看。"""
+    try:
+        total = sum(_zsize(z) for z in (zones or []))
+        a = float(amount or 0)
+    except (TypeError, ValueError):
+        return None
+    if a <= 0 or total <= 0:
+        return None
+    return a / total
+
+
+def oi_relative(amount: float, oi_usd: float) -> float | None:
+    """[v3.88 OPT-14d] OI 相对强度 = 单区金额 / 持仓名义价值（USDT）。
+    注意：币安 /fapi/v1/openInterest 返回的是合约张数（币本位数量），调用方必须先乘以标记价换算成 USDT。"""
+    return liq_relative_strength(amount, oi_usd)
+
+
+def relative_by_denom(denom: str, amount: float, zones: list,
+                      vol24_usd: float, oi_usd: float) -> float | None:
+    """按配置的分母计算相对强度：vol24（24H 成交额）/ oi（持仓名义价值）/ concentration（清算图集中度）。"""
+    if denom == "oi":
+        return oi_relative(amount, oi_usd)
+    if denom == "concentration":
+        return liq_concentration(amount, zones)
+    return liq_relative_strength(amount, vol24_usd)
+
+
+def liq_metrics(zone: dict | None, zones: list, vol24_usd: float, oi_usd: float) -> dict:
+    """[v3.88 OPT-14d] 只记录、不参与决策：同一清算区在三种分母下的相对强度，供积累数据后定阈值。
+    三个分母各自独立计算，任一缺数据只让对应字段为 None，不影响其余两个。"""
+    if not zone:
+        return {}
+    a = _zsize(zone)
+    def _r(x):
+        return round(x, 6) if x is not None else None
+    return {
+        "amount":        round(a, 2),
+        "rel_vol24":     _r(liq_relative_strength(a, vol24_usd)),
+        "rel_oi":        _r(oi_relative(a, oi_usd)),
+        "concentration": _r(liq_concentration(a, zones)),
+        "zone_count":    len(zones or []),
+        # [v3.88 OPT-14d] 单区时 concentration 恒为 1.0，没有区分度；显式标记，分析时应剔除这类样本
+        "concentration_valid": len(zones or []) >= 2,
+    }
