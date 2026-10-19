@@ -614,6 +614,10 @@ class SignalWatcher:
                                     _sl2  = float(_p2.get("sl_price", 0))
                                     _tp12 = float(_p2.get("tp1_price", 0))
                                     try:
+                                        # [v3.83 修复 BUG-3] 原代码直接用 `api`，但本模块没有顶层 import api，
+                                        #   NameError 被下面的 except 吞掉并 continue，导致「TP 可达性 / SL 踩空」紧急检查从不执行。
+                                        #   修复：就地导入 binance_api（与本文件其他位置的写法一致）。
+                                        from shared import binance_api as api
                                         _md2  = api.get_mark_price(_sym2)
                                         _mp2  = float(_md2.get("markPrice", 0))
                                     except Exception:

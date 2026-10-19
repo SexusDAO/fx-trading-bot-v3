@@ -356,7 +356,14 @@ class PositionManager:
                     _last_price[symbol]    = price
                     _last_price_ts[symbol] = now
 
-                    await self._on_price_update(pos, price)
+                    # [v3.83 健壮性] 单个持仓处理失败不应中断整轮价格循环，
+                    #   否则排在后面的持仓会被连带跳过（BUG-1 就是这样放大影响的）。
+                    try:
+                        await self._on_price_update(pos, price)
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as _pu_e:
+                        logger.warning(f"[pm] {symbol} _on_price_update 异常（已隔离，不影响其他持仓）: {_pu_e}")
 
                 await asyncio.sleep(1)
 
@@ -417,8 +424,17 @@ class PositionManager:
         # 条件B：持仓 > 48H + 历史峰值浮盈 > 5% + 当前已从峰值回撤超 80%——长持仓深回撤才保本
         # 两个条件 OR，任一满足即移到保本止损位
         _tp1_filled = pos.get("tp1_filled", False)
+        # [v3.83 修复 BUG-1] 原代码使用未定义的变量 `_entry`：只要某持仓 tp1_filled=True，
+        #   这里就会抛 NameError。该异常没有被就地捕获，会冒泡到 _mark_price_loop 的外层 except，
+        #   导致①「TP1 后保本」从未生效 ②同一轮循环里排在它后面的持仓价格更新被整体跳过（移动止损/MFE 保护延迟 5 秒且每轮重复）。
+        #   修复：在此处用本函数已有的 entry_p 显式定义 _entry。
+        _entry = entry_p
         if _tp1_filled and _entry > 0:
-            _hold_h  = (time.time() - pos.get("open_ts", 0) / 1000) / 3600
+            # [v3.83 修复 BUG-2] 原代码读取 pos["open_ts"]，但持仓记录里开仓时间字段是 "open_time"（毫秒，见 executor/_check_time_stop），
+            #   "open_ts" 不存在 → 默认 0 → _hold_h≈49 万小时，使条件B中的「持仓>72H」恒为真，
+            #   只要峰值浮盈>5% 且当前浮亏>0.5% 就会提前触发保本止损。改读 open_time，缺失时回退为当前时间（持仓时长=0，不误触发）。
+            _open_ms = float(pos.get("open_time") or 0)
+            _hold_h  = ((time.time() * 1000 - _open_ms) / 3_600_000) if _open_ms > 0 else 0.0
             _sl_now  = float(pos.get("sl_price", 0))
             _dir     = pos.get("direction", "long").upper()
             _mfe_val = _mfe.get(pid, 0.0)   # 历史峰值浮盈（小数，0.05=5%）
