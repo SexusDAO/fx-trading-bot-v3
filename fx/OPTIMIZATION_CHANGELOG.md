@@ -309,8 +309,17 @@
 - **`_adjust_sl_tp_once` 止损单向约束：仍然有效。** LONG 只允许上移、SHORT 只允许下移，反方向分支明确 `pass`；上移还需超过 0.3×ATR 才执行。（函数文档字符串写的是「SL 双向调整」，与实现不符，是过时描述。）
 - **OPT-1 / OPT-2 关闭时行为与原来一致：** OPT-1 关闭时阈值回退固定 2%；OPT-2 关闭时 `tp1_protect_action` 对「止损仍在入场价亏损侧」返回 `move_sl`（保持原有保本移动），对「止损已在有利侧」返回 `none`（原代码此时也不动作）。读代码 + 已有单测确认。
 
-## 发现但未改（待决策）
+## 追加修复（按决定实施）
 
-1. **两套巡检同时在跑（疑似重复处理）：** `PositionManager.start()` 启动了 `_patrol_loop`，`main.py` 又单独启动 `_loop_patrol` 调用 `patrol_once`，两者都是每 5 分钟、且都做时间止损 / 突破失败 / 反向信号检查。`_force_close_static` 的 `_closing_set` 只防「同时执行」，不防「先后各执行一次」；我没有在强平函数开头找到重新读取持仓状态的检查。可能出现重复平仓尝试。
-2. **巡检职责被拆开：** 健康检查只在 `_patrol_loop` 里；funding_arb 专用巡检、TP2 动态收紧、加仓只在 `patrol_once` 里。
-3. **未使用但带副作用的调用：** 资金费套利续持判断里 `all_mp = get_all_mark_prices()` 结果未使用（多一次接口请求）；挂单健康检查里 `k15` 未使用（`k15_raw` 同理）。删除会改变异常路径，未动。
+| 编号 | 在哪里 | 改了什么 | 为什么改 | 开关 |
+|---|---|---|---|---|
+| STEP7-2 | `position_manager._force_close_static`（新增 `_pos_still_open`） | 在 `_closing_set` 之后、任何平仓操作之前，重新从 state 读取该仓位：读不到或 status 不是 open 就直接返回（debug 日志「持仓已不存在或已非 open，跳过重复平仓」）；读状态本身失败时按「仍然 open」处理，不放弃平仓 | `PositionManager._patrol_loop` 与 main 里的 `patrol_once` 每 5 分钟都跑时间止损 / 突破失败 / 反向信号检查；`_closing_set` 只防同时执行，不防先后各执行一次，第一个平仓完成后第二个拿旧快照仍可能再平一次。`_force_close` 方法是 `_force_close_static` 的包装，同一入口 | 无 |
+| STEP7-3 | `_adjust_sl_tp_once` 文档字符串 | 「SL 双向调整」更正为「只允许向有利方向移动，幅度需 > 0.3×ATR」 | v3.6 起已禁止外扩，文档过时 | 仅注释 |
+| STEP7-4 | `_patrol_loop` 开头 | 加注释说明巡检职责分布在 `_patrol_loop` 与 `patrol_once` 两处 | 避免以后只保留其中一个循环时丢功能 | 仅注释 |
+
+新增 `tests/test_opt_v387_step7.py`（5 个用例）：open 仓位正常平仓；仓位已删除则跳过；status 非 open 则跳过；两个巡检先后调用时第二次不再平仓；读状态失败时不阻断平仓。
+
+## 审查结论（未改）
+
+- `all_mp`、`k15`（及 `k15_raw`）未使用但带副作用的接口调用：删除会改变异常路径，且前者在平仓决策路径上，按决定不动。
+- 全部 7 步的审查结果与分支对应关系见本文件各轮记录。

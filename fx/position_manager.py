@@ -680,6 +680,10 @@ class PositionManager:
 
     # ── B. 定时巡检任务（每5分钟）──────────────────────────────────────────
     async def _patrol_loop(self):
+        # [v3.87 STEP7-4] 说明：巡检职责分布在两处，修改任一处前请注意另一处。
+        #   本循环（PositionManager.start 启动）：孤单检测、TP REST 确认、时间止损 / 突破失败 / 反向信号、健康检查（含计数器）、挂单有效期。
+        #   patrol_once（main.py 的 _loop_patrol 调用）：除上述同类检查外，还负责 funding_arb 专用巡检、TP2 动态收紧、加仓。
+        #   两处的 B1 检查同时存在，重复平仓由 _force_close_static 开头的状态重读兜底（见 STEP7-2）。
         global _health_check_counter
         # 错开 scanner 的30秒
         await asyncio.sleep(30)
@@ -1668,6 +1672,21 @@ async def _check_pending_expire_static(pos: dict, now_ms: int):
 
 
     # ── 平仓执行（健康/时间止损/突破失败）────────────────────────────────────
+def _pos_still_open(pos: dict) -> bool:
+    """[v3.87 STEP7-2] 按 pos_id（没有则按 symbol）从 state 取最新记录，仅当 status == 'open' 返回 True。"""
+    try:
+        pid = pos.get("pos_id")
+        sym = pos.get("symbol")
+        for p in get_all_positions():
+            if (pid and p.get("pos_id") == pid) or (not pid and not p.get("pos_id") and p.get("symbol") == sym):
+                return p.get("status") == "open"
+        return False
+    except Exception as e:
+        # 读状态失败时不能因此放弃平仓（宁可重复，也不能漏平），按「仍然 open」处理
+        logger.warning(f"[pm] 强平前重读持仓状态失败，按仍然 open 处理: {e}")
+        return True
+
+
 async def _force_close_static(pos: dict, close_reason: str):
     # v3.56: 幂等保护——同一 pos_id 同时只允许一条路径执行平仓
     # 场景：WS SL触发 和 patrol时间止损 极端情况下并发调用同一仓位
@@ -1677,6 +1696,13 @@ async def _force_close_static(pos: dict, close_reason: str):
         return
     _closing_set.add(_pid_fc)
     try:
+        # [v3.87 STEP7-2] 第二道防线：重新从 state 读取该仓位的最新状态。
+        #   _closing_set 只防「同时执行」，防不住「先后各执行一次」：PositionManager._patrol_loop 与 main 里的 patrol_once
+        #   都每 5 分钟跑时间止损 / 突破失败 / 反向信号检查，第一个平仓完成后，第二个拿着旧快照仍可能再发一次平仓。
+        #   读不到（已被删除）或 status 不是 open → 直接返回，不做任何平仓操作。
+        if not _pos_still_open(pos):
+            logger.debug(f"[pm] {pos.get('symbol')} 持仓已不存在或已非 open，跳过重复平仓({close_reason})")
+            return
         await _force_close_static_inner(pos, close_reason)
     finally:
         _closing_set.discard(_pid_fc)
@@ -2950,7 +2976,9 @@ async def _adjust_sl_tp_once(pos: dict, force: bool = False) -> dict | None:
 
     规则：
       TP 双向调整（宽松下调门槛：新TP比旧TP差 > TP_SL_ADJUST_TP_SHRINK_ATR × ATR 才下调，防噪音）
-      SL 双向调整（外扩门槛：新SL比旧SL宽 > TP_SL_ADJUST_SL_WIDEN_ATR × ATR 才外扩，防频繁）
+      SL 只允许向有利方向移动（LONG 只上移、SHORT 只下移），且移动幅度需 > 0.3×ATR 才执行；
+        向不利方向（外扩）的重算结果一律忽略。
+        [v3.87 STEP7-3] 原文档写「SL 双向调整（外扩门槛…）」与实现不符（v3.6 起已禁止外扩），已更正。
       只更新发生实质变化的那一侧
       每次结果写 tp_sl_adjust_log.jsonl
       force=True：跳过持仓时长限制（BTC 剧烈波动时使用）
