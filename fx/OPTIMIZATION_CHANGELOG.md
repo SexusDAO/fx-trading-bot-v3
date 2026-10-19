@@ -183,6 +183,7 @@
 | STEP2-3 | `scanner.analyze_symbol` / `run_funding_arb_scan` | 删除未使用变量 `_chg`、`ok`（LLM 妖币分支）、`hours_to_settle`、`now_ts`、`_pending_score`；删除结果从未使用的 `get_open_interest_hist` 调用 | 清理死代码；资金费套利扫描每个候选少一次接口请求。`ok` 经核对并非信号丢失：结果经 sig_type/direction/reason 传出 | 无 |
 | STEP2-DOC | `scanner.refresh_pool` 文档字符串 | 更正为与实际配置一致 | 原文档数字与配置矛盾 | 仅注释 |
 
-## 审查发现但未改（待决策）
+## 审查发现的问题与处理
 
+- **已处理（STEP2-4）：** `config.LLM_JUDGE_EXPLOSIVE_COIN` 改为 False（回滚：改回 True）。原因见下。
 - 妖币 LLM 分支（`LLM_JUDGE_EXPLOSIVE_COIN=True`）对任何已通过的信号都会检测，命中后把信号类型强制改为 `range_bounce` 且方向强制为 LONG，可能覆盖原本的 SHORT 信号；同时依赖外部大模型输出，不属于币安官方数据。

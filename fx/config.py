@@ -597,7 +597,7 @@ AI_ADVISOR_PARAM_KEYS = [
 # v3.41 LLM 辅助判断开关（fx/shared/llm_judge.py）
 # ═══════════════════════════════════════════════════════════════════════════════
 LLM_JUDGE_ENABLED          = True   # 总开关：False 时所有 LLM 调用全部跳过
-LLM_JUDGE_EXPLOSIVE_COIN   = True   # 场景1：妖币识别（3日涨>100% 但 24H 横盘）
+LLM_JUDGE_EXPLOSIVE_COIN   = False  # 场景1：妖币识别（3日涨>100% 但 24H 横盘）  # [v3.87 STEP2-4] 按评审关闭：该分支会把已通过的信号强制改成 range_bounce LONG（SHORT→LONG 翻转），无历史胜率支撑且依赖外部大模型实时调用；有数据后再评估是否重新开启
 LLM_JUDGE_BORDERLINE       = True   # 场景2：规则边界信号（final_score 45~55）
 LLM_JUDGE_NEWS             = True   # 场景3：新闻 caution 语义深度解读
 LLM_JUDGE_MIN_CONFIDENCE   = 0.65   # LLM 最低置信度门槛，低于此视为不确定→跳过
