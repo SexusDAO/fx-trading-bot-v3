@@ -764,7 +764,7 @@ def analyze_symbol(symbol: str, ticker: dict,
 
     # ── v3.54 ticker 快速预筛（5ms，拦截明显不符合任何策略条件的标的）──────────
     # 目标：把 scan_pool ~110 个里约 50% 的标的在拉 K 线前就排除，降低耗时
-    _chg   = float(ticker.get("priceChangePercent", 0))
+    # [v3.87 STEP2] 删除未使用的 _chg（上一轮删除方向粗筛后遗留）
     _vol   = float(ticker.get("quoteVolume", 0))
     _h24   = float(ticker.get("highPrice", 0))
     _l24   = float(ticker.get("lowPrice", 0))
@@ -1080,7 +1080,7 @@ def analyze_symbol(symbol: str, ticker: dict,
                                 and _llm_v.get("confidence", 0) >= LLM_JUDGE_MIN_CONFIDENCE):
                             sig_type  = "range_bounce"
                             direction = "LONG"
-                            ok        = True
+                            # [v3.87 STEP2] 删除未使用的 ok=True：结果经 sig_type/direction/reason 传出到下方 _sig，并非丢失
                             reason    = {
                                 "signal_strength":  "medium",
                                 "position_size_cap": 0.3,
@@ -1307,7 +1307,9 @@ def maintain_pending_order(pos: dict, ticker: dict) -> str:
 def refresh_pool() -> list:
     """
     刷新候选池并写入缓存文件。
-    组成：成交量Top30 + CG清算量Top30 + 涨幅Top15 + 跌幅Top15 + 资金费率极端Top15，去重，目标总池70~80。
+    组成：成交量Top N + 涨幅Top N + 跌幅Top N + 资金费率极端Top N（N 由 config 的 UNIVERSE_* 经 POOL_* 别名决定，当前成交量榜 50）
+    + CG 清算量Top30（第五来源，Clawby/Coinglass，失败静默跳过），去重后总池规模随当日行情变化。
+    [v3.87 DOC] 原文档写「Top30 / 目标 70~80」与实际配置不符，已更正。
     """
     try:
         tickers  = api.get_ticker_24h()
@@ -1400,10 +1402,31 @@ def refresh_pool() -> list:
         logger.error(f"[scanner] 候选池刷新失败: {e}")
         return []
 
+_POOL_STALE_ALERT_TS = 0.0
+_POOL_CACHE_MAX_AGE_SEC = 45 * 60   # [v3.87 STEP2-1] 候选池缓存最长有效期
+
+
 def _load_pool() -> list:
+    # [v3.87 STEP2-1] 原逻辑不检查缓存时间：定时刷新线程挂掉后，会一直静默使用很久以前的候选池。
+    #   新：缓存超过 45 分钟则尝试重新刷新；刷新失败（返回空）时保留旧池兜底，并发送一次 Telegram 告警（1 小时内不重复）。
     try:
         d = json.loads(POOL_CACHE_FILE.read_text())
-        return d.get("pool", [])
+        pool = d.get("pool", [])
+        age = time.time() - float(d.get("ts", 0) or 0)
+        if pool and age > _POOL_CACHE_MAX_AGE_SEC:
+            logger.warning(f"[scanner] 候选池缓存已过期 {age/60:.0f} 分钟，尝试重新刷新")
+            fresh = refresh_pool()
+            if fresh:
+                return fresh
+            global _POOL_STALE_ALERT_TS
+            if time.time() - _POOL_STALE_ALERT_TS > 3600:
+                _POOL_STALE_ALERT_TS = time.time()
+                try:
+                    from shared.notifier import notify as _notify
+                    _notify(f"⚠️ 候选池缓存已过期 {age/60:.0f} 分钟且刷新失败，扫描暂用旧池，请检查网络/接口")
+                except Exception as _ne:
+                    logger.debug(f"[scanner] 候选池过期告警发送失败: {_ne}")
+        return pool
     except Exception:
         logger.warning("[scanner] 候选池缓存不存在，临时刷新")
         return refresh_pool()
@@ -2452,6 +2475,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
             from shared.indicators import atr as _calc_atr, ema as _calc_ema
 
             prepared = []   # [(sig, entry_low, entry_high, expire_ts, ws_ref)]
+            _snap_by_sym = {}   # [v3.87 STEP2-2] 按标的保存触发快照，避免注册阶段读到上一个标的的残留变量
             _ws_ref = getattr(signal_watcher, "_ws_listener", None)
 
             for sig in avail_signals:
@@ -2484,6 +2508,15 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
                         closes = [float(k[4]) for k in closed]
                         atr_v  = _calc_atr(closed)
                         ema20  = _calc_ema(closes, 20)
+                        # [v3.87 STEP2-2] 在每个标的自己的循环里保存快照（RSI1H/ATR/EMA20）
+                        try:
+                            from shared.indicators import rsi as _calc_rsi_snap
+                            _snap_by_sym[sym] = {
+                                "rsi": _calc_rsi_snap(closes) if len(closes) > 14 else 50.0,
+                                "atr": atr_v, "ema20": ema20,
+                            }
+                        except Exception:
+                            _snap_by_sym[sym] = {"rsi": 50.0, "atr": atr_v, "ema20": ema20}
                         _range = "24h" if mode in ("reversal","funding_arb") else                                  "7d"  if mode == "breakout" else "3d"
                         params = _calc_sl_tp(
                             signal=sig, mark_price=mark_p, atr=atr_v,
@@ -2611,19 +2644,18 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
                     _breakout_ref = 0.0
                     _ema20_at_trigger = 0.0
                     _atr_at_trigger = 0.0
-                    _pending_score = 0.0
+                    # [v3.87 STEP2-2] 原写法用 'k1h' in dir() 判断闭包变量：实际读到的是预算循环里「最后一个标的」的 k1h/atr_v/ema20，
+                    #   且 breakout 判断用的 mode 也是残留值，导致所有信号的触发快照（RSI/ATR/EMA20/突破基准）都是别的币的数据。
+                    #   新：按标的从 _snap_by_sym 取值，mode 取自信号自身。已实测确认原写法读到残留值。
                     try:
-                        if 'k1h' in dir() and k1h and len(k1h) > 14:
-                            from shared.indicators import rsi as _calc_rsi
-                            _closes_1h = [float(k[4]) for k in k1h[:-1]]
-                            _trigger_rsi_1h = _calc_rsi(_closes_1h)
-                        if 'atr_v' in dir():
-                            _atr_at_trigger = atr_v
-                        if 'ema20' in dir():
-                            _ema20_at_trigger = ema20
+                        _snap = _snap_by_sym.get(sym, {})
+                        if _snap:
+                            _trigger_rsi_1h   = _snap["rsi"]
+                            _atr_at_trigger   = _snap["atr"]
+                            _ema20_at_trigger = _snap["ema20"]
                         _reason_dict = sig.get('reason', {}) or {}
                         _dir = sig.get('direction', 'LONG').upper()
-                        if mode == 'breakout':
+                        if sig.get('sig_type') == 'breakout':
                             _breakout_ref = _reason_dict.get('breakout_ref_high' if _dir == 'LONG' else 'breakout_ref_low', 0)
                     except Exception as _snap_e:
                         logger.debug(f"[scanner] {sym} 触发快照字段计算失败: {_snap_e}")
@@ -2876,7 +2908,7 @@ def run_funding_arb_scan(dry_run: bool = False, signal_watcher=None) -> dict:
         logger.warning(f"[arb_scan] get_all_mark_prices 失败: {_fe}")
 
     # ── 结算时间改为逐标的动态获取（支持 1h/4h/8h 不同周期）─────────────────
-    now_ts = _t.time()
+    # [v3.87 STEP2] 删除未使用的 now_ts（随 hours_to_settle 一起清理）
     from shared.binance_api import get_next_funding_time, get_funding_interval
     # 下面逐标的计算 next_settle_ts，这里不再全局写死
 
@@ -2900,7 +2932,7 @@ def run_funding_arb_scan(dry_run: bool = False, signal_watcher=None) -> dict:
             # ── 动态获取结算周期和下次结算时间 ──────────────────────────────
             funding_interval_h = get_funding_interval(sym_full)   # 1/4/8
             next_settle_ts     = get_next_funding_time(sym_full)
-            hours_to_settle    = (next_settle_ts - now_ts) / 3600
+            # [v3.87 STEP2] 删除未使用的 hours_to_settle
 
             k1h = api.get_klines(sym_full, "1h", 100)
             k4h = api.get_klines(sym_full, "4h", 60)
@@ -2926,7 +2958,7 @@ def run_funding_arb_scan(dry_run: bool = False, signal_watcher=None) -> dict:
             # 近3期资金费率历史
             try:
                 from shared.binance_api import get_open_interest_hist as _oi_hist
-                fr_hist_raw = api.get_open_interest_hist(sym_full, "1h", 3)
+                # [v3.87 STEP2] 删除结果从未使用的 get_open_interest_hist 调用（每个候选白白多一次接口请求）
                 # 从 mark_price 历史拉近3期 funding rate
                 fr_hist_raw2 = _get_recent_funding_rates(sym_full, limit=3)
                 funding_hist = fr_hist_raw2 if fr_hist_raw2 else []

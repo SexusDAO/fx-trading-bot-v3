@@ -168,3 +168,21 @@
 | 舍弃 | OPT-8/9 | 会绕过清算区入场价与止损价，代码保留但开关永久 False，不建议开启 |
 
 说明：所有 `OPT_*` 开关在 `config.py` 中已加注释 `[v3.87 合并决策]`。开启某项只需把对应开关改为 True。OPT-11（EMA 趋势触发K线）评审清单未列出，我按保守原则默认关闭。
+
+---
+
+# 第六轮（v3.87 逐模块审查·第 1~2 步）：分支 `opt/step-2-scanner`（基于 main c865905e）
+
+> 验证：静态检查无未定义变量；全量测试 158 通过 / 9 失败（9 个为既有过时测试，与改动前相同）。未回测、未跑模拟盘。
+
+| 编号 | 在哪里 | 改了什么 | 为什么改 | 开关 |
+|---|---|---|---|---|
+| STEP1-DOC | `config.py` | 7 个确实未引用的常量补 DOC-2 标注；`STOP_HUNT_MIN_SCORE_WEEKEND` 撤销误标并注明仅回测使用；`FUNDING_ARB_ENTRY_WINDOW_MAX_H` 注明占位值 | 避免误导调参 | 仅注释 |
+| STEP2-1 | `scanner._load_pool` | 候选池缓存超过 45 分钟则重新刷新；刷新失败保留旧池兜底，并发 Telegram 告警（1 小时内不重复） | 原逻辑不检查时间，刷新线程挂掉后会静默使用陈旧候选池 | 无（`_POOL_CACHE_MAX_AGE_SEC`） |
+| STEP2-2 | `scanner.run_scan` 信号注册 `_do_register` | 触发快照（RSI1H / ATR / EMA20 / 突破基准）改为按标的保存并读取；mode 取信号自身的 sig_type | 原写法 `'k1h' in dir()` 读到的是预算循环里最后一个标的的残留变量（已实测确认），所有信号的快照都是别的币的数据；breakout 基准还依赖残留 mode | 无（bug 修复） |
+| STEP2-3 | `scanner.analyze_symbol` / `run_funding_arb_scan` | 删除未使用变量 `_chg`、`ok`（LLM 妖币分支）、`hours_to_settle`、`now_ts`、`_pending_score`；删除结果从未使用的 `get_open_interest_hist` 调用 | 清理死代码；资金费套利扫描每个候选少一次接口请求。`ok` 经核对并非信号丢失：结果经 sig_type/direction/reason 传出 | 无 |
+| STEP2-DOC | `scanner.refresh_pool` 文档字符串 | 更正为与实际配置一致 | 原文档数字与配置矛盾 | 仅注释 |
+
+## 审查发现但未改（待决策）
+
+- 妖币 LLM 分支（`LLM_JUDGE_EXPLOSIVE_COIN=True`）对任何已通过的信号都会检测，命中后把信号类型强制改为 `range_bounce` 且方向强制为 LONG，可能覆盖原本的 SHORT 信号；同时依赖外部大模型输出，不属于币安官方数据。
