@@ -387,3 +387,15 @@
 - 其余固定金额门槛：等影子运行数据，不改。
 
 验证：pyflakes 无新增问题；`tests/test_opt_v388.py` 25 项通过（本轮新增 9 项）；全量 pytest 仅剩已知 9 个过期旧测试失败。未回测、未实盘。
+
+## 第 15 轮（v3.88 续：开启两个开关 + 价格/数量取整浮点修复，分支 opt/liq-relative-v388）
+
+| 编号 | 在哪里 | 改了什么 | 为什么改 | 开关状态 |
+|---|---|---|---|---|
+| OPT-5 开启 | `config.OPT_BREAKOUT_CLOSED_BAR`；`judges`（突破判断） | 默认值由 False 改为 **True**：突破只用已闭合 1H K 线 | 未闭合 K 线可被重绘成假突破；代价是突破信号晚约一根 K 线 | **默认开启**（用户决定）；设 False 恢复 |
+| OPT-6 开启 | `config.OPT_FUNDING_WINDOW_PER_SYMBOL`；`scanner`（资金费窗口） | 默认值由 False 改为 **True**：资金费窗口按标的自身结算时间计算，不再整轮停扫 | 原逻辑整轮停扫，1H/4H 结算的合约没有保护，还白白损失扫描轮次；代价是扫描频率增加，需观察接口限速 | **默认开启**（用户决定）；设 False 恢复 |
+| OPT-16 | `executor._round_price`、`position_manager._round_price`、`shared/binance_api.round_price`、`round_quantity` | 取整前先 `round(x/步长, 10)` 消除浮点误差再向下取整（与 `_round_qty` 的修法一致） | 原写法 `floor(price/tick)`：0.3/0.1=2.9999999999999996，floor 得 2，价格少一个 tick；数量同理少一个步长。正常价格结果不变，只修边界 | 无开关（纯精度修复） |
+
+注意：OPT-16 影响所有下单和挂单价格的取整（含入场、止损、止盈的挂单价）。只修浮点边界，不改变任何价格的计算逻辑。
+
+验证：pyflakes 无新增问题；`tests/test_opt_v388.py` 27 项通过（本轮新增 2 项）；全量 pytest 仅剩已知 9 个过期旧测试失败。未回测、未实盘。

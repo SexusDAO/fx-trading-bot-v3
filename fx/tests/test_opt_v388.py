@@ -208,3 +208,21 @@ class TestOidAllBull(unittest.TestCase):
             self.assertFalse(r.get("error", "").startswith("oi_divergence SHORT 近5根"))
         finally:
             config.OPT_OID_REJECT_ALL_BULL = orig
+
+
+class TestRoundFloat(unittest.TestCase):
+    """[v3.88 OPT-16] 价格/数量取整的浮点修复。"""
+    def test_price_float_hazard(self):
+        import executor, position_manager
+        from shared import binance_api as ba
+        for fn in (executor._round_price, position_manager._round_price):
+            self.assertEqual(fn(0.3, 0.1), 0.3)        # 原写法得 0.2
+            self.assertEqual(fn(1.1, 0.1), 1.1)
+            self.assertEqual(fn(100.07, 0.1), 100.0)   # 正常向下取整不变
+            self.assertEqual(fn(0.29999, 0.0001), 0.2999)
+        self.assertEqual(ba._math.floor(round(0.3 / 0.1, 10)), 3)
+
+    def test_flags_default_on(self):
+        import config
+        self.assertTrue(config.OPT_BREAKOUT_CLOSED_BAR)
+        self.assertTrue(config.OPT_FUNDING_WINDOW_PER_SYMBOL)

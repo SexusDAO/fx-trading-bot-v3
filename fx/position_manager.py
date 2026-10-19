@@ -110,7 +110,9 @@ TRADE_LOG_PATH = ROOT / "logs" / "trade_log.jsonl"
 def _round_price(price: float, tick: float) -> float:
     if tick <= 0: return round(price, 6)
     prec = max(0, -int(math.floor(math.log10(tick))))
-    return round(math.floor(price / tick) * tick, prec)
+    # [v3.88 OPT-16] 浮点修复：原写法 floor(price/tick) 受浮点误差影响（0.3/0.1=2.9999999999999996，floor 得 2，价格少一个 tick）。
+    #   先 round(price/tick, 10) 消除误差再向下取整，与 _round_qty 的修法一致；正常价格结果不变。
+    return round(math.floor(round(price / tick, 10)) * tick, prec)
 
 
 def _round_qty(qty: float, step: float) -> float:

@@ -619,7 +619,9 @@ def round_price(symbol: str, price: float) -> float:
     tick = p["tick_size"]
     if tick <= 0: return round(price, 6)
     prec = p["price_precision"]
-    return round(_math.floor(price / tick) * tick, prec)
+    # [v3.88 OPT-16] 浮点修复：原写法 floor(price/tick) 受浮点误差影响（0.3/0.1=2.9999999999999996，floor 得 2，价格少一个 tick）。
+    #   先 round(price/tick, 10) 消除误差再向下取整，与 round_quantity 的修法一致；正常价格结果不变。
+    return round(_math.floor(round(price / tick, 10)) * tick, prec)
 
 
 def round_quantity(symbol: str, quantity: float) -> float | None:
@@ -627,7 +629,8 @@ def round_quantity(symbol: str, quantity: float) -> float | None:
     step = p["step_size"]
     if step <= 0: return round(quantity, 3)
     prec = p["qty_precision"]
-    qty  = round(_math.floor(quantity / step) * step, prec)
+    # [v3.88 OPT-16] 同上：先 round(quantity/step, 10) 再向下取整，避免数量少一个步长。
+    qty  = round(_math.floor(round(quantity / step, 10)) * step, prec)
     if qty * 1 < p["min_notional"]:   # 粗略检查（调用方应传入更精确的价格）
         logger.warning(f"[api] {symbol} 数量 {qty} 可能低于最小名义仓位")
     return qty

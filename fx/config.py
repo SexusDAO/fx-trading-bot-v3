@@ -888,8 +888,8 @@ PULLBACK_MAX_DIST_ATR = 2.0
 # ═══════════════════════════════════════════════════════════════════════════════
 # v3.85 第二轮开关——False 即回到原行为
 # ═══════════════════════════════════════════════════════════════════════════════
-OPT_BREAKOUT_CLOSED_BAR       = False   # OPT-5 突破只用已闭合 1H K 线  # [v3.87 合并决策] 默认 False：OPT-5 按评审：先关闭，开启后突破信号晚约一根K线
-OPT_FUNDING_WINDOW_PER_SYMBOL = False   # OPT-6 资金费窗口按标的自身结算时间，不再整轮停扫  # [v3.87 合并决策] 默认 False：OPT-6 按评审：先关闭，开启后扫描频率增加需观察限速
+OPT_BREAKOUT_CLOSED_BAR       = True    # OPT-5 突破只用已闭合 1H K 线  # [v3.88 用户决定开启] 未闭合K线可被重绘成假突破；代价：突破信号晚约一根K线。设 False 恢复
+OPT_FUNDING_WINDOW_PER_SYMBOL = True    # OPT-6 资金费窗口按标的自身结算时间，不再整轮停扫  # [v3.88 用户决定开启] 1H/4H 结算合约也有保护，不再白白停扫；代价：扫描频率增加，需观察限速。设 False 恢复
 OPT_PYRAMID_FAIL_CLOSED       = True   # FIX-2 加仓所需 RSI 拿不到时本轮不加仓
 
 # v3.86 第三轮开关——False 即回到原行为
