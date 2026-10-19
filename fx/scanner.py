@@ -1392,7 +1392,7 @@ def refresh_pool() -> list:
 
         POOL_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
         POOL_CACHE_FILE.write_text(json.dumps({
-            "ts": time.time(), "pool": pool,
+            "ts": time.time(), "ts_unit": "seconds", "pool": pool,
             "updated_at": datetime.now(timezone.utc).isoformat()
         }, ensure_ascii=False))
         logger.info(f"[scanner] 候选池刷新完成: {len(pool)} 个")
