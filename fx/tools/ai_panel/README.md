@@ -32,6 +32,7 @@ python -m fx.tools.ai_panel.panel --analyze --results fx/tools/ai_panel/results/
 费用主要来自模型输出长度。每次运行前先用 1 道题试跑核对扣费，再放开全部。
 
 ## 注意
+- 已知问题：`claude-sonnet-5` 在长问题上试跑时曾返回空回答（输出顶满上限），默认名单已换成 `claude-sonnet-4-6`；换回前请先单独试跑确认。
 - 问题内容会发送到第三方中转站，涉及策略细节时请自行评估是否可以外发。
 - `C1_权重联动_哲学.txt` 是按片段重建的版本，使用前请核对。
 - `results/` 含模型原始回答，已在 `.gitignore` 中忽略，不会提交。

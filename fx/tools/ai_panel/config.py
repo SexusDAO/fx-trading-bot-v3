@@ -26,11 +26,12 @@ PANEL_MODELS = [
     {"name": "gpt-6.1-sol",     "max_tokens": 3000, "token_param": "max_completion_tokens"},
     {"name": "o4-mini",         "max_tokens": 4000, "token_param": "max_completion_tokens"},
     {"name": "glm-5.2",         "max_tokens": 4000},
-    {"name": "claude-sonnet-5", "max_tokens": 3000},
+    {"name": "claude-sonnet-4-6", "max_tokens": 3000},
 ]
 
 # 汇总分析使用的模型（analyzer 会调用一次）
-PANEL_ANALYZER_MODEL = {"name": "claude-sonnet-5", "max_tokens": 3000}
+# [说明] 原用 claude-sonnet-5，但在长问题上试跑出现“输出顶满上限却返回空回答 / 请求长时间不返回”，改用 claude-sonnet-4-6（价格略高，约 15 美元/百万输出）。
+PANEL_ANALYZER_MODEL = {"name": "claude-sonnet-4-6", "max_tokens": 3000}
 
 PANEL_SYSTEM_PROMPT = (
     "你是一名资深量化策略顾问，专注于加密永续合约衍生品市场。\n"
