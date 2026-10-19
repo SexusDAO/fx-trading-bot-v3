@@ -298,7 +298,7 @@ TRAIL_STEPS_TREND_LEGACY = [
     (4.0, 1.5),
     (6.0, 2.0),
 ]
-OPT_TRAIL_BE_BUFFER = True   # v3.84：保本档推迟并加缓冲（False=原阶梯）
+OPT_TRAIL_BE_BUFFER = False   # v3.84：保本档推迟并加缓冲（False=原阶梯）  # [v3.87 合并决策] 默认 False：OPT-4 按评审：先关闭，观察单笔最大回撤后再开
 TRAIL_STEPS_TREND = [
     (1.0, 0.1),
     (1.8, 0.5),
@@ -874,13 +874,13 @@ FUNDING_SYNERGY_THRESH            = 0.0005 # 费率绝对值 > 0.05% 才触发�
 # v3.84 优化开关（第一轮）——每项对应 OPTIMIZATION_CHANGELOG.md 中的一条，False 即回到原行为
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1) 提前滞涨平仓的浮亏阈值随止损距离缩放（原固定 2%）
-OPT_STAGNATION_SCALE_BY_SL = True
+OPT_STAGNATION_SCALE_BY_SL = False  # [v3.87 合并决策] 默认 False：OPT-1 按评审：先关闭，看 early_stagnation 频率再决定
 EARLY_STAGNATION_LOSS_FRAC = 0.6    # 阈值 = max(下限, 0.6 × 止损距离)
 EARLY_STAGNATION_LOSS_MIN  = 0.02   # 下限 2%（与原固定值一致）
 # 2) TP1 成交后价格跌穿入场价：直接平掉剩余仓位，而不是把止损放到错误一侧
-OPT_TP1_PROTECT_CLOSE = True
+OPT_TP1_PROTECT_CLOSE = False  # [v3.87 合并决策] 默认 False：OPT-2 按评审：BUG-1/2 跑稳约 1 周后再开
 # 3) 回踩入场（无清算区降级）多空对称
-OPT_PULLBACK_ENTRY_SYMMETRIC = True
+OPT_PULLBACK_ENTRY_SYMMETRIC = False  # [v3.87 合并决策] 默认 False：OPT-3 按评审：暂缓，空头 0.8ATR 为有意设计，待数据
 PULLBACK_DEGRADED_ATR = 0.5
 PULLBACK_MIN_DIST_ATR = 0.3
 PULLBACK_MAX_DIST_ATR = 2.0
@@ -888,23 +888,23 @@ PULLBACK_MAX_DIST_ATR = 2.0
 # ═══════════════════════════════════════════════════════════════════════════════
 # v3.85 第二轮开关——False 即回到原行为
 # ═══════════════════════════════════════════════════════════════════════════════
-OPT_BREAKOUT_CLOSED_BAR       = True   # OPT-5 突破只用已闭合 1H K 线
-OPT_FUNDING_WINDOW_PER_SYMBOL = True   # OPT-6 资金费窗口按标的自身结算时间，不再整轮停扫
+OPT_BREAKOUT_CLOSED_BAR       = False   # OPT-5 突破只用已闭合 1H K 线  # [v3.87 合并决策] 默认 False：OPT-5 按评审：先关闭，开启后突破信号晚约一根K线
+OPT_FUNDING_WINDOW_PER_SYMBOL = False   # OPT-6 资金费窗口按标的自身结算时间，不再整轮停扫  # [v3.87 合并决策] 默认 False：OPT-6 按评审：先关闭，开启后扫描频率增加需观察限速
 OPT_PYRAMID_FAIL_CLOSED       = True   # FIX-2 加仓所需 RSI 拿不到时本轮不加仓
 
 # v3.86 第三轮开关——False 即回到原行为
-OPT_REVERSAL_SHORT_TIER_RSI = True   # OPT-7 反转做空的 RSI4H 门槛按波动层区分（高波动 70）
+OPT_REVERSAL_SHORT_TIER_RSI = False   # OPT-7 反转做空的 RSI4H 门槛按波动层区分（高波动 70）  # [v3.87 合并决策] 默认 False：OPT-7 按评审：暂缓，待对比高波动做空历史胜率
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # v3.87 开仓场景重构（第一批）——False 即回到原行为
 # ═══════════════════════════════════════════════════════════════════════════════
-OPT_PULLBACK_ENTRY_AT_CONFIRM = True   # OPT-8 回踩在确认处入场（mark∓0.1ATR）
-OPT_INVALIDATION_SL           = True   # OPT-9 回踩/EMA趋势/反转用失效位止损（1H 结构点外 0.3ATR，1~3ATR）
-OPT_OI_DIV_EXHAUSTION_CONFIRM = True   # OPT-10 OI 背离需不创新低(高) + 主动买卖比确认
-OPT_EMA_TREND_TRIGGER_BAR     = True   # OPT-11 EMA 趋势需 1H/15M 触发 K 线
+OPT_PULLBACK_ENTRY_AT_CONFIRM = False   # OPT-8 回踩在确认处入场（mark∓0.1ATR）  # [v3.87 合并决策] 默认 False：OPT-8 按评审：舍弃，会绕过清算区加权入场价；代码保留但永久关闭
+OPT_INVALIDATION_SL           = False   # OPT-9 回踩/EMA趋势/反转用失效位止损（1H 结构点外 0.3ATR，1~3ATR）  # [v3.87 合并决策] 默认 False：OPT-9 按评审：舍弃，会绕过清算区止损；代码保留但永久关闭
+OPT_OI_DIV_EXHAUSTION_CONFIRM = False   # OPT-10 OI 背离需不创新低(高) + 主动买卖比确认  # [v3.87 合并决策] 默认 False：OPT-10 按评审：暂缓，待 oi_divergence 累计 20+ 笔再定
+OPT_EMA_TREND_TRIGGER_BAR     = False   # OPT-11 EMA 趋势需 1H/15M 触发 K 线  # [v3.87 合并决策] 默认 False：OPT-11 评审未列入：保守起见默认关闭，待数据
 
 # v3.87 第二批
-OPT_BREAKOUT_RSI_STRONG_RELAX = True   # OPT-12 放量(量比≥强量阈值)突破放宽 RSI 限制
+OPT_BREAKOUT_RSI_STRONG_RELAX = False   # OPT-12 放量(量比≥强量阈值)突破放宽 RSI 限制  # [v3.87 合并决策] 默认 False：OPT-12 按评审：暂缓，待验证 RSI>65 突破单质量
 BREAKOUT_RSI_MAX_LONG_STRONG  = 75     # 强量突破做多 RSI1H 上限
 BREAKOUT_RSI_MIN_SHORT_STRONG = 25     # 强量突破做空 RSI1H 下限
-OPT_BREAKOUT_MOMENTUM_ENTRY   = True   # OPT-13 距突破位≤0.5ATR 时延续入场，不再强制等回踩
+OPT_BREAKOUT_MOMENTUM_ENTRY   = False   # OPT-13 距突破位≤0.5ATR 时延续入场，不再强制等回踩  # [v3.87 合并决策] 默认 False：OPT-13 按评审：暂缓，待对比成交率与止损率
