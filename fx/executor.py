@@ -617,7 +617,9 @@ def _place_open_order(symbol: str, direction: str, mode: str,
     )
     if not _val_ok:
         logger.error(f"[executor] {symbol} 下单参数校验失败，取消开仓: {_val_reason}")
-        return None  # 返回 None 表示下单失败
+        # [v3.87 STEP4-6] 原写法 return None，但调用方 `order_id, err = _place_open_order(...)` 需要二元组，
+        #   参数校验失败时会抛 TypeError（被外层吞掉或中断本次开仓流程）。改为返回 (None, 原因)，与其它失败出口一致。
+        return None, f"下单参数校验失败: {_val_reason}"
 
     try:
         if mode == "breakout":

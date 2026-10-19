@@ -170,6 +170,26 @@ def _densest_liq_for_tp(price: float, direction: str,
         return max(below, key=_zone_size) if below else None
 
 
+def _tighten_sl_after_cap(entry: float, sl: float, tp1: float, direction: str,
+                          rr_min: float, tier: str) -> tuple:
+    """
+    [v3.87 STEP4-2] TP1 被 cap 截断后 RR 不足时，尝试收紧止损使 RR 达标。
+    原逻辑最小距离写死 2.5%，与按波动层的最小止损距离（低 2.5% / 中 3% / 高 5%）不一致，
+    中高波动币的止损可能被收紧到噪声区间内。现按波动层取最小距离，达不到返回 (None, 收紧比例)，调用方应拒绝信号。
+    收紧后的止损还必须不比原止损更宽。
+    返回 (新止损或 None, 收紧后的止损距离比例)
+    """
+    tp1_dist = abs(tp1 - entry)
+    needed = tp1_dist / rr_min
+    sl_tight = entry - needed if direction == "LONG" else entry + needed
+    pct = abs(entry - sl_tight) / (entry + 1e-9)
+    min_pct = {"low": 0.025, "mid": 0.03, "high": 0.05}.get(tier, 0.025)
+    not_wider = (sl_tight >= sl) if direction == "LONG" else (sl_tight <= sl)
+    if pct >= min_pct and not_wider:
+        return sl_tight, pct
+    return None, pct
+
+
 def _check_sl_distance(entry: float, sl: float, direction: str, tier: str = "mid") -> bool:
     """止损距离上限按波动层级动态调整: low=12% mid=15% high=20%"""
     if direction == "LONG":
@@ -543,7 +563,9 @@ def _calc_sl(entry: float, atr: float, direction: str,
             if direction == "SHORT" and _struct_sl > sl:
                 _old = sl
                 sl = _struct_sl
-                sl_degraded = True
+                # [v3.87 STEP4-1] 删除无效赋值 sl_degraded = True：本函数最终返回的是变量 degraded，
+                #   这里的 sl_degraded 是局部遮蔽变量，从未传出。摆动点保护加宽止损「有意不触发降级」（降级会让执行器减半仓位），
+                #   删除赋值不改变任何行为，仅消除误导。
                 logger.info(
                     f"[calc_sl] SHORT 结构止损保护: "
                     f"原={_old:.6g} → 摆动高点={sl:.6g} "
@@ -552,7 +574,7 @@ def _calc_sl(entry: float, atr: float, direction: str,
             elif direction == "LONG" and _struct_sl < sl:
                 _old = sl
                 sl = _struct_sl
-                sl_degraded = True
+                # [v3.87 STEP4-1] 同上：无效赋值已删除，摆动点保护有意不触发降级。
                 logger.info(
                     f"[calc_sl] LONG 结构止损保护: "
                     f"原={_old:.6g} → 摆动低点={sl:.6g} "
@@ -796,7 +818,10 @@ def calc_sl_tp(
         "liq_data_available": bool,
         "sl_degraded":  bool,
         "tp_degraded":  bool,
-        "entry_mode":   str,            # immediate | pending_order
+        "entry_mode":   str,            # [v3.87 STEP4-5] 实际取值：immediate(市价/贴近现价) | pending_order(等待回调的限价单，
+                                        #   reversal/oi_divergence 专用) | weighted(回踩清算区加权入场价) | limit(range_bounce/stop_hunt 限价)
+                                        #   | fixed(仓位维护沿用已成交价) | at_confirm(OPT-8 开启时的回踩确认处入场，默认关闭)
+                                        #   执行器只对 pending_order 做特殊处理，其余值统一按 GTC 限价单提交
     }
     """
     mode      = signal.get("mode", "pullback")
@@ -1165,9 +1190,12 @@ def calc_sl_tp(
     # SHORT：val（价值区下沿）在入场价下方 + RR >= 1.2 时，替换 tp_degraded TP1
     if tp_degraded and _vp_valid and mode not in ("stop_hunt", "funding_arb", "range_bounce"):
         _sl_dist = abs(entry - sl)
+        # [v3.87 STEP4-3] 原门槛写死 1.2，低于全局 TP1 最小 RR（RR_MIN_TP1=2.0，高波动层 RR_MIN_TP1_HIGH=1.5），
+        #   VP 路径会放过本该被拒绝的低 RR 单。改为与全局一致。
+        _vp_rr_min = _CFG_RR_MIN_TP1_HIGH if tier == "high" else _TP1_MIN_RR
         if direction == "LONG" and _vp_vah > entry:
             _vp_rr = (_vp_vah - entry) / (_sl_dist + 1e-9)
-            if _vp_rr >= 1.2:
+            if _vp_rr >= _vp_rr_min:
                 logger.info(
                     f"[calc_sl_tp] LONG VP TP1增强: degraded→vah={_vp_vah:.6g} "
                     f"RR={_vp_rr:.2f} (原tp1={tp1:.6g})"
@@ -1176,7 +1204,7 @@ def calc_sl_tp(
                 tp_degraded = False
         elif direction == "SHORT" and 0 < _vp_val < entry:
             _vp_rr = (entry - _vp_val) / (_sl_dist + 1e-9)
-            if _vp_rr >= 1.2:
+            if _vp_rr >= _vp_rr_min:
                 logger.info(
                     f"[calc_sl_tp] SHORT VP TP1增强: degraded→val={_vp_val:.6g} "
                     f"RR={_vp_rr:.2f} (原tp1={tp1:.6g})"
@@ -1198,20 +1226,9 @@ def calc_sl_tp(
         _sl_dist_check = abs(entry - sl) + 1e-9
         _rr_after_cap  = abs(tp1 - entry) / _sl_dist_check
         if _rr_after_cap < _rr_min:
-            # 尝试收紧 SL：SL = entry ± tp1_dist / _rr_min
-            _tp1_dist = abs(tp1 - entry)
-            _sl_needed_dist = _tp1_dist / _rr_min
-            if direction == "LONG":
-                sl_tight = entry - _sl_needed_dist
-            else:
-                sl_tight = entry + _sl_needed_dist
-            _sl_tight_pct = abs(entry - sl_tight) / (entry + 1e-9)
-            # 收紧后的 SL 必须满足：>= 最小距离 2.5%，且 <= 原 SL（不能比原来更宽）
-            _sl_min_dist = 0.025
-            if _sl_tight_pct >= _sl_min_dist and (
-                (direction == "LONG"  and sl_tight >= sl) or
-                (direction == "SHORT" and sl_tight <= sl)
-            ):
+            # 尝试收紧 SL：SL = entry ± tp1_dist / _rr_min（最小距离按波动层，见 _tighten_sl_after_cap）
+            sl_tight, _sl_tight_pct = _tighten_sl_after_cap(entry, sl, tp1, direction, _rr_min, tier)
+            if sl_tight is not None:
                 logger.info(
                     f"[calc_sl_tp] {symbol_hint} TP1 cap 后 RR={_rr_after_cap:.2f} < {_rr_min}，"
                     f"收紧 SL: {sl:.6g} → {sl_tight:.6g} (-{_sl_tight_pct*100:.1f}%)，RR 修复为 {_rr_min}，"
@@ -1224,7 +1241,7 @@ def calc_sl_tp(
                 # 无法收紧（原 SL 本就很近，或收紧后低于 2.5% 最小距离）→ 拒绝
                 return {"error": (
                     f"TP1 cap {_tp1_cap*100:.0f}% 后 RR={_rr_after_cap:.2f} < {_rr_min}，"
-                    f"收紧 SL 至 {_sl_tight_pct*100:.1f}% 不满足最小距离 2.5%，拒绝信号（tier={tier}）"
+                    f"收紧 SL 至 {_sl_tight_pct*100:.1f}% 不满足 {tier} 层最小止损距离，或比原止损更宽，拒绝信号"
                 )}
         else:
             logger.debug(f"TP1 收窄至 {_tp1_cap*100:.0f}%（tier={tier}）: {tp1_pct*100:.1f}% → {_tp1_cap*100:.0f}%，RR={_rr_after_cap:.2f}")
