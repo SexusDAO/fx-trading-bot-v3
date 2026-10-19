@@ -2449,6 +2449,9 @@ def _judge_range_bounce_impl(k1h, k4h, k15, ind, chg24, funding):
     out["pre_gain"]     = round(pre_gain, 1)
     out["c_range"]      = round(c_range, 1)
     out["c_high"]       = round(c_high, 8)   # 区间上沿，供 calc_sl_tp range_bounce TP1 锚定
+    # [v3.87 STEP5-1] 新增 c_low（区间下沿）。signal_watcher._survival_check 的 range_bounce 做多撤单条件读取 reason['c_low']，
+    #   但此前判定函数从未输出该字段，值恒为 0，「区间下沿被跌破则撤单」条件从未生效。只加字段，不改任何判定逻辑。
+    out["c_low"]        = round(c_low, 8)
     out["zone_mid"]     = round(zone_mid, 6)
     out["gap_4h"]       = round(gap_4h, 1)
     return True, out

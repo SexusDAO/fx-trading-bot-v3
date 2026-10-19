@@ -1139,7 +1139,9 @@ class SignalWatcher:
             # 核心理由：EMA 趋势跟随——价格在 EMA20/EMA50 多头排列中回踩，等待反弹
             # 撤单条件：价格跌破/涨破 EMA20（趋势结构失效）
             # ema_trend 是 immediate 模式（基本立刻成交），此处仅作保底
-            ema20 = entry.ema20_at_trigger
+            # [v3.87 STEP5-6] 与 pullback 对齐：优先使用实时 EMA20（调用方传入），触发时快照只做兜底。
+            #   原先只用触发快照，价格移动后快照会偏离真实的 EMA20 支撑/压力位。
+            ema20 = realtime_ema20 if realtime_ema20 > 0 else entry.ema20_at_trigger
             if ema20 > 0:
                 if direction == 'LONG' and price < ema20 - atr_trigger * 0.5:
                     return True, f"ema_trend LONG 价格跌破 EMA20-0.5ATR={ema20 - atr_trigger*0.5:.6g}"
@@ -1351,11 +1353,10 @@ class SignalWatcher:
                 # ── v3.68 改动一：重挂单 dist 保护 ──────────────────────────────
                 # 新入场价可能再次超过 1.5 ATR（清算区本身就很远），
                 # 与 calc_sl_tp._entry_reversal 的保护逻辑保持一致
-                _entry_clamped = False
+                # [v3.87 STEP5-7] 删除未使用的 _entry_clamped 标记
                 _original_entry = new_entry_p
                 if abs(new_entry_p - mark_mp) > atr_v * 1.5:
                     new_entry_p = mark_mp + atr_v * 0.5
-                    _entry_clamped = True
                     logger.warning(
                         f'[recheck] {sym} 清算区位移重挂 dist 保护: '
                         f'原清算区中点 {_original_entry:.6g} 距 mark {mark_mp:.6g} '

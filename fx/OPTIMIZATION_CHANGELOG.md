@@ -230,3 +230,28 @@
 - OPT-8 / OPT-9：两个开关均为 False，代码以 `try: import … except: False` 读取，读不到也是关闭；按决定不加硬锁，由 config 控制。
 - 所有出口的返回字典字段一致；`entry_mode` 除 `pending_order` 外，执行器统一按 GTC 限价单提交（breakout 为 GTD，reversal 的 pending_order 为 GTX），处理正确。
 - 最终出口不加统一 RR 检查：改动面覆盖所有路径，风险高于收益。
+
+---
+
+# 第九轮（v3.87 逐模块审查·第 5 步 signal_watcher.py）：分支 `opt/step-5-watcher`（基于 main eaf167ef）
+
+> 验证：静态检查无未定义变量；全量测试 163 通过 / 9 失败（9 个为既有过时测试，与改动前相同）。未回测、未跑模拟盘。
+
+| 编号 | 在哪里 | 改了什么 | 为什么改 | 开关 |
+|---|---|---|---|---|
+| STEP5-1 | `judges._judge_range_bounce_impl` 输出 | 新增 `c_low`（区间下沿）字段，只加字段不改判定 | `_survival_check` 的 range_bounce 做多撤单条件读 `reason['c_low']`，此前从未被输出，值恒为 0，「跌破区间下沿则撤单」从未生效 | 无 |
+| STEP5-6 | `signal_watcher._survival_check` ema_trend 分支 | 优先使用实时 EMA20，触发快照仅兜底 | 与 pullback 分支对齐；快照 EMA20 在价格移动后会偏离真实支撑/压力位 | 无 |
+| STEP5-7 | `signal_watcher._recheck_one` | 删除未使用的 `_entry_clamped` | 死变量 | 无 |
+
+## 审查结论（未改）
+
+- `triggered=True` 是在价格进入触发区间、开始下限价单流程之前就置位的，因此 BTC 守护与 `_recheck_one` 都不处理已触发条目；已向交易所挂出的限价单不在守护撤销范围内。属有意设计，记录在案。
+- BTC 守护对所有 LONG 挂单一刀切，不套用 `_recheck_one` 的三条豁免：按决定保持。
+- 低分撤单实际只作用于 weak / 未知强度信号：按决定保持。
+- `_tp12` 取而不用（TP1 可达性未接入）：按决定保留，待实盘数据积累后再定义「不可达」。
+- funding_arb 不进入挂单监控（市价立即入场），BTC 守护不会撤它。
+- OPT-13 关闭时 `compute_entry_range` 突破分支与原逻辑一致（读代码确认，无单测）。
+
+## 发现但未改（待决策）
+
+- **价格位移重挂（`_recheck_one` B1 段）疑似会丢单：** 重挂时先 `_cancel_and_remove` 撤掉旧单，再调用 `add_signal(..., loop=loop, is_reorder=True, ...)`；但 `add_signal` 没有 `loop` 参数，且必需参数 `on_trigger` 未传，会抛 TypeError。异常被外层 `except` 以 debug 级别吞掉并记为「保留原挂单」，实际旧单已被撤。涉及 `SIGNAL_PRICE_SHIFT_REORDER_TYPES=("reversal","breakout")`，价格偏离原入场价超过 1 ATR 时触发。
