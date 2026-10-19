@@ -261,3 +261,26 @@
 新增 `tests/test_opt_v387_step5.py`（3 个用例）：撤旧单发生时队列里已是新条目、注册失败时旧单保留且不撤单、不带 replace 时重复注册仍被跳过。
 
 **合并后请观察：** 日志中「价格位移」「重算入场参数并重挂」出现的频率，以及「价格位移重挂失败，保留原挂单」的 warning 是否出现。只对 reversal / breakout 生效，价格偏离原入场价超过 1 ATR 才触发。
+
+---
+
+# 第十轮（v3.87 逐模块审查·第 6 步 executor.py）：分支 `opt/step-6-executor`（基于 main 405d78bd）
+
+> 验证：静态检查无未定义变量；新增 6 个单测通过；全量测试 172 通过 / 9 失败（9 个为既有过时测试，与改动前相同）。二次验证平仓失败出口没有单测（需要大量模拟下单环境）。未回测、未跑模拟盘。
+
+| 编号 | 在哪里 | 改了什么 | 为什么改 | 开关 |
+|---|---|---|---|---|
+| STEP6-1 | `executor._entry_recheck` | 删除 v3.78「逆势拉盘扫入就平仓」规则及其死变量 `_fill_candle_dir`、`rsi_1h` | 规则依赖快照里的 `vol_ratio` / `prev_close` / `entry_price_snap`，调用方构造的快照从未提供这三个字段，条件恒不成立；无数据支撑，按评审决定删除。现在该函数只在资金费率极端（多头 >0.5% / 空头 <-0.5%）时判定平仓 | 无 |
+| STEP6-2 | `executor._execute_async` 二次验证 CLOSE 平仓失败出口 | 平仓抛异常时：发送告警（symbol、方向、成交价、数量、复核结论、错误原因，注明需人工确认），然后 `return False`；不写持仓记录、不挂保护单 | 原写法只发通知，随后用回退价格 0 计算盈亏并 `return True`，调用方以为流程已完成，而仓位无保护、也不在系统记录里。**注意：失败后仓位不被机器人跟踪，必须人工处理** | 无 |
+| STEP6-3 | `executor._place_guards_async` 止损数量；新增 `_round_sum_qty` | `sl_qty = tp1_qty + tp2_qty` 相加后按步长精度四舍五入 | `binance_api.place_sl` 直接用 `f"{quantity}"` 拼接数量，两个浮点数相加会产生 0.30000000000000004 之类的噪声，可能被交易所以精度错误拒绝，止损单提交失败 | 无 |
+| STEP6-4 | `executor` 死变量 | 删除 `LIQUIDITY_GATE_MIN_U`（`_account_final_check` 内）、`exec_type`（`_wait_fill_ws`）；保留 `_max_lev_for_notional`（涉及杠杆，不碰） | 死代码 | 无 |
+
+## 审查结论（未改）
+
+- 其余返回元组的函数（`_precheck`、`_check_correlation`、`_check_liquidity_gate`、`_validate_order_params`、`_account_final_check`、`_place_open_order`、`_entry_recheck`）用语法树核对过，所有出口的元组长度与调用方解包一致，没有其他解包错误。
+- 保护单提交失败只告警、不重试：依赖持仓管理 5 分钟巡检兜底，按决定保持。
+- `_precheck` 顺序：结果正确，按决定不动。余额快速预检（20U）已在第 1-9 项，「余额检查太晚」已不存在。
+
+## 发现但未改（待决策）
+
+- `_round_qty` 使用 `floor(qty/step)*step`，浮点除法可能多丢一个步长（例如 0.3/0.1 = 2.9999999999999996，向下取整得 2，数量变成 0.2）。影响开仓数量和 TP 数量，涉及下单数量，故只记录不改。

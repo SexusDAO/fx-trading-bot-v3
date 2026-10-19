@@ -109,6 +109,14 @@ def _round_price(price: float, tick: float) -> float:
     return round(math.floor(price / tick) * tick, prec)
 
 
+def _round_sum_qty(a: float, b: float, step: float) -> float:
+    """[v3.87 STEP6-3] 两个已按步长取整的数量相加后，按步长精度四舍五入，消除浮点噪声（不做向下取整，避免丢一个步长）。"""
+    if step <= 0:
+        return round(a + b, 3)
+    prec = max(0, -int(math.floor(math.log10(step))))
+    return round(a + b, prec)
+
+
 def _round_qty(qty: float, step: float) -> float:
     if step <= 0:
         return round(qty, 3)
@@ -353,10 +361,9 @@ def _validate_order_params(symbol: str, side: str, position_side: str,
     任何校验失败都会阻止下单，并记录详细日志。
     """
     try:
-        from config import MAX_SINGLE_NOMINAL, LIQUIDITY_GATE_MIN_U
+        from config import MAX_SINGLE_NOMINAL   # [v3.87 STEP6] 移除未使用的 LIQUIDITY_GATE_MIN_U
     except ImportError:
         MAX_SINGLE_NOMINAL = 1000
-        LIQUIDITY_GATE_MIN_U = 10_000
 
     errors = []
 
@@ -707,7 +714,7 @@ async def _wait_fill_ws(symbol: str, order_id: int,
             continue
 
         status     = event.get("X", "")    # 订单状态
-        exec_type  = event.get("x", "")    # 执行类型
+        # [v3.87 STEP6] 删除未使用的 exec_type
         f_qty      = float(event.get("l", 0))   # 本次成交数量
         f_price    = float(event.get("L", 0))   # 本次成交价
 
@@ -754,7 +761,7 @@ async def _entry_recheck(
     CLOSE 条件（满足任一）：
       - RSI1H 多单>80 / 空单<20（极端超买/超卖，反向）
       - 资金费率方向与持仓相反且绝对值>0.5%
-      - v3.78: pullback/breakout SHORT 被逆势拉盘扫进拆步——vol_ratio>3 且排价阳线
+      - （v3.78 的「逆势拉盘扫入」规则已在 v3.87 删除：所需快照字段从未提供，规则从未生效）
     其余情况一律 HOLD，保持原有止损/止盈逻辑不变。
     """
     recheck = {
@@ -763,8 +770,7 @@ async def _entry_recheck(
         "reason":  "快速规则通过",
     }
     try:
-        rsi_1h  = entry_snap.get("rsi_1h", 50.0)
-        funding = entry_snap.get("funding_rate", 0.0)
+        funding = entry_snap.get("funding_rate", 0.0)   # [v3.87 STEP6] 删除未使用的 rsi_1h
 
         if direction == "LONG":
             # v3.6: 去掉 rsi_1h>80 CLOSE（成交后K线未更新，几乎不会触发，意义不大）
@@ -779,24 +785,10 @@ async def _entry_recheck(
             if funding < -0.005:
                 recheck.update({"verdict": "CLOSE", "reason": f"负资金费率{funding*100:.3f}%，空头付费成本过高"})
 
-            # v3.78: 逬空/轧空抣步检测（仅适用于 pullback/breakout SHORT）
-            # 场景：挂单等待过程中行情结构已变，空头挂单被拉盘扫进 -> 入场即被套
-            # 识别特征：成交时 K 线为大阳线（与空单方向相反）且成交量能异常放大
-            if recheck["verdict"] == "HOLD" and mode in ("pullback", "breakout"):
-                _vol_ratio_fill = entry_snap.get("vol_ratio", entry_snap.get("vol_ratio_1h", 0.0))
-                _fill_candle_dir = "bull" if fill_price > entry_snap.get("prev_close", fill_price) else "bear"
-                # 简化判断：成交价远高于汇报中快照入场价 = 被拉盘扫入证据
-                _snap_entry = entry_snap.get("entry_price_snap", 0.0)
-                _price_jump_pct = (fill_price - _snap_entry) / _snap_entry * 100 if _snap_entry > 0 else 0
-                if _vol_ratio_fill > 3.0 and _price_jump_pct > 1.5:
-                    recheck.update({
-                        "verdict": "CLOSE",
-                        "reason": (
-                            f"成交时异常放量(vol_ratio={_vol_ratio_fill:.1f}>3.0)"
-                            f"且价格远高于信号触发价(+{_price_jump_pct:.1f}%>1.5%)，"
-                            f"判断为拉盘扫入逆势入场，立即平仓"
-                        )
-                    })
+            # [v3.87 STEP6-1] 删除 v3.78 的「逆势拉盘扫入就平仓」规则（pullback/breakout SHORT，vol_ratio>3 且成交价高出触发价>1.5%）。
+            #   该规则依赖入场快照里的 vol_ratio / prev_close / entry_price_snap，但调用方构造的快照从未包含这三个字段，
+            #   所以 _snap_entry 恒为 0、价格跳升恒为 0，条件从未成立过；没有数据支撑，按评审决定删除，避免死代码误导。
+            #   若以后要恢复，需先在 _execute_async 的快照里补齐这三个字段并用数据验证。
     except Exception as e:
         logger.debug(f"[recheck] {symbol} 规则检查异常，降级HOLD: {e}")
         recheck["reason"] = f"规则检查异常降级: {e}"
@@ -834,7 +826,9 @@ async def _place_guards_async(
 
     # v3.6: sl_qty 改用取整后合计，防止 TP1+TP2 取整后略少，导致 TP 全成交后
     # 止损单剩余数量>0 触发 reduceOnly 拒绝
-    sl_qty_f  = tp1_qty_f + tp2_qty_f if tp2_qty_f > 0 else tp1_qty_f
+    # [v3.87 STEP6-3] place_sl 直接用 f"{quantity}" 拼接数量字符串，tp1+tp2 两个浮点数相加会产生
+    #   0.30000000000000004 这类噪声，可能被交易所以精度错误拒绝（止损单提交失败）。相加后按步长精度再取一次整。
+    sl_qty_f  = _round_sum_qty(tp1_qty_f, tp2_qty_f, step) if tp2_qty_f > 0 else tp1_qty_f
     sl_p  = _round_price(sl_price,  tick)
     tp1_p = _round_price(tp1_price, tick)
     tp2_p = _round_price(tp2_price, tick) if has_tp2 else None
@@ -1647,9 +1641,19 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
             )
             close_price = float(close_resp.get("avgPrice", mark_price))
         except Exception as ce:
+            # [v3.87 STEP6-2] 平仓失败 → 仓位状态未知。原写法只发通知，然后继续往下算盈亏并 return True，
+            #   调用方以为本次开仓流程已完成。现按评审决定：发告警后 return False，不写持仓记录、不挂保护单
+            #   （仓位状态未知时挂保护单可能造成更大混乱，交人工处理）。
+            #   注意：此时仓位不在系统记录里，机器人不会跟踪它，必须人工确认。
             logger.error(f"[executor] {symbol} 二次验证CLOSE 平仓失败: {ce}")
-            await notify_async(f"⚠️ {symbol} 二次验证建议平仓，但平仓指令失败！"
-                         f"请人工介入。原因：{ce}")
+            await notify_async(
+                f"🚨 {symbol} 二次验证平仓失败，需要人工确认！\n"
+                f"方向:{direction} 成交价:{fill_price:.6g} 数量:{fill_qty}\n"
+                f"复核结论:{recheck_result.get('reason', '')}\n"
+                f"平仓错误:{ce}\n"
+                f"本次未写入持仓记录、未挂止损止盈，请立即人工检查该仓位。"
+            )
+            return False
 
         pnl_est = (close_price - fill_price) * fill_qty if direction == "LONG"                   else (fill_price - close_price) * fill_qty
         logger.info(f"[executor] {symbol} 二次验证平仓 价格={close_price} PnL估={pnl_est:.2f}U")
