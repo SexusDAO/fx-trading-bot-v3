@@ -116,7 +116,10 @@ def _round_price(price: float, tick: float) -> float:
 def _round_qty(qty: float, step: float) -> float:
     if step <= 0: return round(qty, 3)
     prec = max(0, -int(math.floor(math.log10(step))))
-    return round(math.floor(qty / step) * step, prec)
+    # [v3.87 STEP7-1] 与 executor._round_qty 对齐：原写法 floor(qty/step)*step 受浮点误差影响会多丢一个步长
+    #   （0.3/0.1=2.9999999999999996，floor 得 2，数量变成 0.2）。先 round(qty/step, 10) 消除噪声再 floor。
+    #   影响本模块的平仓、止损/止盈补挂、加仓、挂单调整数量。
+    return round(math.floor(round(qty / step, 10)) * step, prec)
 
 
 def _get_precision(symbol: str) -> dict:
@@ -212,7 +215,7 @@ def _calc_trail_sl(pos: dict, current_price: float) -> float | None:
 # ─────────────────────────────────────────────────────────────────────────────
 async def _execute_trail_sl(pos: dict, new_sl: float) -> None:
     symbol    = pos["symbol"]
-    direction = pos["direction"].upper()
+    # [v3.87 STEP7-5] 删除未使用的 direction 赋值
     pos_id    = pos.get("pos_id", pos.get("symbol","unknown"))
     old_sl_id = pos.get("sl_order_id")
     qty_remaining = float(pos.get("quantity_remaining", pos.get("quantity", 0)))
@@ -331,7 +334,7 @@ class PositionManager:
                     # 初始化峰值水位线
                     pid = pos.get("pos_id", pos.get("symbol","unknown"))
                     if pid not in _peak:
-                        direction = pos["direction"].upper()
+                        # [v3.87 STEP7-5] 删除未使用的 direction 赋值
                         _peak[pid] = float(pos["entry_price"])
                         _mfe[pid]  = 0.0
                         _mae[pid]  = 0.0
@@ -2045,7 +2048,7 @@ async def _close_position_post_static(
                         pass
                     _new.append(_line)
                 _lp.write_text("\n".join(_new) + "\n")
-            except Exception as _e:
+            except Exception:   # [v3.87 STEP7-5] 去掉未使用的异常变量 _e
                 pass  # 后台任务失败不影响主流程
         _thr.Thread(
             target=_sl_quality_check,

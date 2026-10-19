@@ -41,6 +41,15 @@ class TestRoundQty(unittest.TestCase):
         self.assertEqual(ex._round_qty(1.23456, 0), 1.235)
 
 
+class TestPositionManagerRoundQty(unittest.TestCase):
+    """[v3.87 STEP7-1] position_manager._round_qty 与 executor 保持一致。"""
+    def test_boundary_and_consistency(self):
+        import position_manager as pm
+        self.assertEqual(pm._round_qty(0.3, 0.1), 0.3)
+        for q, st in ((0.7, 0.1), (1.1, 0.1), (0.29, 0.01), (123.456, 0.01), (5.9, 1.0), (0.39, 0.1)):
+            self.assertEqual(pm._round_qty(q, st), ex._round_qty(q, st))
+
+
 class TestEntryRecheck(unittest.TestCase):
     def _run(self, direction, mode, snap):
         return asyncio.run(ex._entry_recheck("XUSDT", direction, mode, 100.0, 1.0, snap, {}))

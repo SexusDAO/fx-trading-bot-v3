@@ -290,3 +290,27 @@
 新增 5 个 `_round_qty` 单测：0.3/0.1 边界、0.7、1.1、0.29/0.01 等浮点边界，仍然向下取整，结果不超过输入，步长为 0 的回退。
 
 `_round_price` 使用同样的 `floor(price/tick)*tick`，可能有同类问题（价格差一个 tick），本轮未改，仅记录。
+
+---
+
+# 第十一轮（v3.87 逐模块审查·第 7 步 position_manager.py）：分支 `opt/step-7-pm`（基于 main 72d3b65e）
+
+> 验证：静态检查无未定义变量；新增 1 个单测（持仓管理取整与 executor 一致）；全量测试 178 通过 / 9 失败（9 个为既有过时测试，与改动前相同）。未回测、未跑模拟盘。**本轮只做了无风险项，涉及平仓 / 止损 / Algo 单的发现全部留待决策。**
+
+| 编号 | 在哪里 | 改了什么 | 为什么改 | 开关 |
+|---|---|---|---|---|
+| STEP7-1 | `position_manager._round_qty` | `floor(qty/step)*step` 改为 `floor(round(qty/step, 10))*step`，与 executor 对齐 | 同样的浮点误差会多丢一个步长。本模块用它算平仓数量、止损/止盈补挂数量、加仓数量、挂单调整数量 | 无 |
+| STEP7-5 | `_execute_trail_sl`、日志后台任务、MFE 初始化 | 删除未使用的 `direction` 赋值和异常变量 `_e` | 死变量，无行为影响 | 无 |
+
+## 审查结论
+
+- **funding_arb 路由隔离：成立。** `_check_time_stop` 与 `_check_exit_signal` 内部开头就跳过 funding_arb，健康检查在 `_patrol_loop` 里显式跳过，`patrol_once` 对加仓、TP2 收紧也显式跳过，专用巡检 `_patrol_funding_arb` 只在 `patrol_once` 里调用。
+- **加仓后 Algo 止损同步：仍然有效。** `_maybe_pyramid` 加仓成功后立即把止损设到原入场价（保本线），并调用 `_execute_trail_sl` 同步交易所 Algo 单。
+- **`_adjust_sl_tp_once` 止损单向约束：仍然有效。** LONG 只允许上移、SHORT 只允许下移，反方向分支明确 `pass`；上移还需超过 0.3×ATR 才执行。（函数文档字符串写的是「SL 双向调整」，与实现不符，是过时描述。）
+- **OPT-1 / OPT-2 关闭时行为与原来一致：** OPT-1 关闭时阈值回退固定 2%；OPT-2 关闭时 `tp1_protect_action` 对「止损仍在入场价亏损侧」返回 `move_sl`（保持原有保本移动），对「止损已在有利侧」返回 `none`（原代码此时也不动作）。读代码 + 已有单测确认。
+
+## 发现但未改（待决策）
+
+1. **两套巡检同时在跑（疑似重复处理）：** `PositionManager.start()` 启动了 `_patrol_loop`，`main.py` 又单独启动 `_loop_patrol` 调用 `patrol_once`，两者都是每 5 分钟、且都做时间止损 / 突破失败 / 反向信号检查。`_force_close_static` 的 `_closing_set` 只防「同时执行」，不防「先后各执行一次」；我没有在强平函数开头找到重新读取持仓状态的检查。可能出现重复平仓尝试。
+2. **巡检职责被拆开：** 健康检查只在 `_patrol_loop` 里；funding_arb 专用巡检、TP2 动态收紧、加仓只在 `patrol_once` 里。
+3. **未使用但带副作用的调用：** 资金费套利续持判断里 `all_mp = get_all_mark_prices()` 结果未使用（多一次接口请求）；挂单健康检查里 `k15` 未使用（`k15_raw` 同理）。删除会改变异常路径，未动。
