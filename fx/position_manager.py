@@ -444,6 +444,29 @@ class PositionManager:
                        and _mfe_val > 0.05
                        and fav < -0.005)                  # 已亏损 0.5%
             _should_protect = _cond_a or _cond_b
+            # [v3.84 优化 OPT-2] 逻辑冲突修复：触发条件要求「浮盈<0（价格已跌穿入场价）」，
+            #   但原动作是把止损移到入场价上方/下方 0.1%，该价位在当前价的错误一侧，交易所会拒单(-2021)或立即市价成交。
+            #   新：此时直接市价平掉剩余仓位（TP1 利润已兑现，剩余仓位回到亏损侧即离场）；
+            #   价格仍在有利一侧时保持原来的「移动止损到保本」。判定逻辑见 shared/opt_v384.tp1_protect_action（含单测）。
+            if _should_protect:
+                # 先生成原因文本（原代码在后面的分支里才定义，新逻辑需要提前使用）
+                _reason = (f"浮盈{fav*100:.2f}%<0跌穿入场价" if _cond_a
+                           else f"持仓{_hold_h:.0f}H+峰值{_mfe_val*100:.1f}%+当前{fav*100:.2f}%<-0.5%")
+                try:
+                    from config import OPT_TP1_PROTECT_CLOSE as _OPT_TP1
+                except Exception:
+                    _OPT_TP1 = False
+                from shared.opt_v384 import tp1_protect_action as _tp1_action
+                _act = _tp1_action(_dir, _sl_now, _entry, fav, _OPT_TP1)
+                if _act == "close":
+                    logger.info(
+                        f"[PM] {pos.get('symbol')} TP1后保本保护：{_reason}，止损仍在亏损侧，"
+                        f"改为市价平掉剩余仓位（OPT-2）"
+                    )
+                    await _force_close_static(pos, "tp1_protect_exit")
+                    return
+                if _act == "none":
+                    _should_protect = False
             if _should_protect:
                 _reason = (f"浮盈{fav*100:.2f}%<0跌穿入场价" if _cond_a
                            else f"持仓{_hold_h:.0f}H+峰值{_mfe_val*100:.1f}%+当前{fav*100:.2f}%<-0.5%")
@@ -1016,13 +1039,24 @@ class PositionManager:
         #   2. 趋势结构仍在：4H EMA 方向与持仓方向一致且差距 > 0.5%
         _mode = pos.get("mode", "pullback")
         _stag_limit = 480 if _mode == "reversal" else 360  # reversal=8H, 其他=6H
+        # [v3.84 优化 OPT-1] 原「浮亏>固定2%直接平仓」比止损(最小2.5%/3%/5%)更紧，等于隐形止损，抬高实现亏损次数。
+        #   新：阈值 = max(2%, 0.6×止损距离)；止损距离取不到时回退 2%（与原行为一致）。公式见 shared/opt_v384.stagnation_loss_threshold。
+        try:
+            from config import (OPT_STAGNATION_SCALE_BY_SL as _OPT_ST,
+                                EARLY_STAGNATION_LOSS_FRAC as _ST_FRAC,
+                                EARLY_STAGNATION_LOSS_MIN as _ST_MIN)
+        except Exception:
+            _OPT_ST, _ST_FRAC, _ST_MIN = False, 0.6, 0.02
+        from shared.opt_v384 import stagnation_loss_threshold as _stag_thr
+        _sl_dist_pct = abs(entry - sl_price) / entry if (entry > 0 and sl_price > 0) else 0.0
+        _stag_loss_thr = _stag_thr(_sl_dist_pct, _OPT_ST, _ST_FRAC, _ST_MIN)
         _stag_upper = _stag_limit + 120  # 检查窗口=stag_limit ~ stag_limit+2H
         if hold_min >= _stag_limit and hold_min < _stag_upper:
             if not pos.get("early_stagnation_checked"):
                 if pnl_pct >= 0.01:  # 浮盈已超1%，持仓有效，不触发
                     update_position(pid, {"early_stagnation_checked": True})
-                elif pnl_pct < -0.02:  # 浮亏>2%：已在持续下跌，直接平仓，不给豁免
-                    logger.info(f"[pm] {symbol} 早期滞涨：浮亏={pnl_pct*100:.2f}%>2%，直接平仓")
+                elif pnl_pct < -_stag_loss_thr:  # 浮亏超过动态阈值(OPT-1)：已在持续下跌，直接平仓，不给豁免
+                    logger.info(f"[pm] {symbol} 早期滞涨：浮亏={pnl_pct*100:.2f}%>{_stag_loss_thr*100:.1f}%（止损距离{_sl_dist_pct*100:.1f}%），直接平仓")
                     await self._force_close(pos, "early_stagnation")
                     update_position(pid, {"early_stagnation_checked": True})
                     return
@@ -2034,6 +2068,7 @@ async def _close_position_post_static(
             "time_stop_loss":               f"时间止损：{mode_label}做{'多' if direction=='LONG' else '空'}持仓期间价格持续亏损未回本，超时强制离场",
             "time_stop_hard":               f"时间止损：{mode_label}做{'多' if direction=='LONG' else '空'}持仓满12小时仍未达到止盈条件，强制市价离场",
             "time_stop_profit_insufficient":f"时间止损：{mode_label}做{'多' if direction=='LONG' else '空'}浮盈不足ATR×1.5，结构动能衰减，时间止损离场",
+            "tp1_protect_exit":             f"{mode_label}做{'多' if direction=='LONG' else '空'}，TP1 已兑现后价格跌穿入场价，市价平掉剩余仓位保护利润（v3.84 OPT-2）",
             "early_stagnation":             f"时间止损：{mode_label}做{'多' if direction=='LONG' else '空'}，持仓后价格横盘滞涨/滞跌，动能耗尽，系统判定早期滞涨，市价平仓离场",
             "health_force_close":           f"健康检查：{mode_label}做{'多' if direction=='LONG' else '空'}，仓位结构异常（挂单失效/回踩窗口关闭），强制平仓",
             "breakout_fail":                f"突破失败：{mode_label}做{'多' if direction=='LONG' else '空'}，价格未能有效突破确认位，假突破离场",

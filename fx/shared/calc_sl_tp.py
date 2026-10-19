@@ -190,6 +190,16 @@ def _entry_pullback(mark: float, atr: float, ema20: float,
     v3.14: 加清算区距离上限保护——清算区上/下沿距 mark 超过 MAX_PULLBACK_LIQ_DIST_ATR 时降级
     """
     _MAX_PULLBACK_LIQ_DIST_ATR = 3.0  # 清算区距 mark 超过 3 ATR 则不用来计算 pullback entry
+    # [v3.84 优化 OPT-3] 降级入场的 ATR 参数多空对称化（原：多 0.3/0.15/1.5，空 0.8/0.4/2.5）。
+    #   多头回踩仅 0.3ATR 落在噪声内、易在趋势末端被动成交；空头要等 0.8ATR、成交机会被压缩。
+    #   参数与依据见 shared/opt_v384.pullback_entry_params；关闭 OPT_PULLBACK_ENTRY_SYMMETRIC 即回到原值。
+    try:
+        from config import (OPT_PULLBACK_ENTRY_SYMMETRIC as _OPT_PB, PULLBACK_DEGRADED_ATR as _PB_DEG,
+                            PULLBACK_MIN_DIST_ATR as _PB_MIN, PULLBACK_MAX_DIST_ATR as _PB_MAX)
+    except Exception:
+        _OPT_PB, _PB_DEG, _PB_MIN, _PB_MAX = False, 0.5, 0.3, 2.0
+    from shared.opt_v384 import pullback_entry_params as _pb_params
+    _pp = _pb_params(_OPT_PB, _PB_DEG, _PB_MIN, _PB_MAX)
     vol_mid = _vol_mid(k1h)
 
     if direction == "LONG":
@@ -208,19 +218,19 @@ def _entry_pullback(mark: float, atr: float, ema20: float,
             weighted = (liq_edge * 2 + ema20 * 1 + vol_mid * 1) / 4
             entry = weighted
         else:
-            entry = mark - atr * 0.3             # 无清算区降级
+            entry = mark - atr * _pp["long_deg"]   # 无清算区降级（OPT-3 参数化）
 
         # 合理性检查1：entry 不应高于 mark 或低于 mark-1.5ATR
-        if entry >= mark or (mark - entry) > atr * 1.5:
+        if entry >= mark or (mark - entry) > atr * _pp["long_max"]:
             logger.warning(
                 f"[entry_pullback] LONG 降级ATR入场: "
                 f"entry={entry:.6g} mark={mark:.6g} atr={atr:.6g} "
                 f"liq_edge={liq_edge} ema20={ema20:.6g} vol_mid={vol_mid:.6g}"
             )
-            entry = mark - atr * 0.3
+            entry = mark - atr * _pp["long_deg"]
         # 合理性检查2：最小距离保护（至少 0.15ATR）
-        if (mark - entry) < atr * 0.15:
-            entry = mark - atr * 0.15
+        if (mark - entry) < atr * _pp["long_min"]:
+            entry = mark - atr * _pp["long_min"]
         # 入场价随机化（反猎杀），LONG 方向在精度截断后偏移 ±ORDER_ENTRY_RANDOM_ATR × atr
         try:
             from config import ORDER_ENTRY_RANDOMIZE, ORDER_ENTRY_RANDOM_ATR
@@ -248,18 +258,18 @@ def _entry_pullback(mark: float, atr: float, ema20: float,
             weighted = (liq_edge * 2 + ema20 * 1 + vol_mid * 1) / 4
             entry = weighted
         else:
-            entry = mark + atr * 0.8  # v3.20: 0.3→0.8 ATR，无清算图时确保有足够等待反弹空间
+            entry = mark + atr * _pp["short_deg"]  # v3.20: 0.3→0.8 ATR（v3.84 OPT-3 起由开关参数化）
 
-        if entry <= mark or (entry - mark) > atr * 2.5:  # v3.20: 上限 1.5→2.5，匹配新降级弹幅
+        if entry <= mark or (entry - mark) > atr * _pp["short_max"]:  # v3.20: 上限 1.5→2.5，匹配新降级弹幅
             logger.warning(
                 f"[entry_pullback] SHORT 降级ATR入场: "
                 f"entry={entry:.6g} mark={mark:.6g} atr={atr:.6g} "
                 f"liq_edge={liq_edge} ema20={ema20:.6g} vol_mid={vol_mid:.6g}"
             )
-            entry = mark + atr * 0.8  # v3.20: 共两处保持一致
+            entry = mark + atr * _pp["short_deg"]  # v3.20: 共两处保持一致
         # 最小距离保护（至少 0.4 ATR，v3.20: 0.15→0.4，与新降级弹幅起点匹配）
-        if (entry - mark) < atr * 0.4:
-            entry = mark + atr * 0.8  # 小于最小距离时，直接跳到降级弹幅
+        if (entry - mark) < atr * _pp["short_min"]:
+            entry = mark + atr * _pp["short_deg"]  # 小于最小距离时，直接跳到降级弹幅
         # 入场价随机化（反猎杀），SHORT 方向偏移
         try:
             from config import ORDER_ENTRY_RANDOMIZE, ORDER_ENTRY_RANDOM_ATR

@@ -285,13 +285,27 @@ ORDER_TIMEOUT_NORMAL      = 14400 # 秒
 # 第六组：持仓管理参数
 # ═══════════════════════════════════════════════════════════════════════════════
 # 动态止损跟随阶梯
-TRAIL_STEPS_TREND = [
+# 动态止损跟随阶梯（趋势类：回踩/突破/OI背离/EMA趋势）。格式：(浮盈ATR倍数, 止损移到入场价+偏移ATR倍数)
+# [v3.84 优化] 原第一档 (0.8, 0.0) = 浮盈 0.8ATR 就把止损挪到「恰好入场价」。
+#   问题：入场价无缓冲，手续费+滑点+正常回撤(0.5~1ATR)使「保本止损」被噪声扫出，
+#         变成「赚了一点又被打回 0」的零收益止损，抬高止损次数、压低胜率统计。
+#   新：第一档推迟到 1.0ATR，且止损放在入场价 +0.1ATR（覆盖往返手续费与滑点），其余档整体后移 0.3ATR 左右，
+#       给趋势更多回撤空间。开关 OPT_TRAIL_BE_BUFFER 关闭即回到原阶梯。
+TRAIL_STEPS_TREND_LEGACY = [
     (0.8, 0.0),
     (1.5, 0.5),
     (2.5, 1.0),
     (4.0, 1.5),
     (6.0, 2.0),
 ]
+OPT_TRAIL_BE_BUFFER = True   # v3.84：保本档推迟并加缓冲（False=原阶梯）
+TRAIL_STEPS_TREND = [
+    (1.0, 0.1),
+    (1.8, 0.5),
+    (2.8, 1.0),
+    (4.0, 1.5),
+    (6.0, 2.0),
+] if OPT_TRAIL_BE_BUFFER else TRAIL_STEPS_TREND_LEGACY
 TRAIL_STEPS_REVERSAL = [
     (0.5, 0.0),
     (1.0, 0.5),
@@ -853,3 +867,20 @@ PYRAMID_RSI_SHORT_MIN             = 25     # SHORT 加仓时 RSI1H 下限
 FUNDING_SYNERGY_BONUS             = 1.25   # 方向与费率一致时仓位上浮系数
 FUNDING_SYNERGY_PENALTY           = 0.80   # 方向与费率相反时仓位下调系数
 FUNDING_SYNERGY_THRESH            = 0.0005 # 费率绝对值 > 0.05% 才触发协同逻辑
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# v3.84 优化开关（第一轮）——每项对应 OPTIMIZATION_CHANGELOG.md 中的一条，False 即回到原行为
+# ═══════════════════════════════════════════════════════════════════════════════
+# 1) 提前滞涨平仓的浮亏阈值随止损距离缩放（原固定 2%）
+OPT_STAGNATION_SCALE_BY_SL = True
+EARLY_STAGNATION_LOSS_FRAC = 0.6    # 阈值 = max(下限, 0.6 × 止损距离)
+EARLY_STAGNATION_LOSS_MIN  = 0.02   # 下限 2%（与原固定值一致）
+# 2) TP1 成交后价格跌穿入场价：直接平掉剩余仓位，而不是把止损放到错误一侧
+OPT_TP1_PROTECT_CLOSE = True
+# 3) 回踩入场（无清算区降级）多空对称
+OPT_PULLBACK_ENTRY_SYMMETRIC = True
+PULLBACK_DEGRADED_ATR = 0.5
+PULLBACK_MIN_DIST_ATR = 0.3
+PULLBACK_MAX_DIST_ATR = 2.0
