@@ -293,7 +293,14 @@ async def _execute_trail_sl_inner(pos: dict, new_sl: float,
         )
         for ao in (all_algo or []):
             aid = int(ao.get("algoId", 0))
-            if aid and aid != new_sl_id:   # 不撤刚挂的新单
+            owned = (str(aid) == str(old_sl_id) and aid != new_sl_id
+                     and ao.get("symbol") == symbol
+                     and ao.get("side") == close_side
+                     and ao.get("positionSide") in (pos_side, "BOTH")
+                     and ao.get("orderType", ao.get("type")) in ("STOP", "STOP_MARKET"))
+            if str(aid) == str(old_sl_id) and not owned:
+                logger.warning(f"[pm] {symbol} 旧止损归属或类型无法确认，保留 id={aid}")
+            if owned:
                 try:
                     await asyncio.get_running_loop().run_in_executor(
                         None, lambda _aid=aid: api.cancel_algo_order(symbol, _aid)
