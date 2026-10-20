@@ -365,49 +365,81 @@ def card_remove(sig_id: str) -> None:
 # 格式化工具（供各模块使用）
 # =============================================================================
 
+_SEP = "━━━━━━━━━━━━━━━━━━━"
+
+
 def _hhmm() -> str:
     """当前 UTC 时间 HH:MM。"""
     import datetime
     return datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M")
 
 
-_DIR_CN = {"LONG": "做多", "SHORT": "做空"}
-_MODE_CN = {
-    "pullback":      "回踩",
-    "breakout":      "突破",
-    "reversal":      "反转",
-    "oi_divergence": "OI背离",
-    "ema_trend":     "EMA趋势",
-    "stop_hunt":     "猎杀止损",
-    "funding_arb":   "资金费套利",
+def _fmt_price(price) -> str:
+    """价格加千位分隔符，保留原始小数精度。"""
+    try:
+        p = float(price)
+        # 判断小数位数
+        s = f"{p:.10f}".rstrip("0").rstrip(".")
+        if "." in s:
+            dec = len(s.split(".")[1])
+        else:
+            dec = 0
+        # 整数部分加千分位
+        if dec == 0:
+            return f"{int(p):,}"
+        fmt = f"{{:,.{dec}f}}"
+        return fmt.format(p)
+    except Exception:
+        return str(price)
+
+
+# mode + direction 组合中文
+_MODE_DIR_CN: dict = {
+    ("breakout",     "LONG"):  "突破做多",
+    ("breakout",     "SHORT"): "突破做空",
+    ("pullback",     "LONG"):  "回踩做多",
+    ("pullback",     "SHORT"): "回踩做空",
+    ("reversal",     "LONG"):  "反转做多",
+    ("reversal",     "SHORT"): "反转做空",
+    ("oi_divergence","LONG"):  "OI背离做多",
+    ("oi_divergence","SHORT"): "OI背离做空",
+    ("ema_trend",    "LONG"):  "EMA趋势做多",
+    ("ema_trend",    "SHORT"): "EMA趋势做空",
+    ("stop_hunt",    "LONG"):  "猎杀止损做多",
+    ("stop_hunt",    "SHORT"): "猎杀止损做空",
+    ("funding_arb",  "LONG"):  "资费套利做多",
+    ("funding_arb",  "SHORT"): "资费套利做空",
 }
+
 _STRENGTH_CN = {"strong": "强信号", "medium": "中等信号", "weak": "弱信号"}
+
 _CLOSE_REASON_CN = {
-    "tp2":                       "TP2止盈",
-    "sl":                        "止损",
-    "sl_triggered":              "止损",
-    "manual_close":              "手动平仓",
-    "time_stop":                 "时间止损",
-    "time_stop_no_progress":     "时间止损",
-    "time_stop_loss":            "时间止损",
-    "time_stop_hard":            "时间止损",
-    "time_stop_hard_72h":        "时间止损",
-    "trailing_stop":             "移动止损锁利",
-    "pnl_lock":                  "浮盈保护平仓",
-    "early_stagnation":          "时间止损",
-    "pnl_protection":            "浮盈保护平仓",
-    "tp1_protect_exit":          "浮盈保护平仓",
-    "partial_time_stop":         "时间止损",
-    "breakout_fail":             "突破失败",
-    "exit_signal_reversal":      "反向信号平仓",
+    "tp2":               "TP2止盈",
+    "sl":                "止损",
+    "sl_triggered":      "止损",
+    "manual_close":      "手动平仓",
+    "time_stop":         "时间止损",
+    "time_stop_no_progress": "时间止损",
+    "time_stop_loss":    "时间止损",
+    "time_stop_hard":    "时间止损",
+    "time_stop_hard_72h": "时间止损",
+    "trailing_stop":     "移动止损锁利",
+    "pnl_lock":          "浮盈保护平仓",
+    "early_stagnation":  "时间止损",
+    "pnl_protection":    "浮盈保护平仓",
+    "tp1_protect_exit":  "浮盈保护平仓",
+    "partial_time_stop": "时间止损",
+    "breakout_fail":     "突破失败",
+    "exit_signal_reversal": "反向信号平仓",
 }
 
 
 def make_card_header(symbol: str, direction: str, mode: str, signal_strength: str) -> str:
-    dir_cn  = _DIR_CN.get(direction.upper(), direction)
-    mode_cn = _MODE_CN.get(mode, mode)
-    str_cn  = _STRENGTH_CN.get(signal_strength, signal_strength)
-    return f"📋 {symbol} · {dir_cn} · {mode_cn} · {str_cn}"
+    """卡片标题（带头部分隔线）。"""
+    mode_dir = _MODE_DIR_CN.get((mode, direction.upper()),
+                                f"{mode} {direction.upper()}")
+    str_cn   = _STRENGTH_CN.get(signal_strength, signal_strength)
+    return f"{_SEP}\n📋 {symbol} · {mode_dir} · {str_cn}\n{_SEP}"
 
 
 def fmt_hold_time(hold_minutes: float) -> str:
@@ -416,3 +448,151 @@ def fmt_hold_time(hold_minutes: float) -> str:
     if h > 0:
         return f"{h}h {m}min"
     return f"{m}min"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 节点格式化函数（供各模块调用，统一在此维护）
+# ─────────────────────────────────────────────────────────────────────────────
+
+def fmt_node_monitor(score, pre_entry_price, expire_min: int, sl_degraded: bool = False) -> str:
+    """节点1：进入监控"""
+    score_str = f"{int(score)}" if score is not None else "—"
+    lines = [
+        f"\n✅ {_hhmm()} 进入监控",
+        f" 评分 {score_str} | 预估入场 {_fmt_price(pre_entry_price)} | {expire_min}min后过期",
+    ]
+    if sl_degraded:
+        lines.append(" ⚠️ 止损非结构位（降级），风险略高")
+    return "\n".join(lines)
+
+
+def fmt_node_trigger(trigger_price, entry_price) -> str:
+    """节点2：价格触发"""
+    return (
+        f"\n⏳ {_hhmm()} 价格触发"
+        f"\n 市价 {_fmt_price(trigger_price)} → 限价挂出 {_fmt_price(entry_price)}"
+    )
+
+
+def fmt_node_open(fill_price, sl_price, tp1_price, tp2_price,
+                  leverage, notional, rr_tp1, rr_tp2=None,
+                  entry_price=None, sl_degraded: bool = False) -> str:
+    """节点3：开仓成交"""
+    # 滑点
+    slip_str = ""
+    if entry_price and float(entry_price) > 0:
+        slip_pct = abs(float(fill_price) - float(entry_price)) / float(entry_price) * 100
+        if slip_pct >= 0.05:
+            slip_str = f" 滑点 +{slip_pct:.2f}%"
+    # TP2
+    tp2_str = _fmt_price(tp2_price) if tp2_price else "单TP"
+    # RR（去掉 1: 前缀）
+    rr_str = f"{float(rr_tp1):.1f}"
+    if rr_tp2:
+        rr_str += f" / {float(rr_tp2):.1f}"
+    # 止损降级标记
+    sl_deg = " ⚠️降级" if sl_degraded else ""
+    return (
+        f"\n✅ {_hhmm()} 开仓成交"
+        f"\n 成交价 {_fmt_price(fill_price)}{slip_str}"
+        f"\n 止 损 {_fmt_price(sl_price)}{sl_deg}"
+        f"\n TP1 {_fmt_price(tp1_price)}"
+        f"\n TP2 {tp2_str}"
+        f"\n 杠杆 {leverage}x · 仓位 {int(float(notional))}U · RR {rr_str}"
+    )
+
+
+def fmt_node_immediate_close(reason: str) -> str:
+    """节点4：开仓后立即平仓"""
+    return (
+        f"\n🟡 {_hhmm()} 开仓后立即平仓"
+        f"\n 原因：{reason}"
+    )
+
+
+def fmt_node_tp1(tp1_fill_price, new_sl_price) -> str:
+    """节点5：TP1止盈"""
+    return (
+        f"\n🎯 {_hhmm()} TP1止盈"
+        f"\n 成交价 {_fmt_price(tp1_fill_price)} · 锁利 60%"
+        f"\n 止损上移至 {_fmt_price(new_sl_price)}（保本）"
+        f"\n 剩余仓位 40%"
+    )
+
+
+def fmt_node_close(close_reason: str, exit_price, hold_minutes: float,
+                   pnl_usdt: float, pnl_pct: float,
+                   tp1_filled: bool, tp2_filled: bool) -> str:
+    """节点6：平仓完成（含尾部分隔线）"""
+    reason_cn  = _CLOSE_REASON_CN.get(close_reason, close_reason)
+    hold_str   = fmt_hold_time(hold_minutes)
+    tp1_mark   = "✓" if tp1_filled else "✗"
+    tp2_mark   = "✓" if tp2_filled else "✗"
+    if pnl_usdt >= 0:
+        emoji    = "🟢"
+        pnl_line = f" PnL +{pnl_usdt:.1f}U (+{pnl_pct:.2f}%)"
+        result_line = f" TP1 {tp1_mark} TP2 {tp2_mark}"
+    else:
+        emoji    = "🔴"
+        pnl_line = f" PnL {pnl_usdt:.1f}U ({pnl_pct:.2f}%)"
+        result_line = f" TP1 {tp1_mark} 止损 ✓"
+    return (
+        f"\n{emoji} {_hhmm()} 平仓完成 {reason_cn}"
+        f"\n 出场价 {_fmt_price(exit_price)}"
+        f"\n 持仓 {hold_str} · {pnl_line}"
+        f"\n{result_line}"
+        f"\n{_SEP}"
+    )
+
+
+def fmt_node_timeout(waited_min: int) -> str:
+    """节点7：超时撤销"""
+    return (
+        f"\n⏰ {_hhmm()} 超时撤销"
+        f"\n 等待 {waited_min}min 未触发，监控结束"
+    )
+
+
+def fmt_node_evicted(new_symbol: str, new_score) -> str:
+    """节点8：竞争驱逐"""
+    return (
+        f"\n⬇️ {_hhmm()} 被驱逐"
+        f"\n {new_symbol}（评分{int(float(new_score))}）替换，本信号结束"
+    )
+
+
+def fmt_node_sl_lost() -> str:
+    """节点9：止损丢失告警"""
+    return (
+        f"\n🚨 {_hhmm()} 止损丢失"
+        f"\n 保护单补挂失败，请手动检查持仓！"
+    )
+
+
+def fmt_global_btc_guard(direction: str, minutes: int, pct: float,
+                         cancelled_count: int, symbols: list) -> str:
+    """全局事件：BTC急涨/跌保护撤单"""
+    dir_str  = "涨" if direction == "UP" else "跌"
+    sym_str  = " · ".join(symbols[:6])  # 最多显示6个
+    return (
+        f"{_SEP}"
+        f"\n⚡ BTC {minutes}分钟急{dir_str} {pct:.1f}%"
+        f"\n已撤销全部 {cancelled_count} 个待触发监控"
+        f"\n{sym_str}"
+        f"\n{_SEP}"
+    )
+
+
+def fmt_global_heartbeat(hhmm: str, candidate_count: int,
+                         raw_signals: int, monitored: int, filled: int,
+                         ws_ok: bool) -> str:
+    """全局事件：系统心跳"""
+    ws_str = "✅ 全部连接" if ws_ok else "⚠️ 部分断开"
+    return (
+        f"{_SEP}"
+        f"\n💓 系统心跳 · {hhmm} UTC"
+        f"\n扫描正常 | {candidate_count}个标的 | 每5分钟一轮"
+        f"\n过去6小时：原始信号{raw_signals}个 | 进入监控{monitored}个 | 成交{filled}笔"
+        f"\nWS：{ws_str}"
+        f"\n{_SEP}"
+    )

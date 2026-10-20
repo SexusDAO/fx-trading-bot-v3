@@ -59,7 +59,11 @@ from shared.state import (
     get_all_positions, update_position, remove_position,
     set_cooldown, is_in_cooldown,
 )
-from shared.notifier import notify, card_append, card_append_async, card_remove, _hhmm, _CLOSE_REASON_CN, fmt_hold_time
+from shared.notifier import (
+    notify, card_append, card_append_async, card_remove,
+    _hhmm, _CLOSE_REASON_CN, fmt_hold_time,
+    fmt_node_tp1, fmt_node_close, fmt_node_sl_lost,
+)
 
 logger = logging.getLogger("fx.position_manager")
 
@@ -666,13 +670,13 @@ class PositionManager:
                         # 同步卡片
                         _pos_tp1f = get_all_positions()
                         _tp1_sid = next((p.get("_sig_id","") for p in _pos_tp1f if p.get("symbol")==symbol), "")
-                        if _tp1_sid: await card_append_async(_tp1_sid, f"🚨 {_hhmm()} 止损丢失 保护单补挂失败，请手动检查持仓！")
+                        if _tp1_sid: await card_append_async(_tp1_sid, fmt_node_sl_lost())
                 except Exception as _tp1_sl_e:
                     logger.error(f"[pm] {symbol} TP1后补挂SL异常: {_tp1_sl_e}")
                     await _notify_async(f"🚨 {symbol} TP1触发后补挂SL异常,请检查仓位!\n错误:{_tp1_sl_e}")
                     _pos_tp1f2 = get_all_positions()
                     _tp1_sid2 = next((p.get("_sig_id","") for p in _pos_tp1f2 if p.get("symbol")==symbol), "")
-                    if _tp1_sid2: await card_append_async(_tp1_sid2, f"🚨 {_hhmm()} 止损丢失 保护单补挂失败，请手动检查持仓！")
+                    if _tp1_sid2: await card_append_async(_tp1_sid2, fmt_node_sl_lost())
             return
 
         # ── TP2 触发 ──────────────────────────────────────────────────────────
@@ -1044,7 +1048,7 @@ class PositionManager:
                             try:
                                 _sl_pos = next((p for p in get_all_positions() if p.get("symbol")==symbol), {})
                                 _sl_sid = _sl_pos.get("_sig_id", "")
-                                _sl_warn = f"🚨 {_hhmm()} 止损丢失 保护单补挂失败，请手动检查持仓！"
+                                _sl_warn = fmt_node_sl_lost()
                                 if _sl_sid:
                                     await card_append_async(_sl_sid, _sl_warn)
                                 else:
@@ -1317,13 +1321,10 @@ class PositionManager:
                         except Exception as _rsl_e:
                             logger.warning(f"[pm] {symbol} REST路径TP1后补挂SL失败: {_rsl_e}")
                     # TP1 成交：追加到卡片
-                    _pos_tp1r = next((p for p in get_all_positions() if p.get("symbol")==symbol), {})
-                    _sl_new_p = float(_pos_tp1r.get("sl_price", 0))
+                    _pos_tp1r  = next((p for p in get_all_positions() if p.get("symbol")==symbol), {})
+                    _sl_new_p  = float(_pos_tp1r.get("sl_price", 0))
                     _tp1_sid_r = _pos_tp1r.get("_sig_id", "")
-                    _tp1_line = (
-                        f"🎯 {_hhmm()} TP1止盈 {fill_price:.6g}成交 | 锁利60%\n"
-                        f" 新止损移至 {_sl_new_p:.6g}（保本）| 剩余40%仓位"
-                    )
+                    _tp1_line  = fmt_node_tp1(fill_price, _sl_new_p)
                     if _tp1_sid_r:
                         await card_append_async(_tp1_sid_r, _tp1_line)
                     else:
@@ -2130,27 +2131,17 @@ async def _close_position_post_static(
 
     # 步骤6:发送 Jarvis 通知 → 追加到信号卡片
     try:
-        _pos_close   = next((p for p in get_all_positions() if p.get("symbol") == symbol), {})
-        _sig_id_cls  = _pos_close.get("_sig_id", "")
-        _reason_cn   = _CLOSE_REASON_CN.get(close_reason, close_reason)
-        _hold_str    = fmt_hold_time(hold_minutes)
-        _tp1_filled  = _pos_close.get("tp1_filled", False)
-        _tp2_filled  = _pos_close.get("tp2_filled", False)
-        _tp1_mark    = "✓" if _tp1_filled else "✗"
-        _tp2_mark    = "✓" if _tp2_filled else "✗"
-        _emoji       = "🟢" if pnl_usdt >= 0 else "🔴"
-        if pnl_usdt >= 0:
-            _close_line = (
-                f"{_emoji} {_hhmm()} 平仓完成 {_reason_cn}\n"
-                f" 持仓 {_hold_str} | PnL +{pnl_usdt:.2f}U (+{pnl_pct:.2f}%)\n"
-                f" TP1{_tp1_mark} TP2{_tp2_mark}"
-            )
-        else:
-            _close_line = (
-                f"{_emoji} {_hhmm()} 平仓完成 {_reason_cn}\n"
-                f" 持仓 {_hold_str} | PnL {pnl_usdt:.2f}U ({pnl_pct:.2f}%)\n"
-                f" TP1{_tp1_mark} 止损✓"
-            )
+        _pos_close  = next((p for p in get_all_positions() if p.get("symbol") == symbol), {})
+        _sig_id_cls = _pos_close.get("_sig_id", "")
+        _close_line = fmt_node_close(
+            close_reason = close_reason,
+            exit_price   = exit_price,
+            hold_minutes = hold_minutes,
+            pnl_usdt     = pnl_usdt,
+            pnl_pct      = pnl_pct,
+            tp1_filled   = _pos_close.get("tp1_filled", False),
+            tp2_filled   = _pos_close.get("tp2_filled", False),
+        )
         if _sig_id_cls:
             await card_append_async(_sig_id_cls, _close_line)
             card_remove(_sig_id_cls)

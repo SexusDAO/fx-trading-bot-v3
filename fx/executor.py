@@ -56,7 +56,11 @@ from shared.state import (
     get_all_positions, add_position, update_position,
     is_in_cooldown, get_pending_orders,
 )
-from shared.notifier import notify, notify_async, card_append, card_append_async, card_remove, _hhmm, _CLOSE_REASON_CN, fmt_hold_time
+from shared.notifier import (
+    notify, notify_async, card_append, card_append_async, card_remove,
+    _hhmm, _CLOSE_REASON_CN, fmt_hold_time,
+    fmt_node_immediate_close, fmt_node_open, fmt_node_close,
+)
 
 logger = logging.getLogger("fx.executor")
 
@@ -1029,23 +1033,18 @@ async def _on_position_closed(pos_id: str, symbol: str,
         _hold_min  = (int(time.time() * 1000) - int(pos.get("open_time", int(time.time() * 1000)))) / 60000 if pos else 0
         _tp1_ok    = pos.get("tp1_filled", False) if pos else False
         _tp2_ok    = pos.get("tp2_filled", False) if pos else False
-        _reason_cn = _CLOSE_REASON_CN.get(close_reason, close_reason)
-        _hold_str  = fmt_hold_time(_hold_min)
-        _emoji     = "🟢" if pnl >= 0 else "🔴"
-        _tp1_mark  = "✓" if _tp1_ok else "✗"
-        _tp2_mark  = "✓" if _tp2_ok else "✗"
-        if pnl >= 0:
-            _close_line = (
-                f"{_emoji} {_hhmm()} 平仓完成 {_reason_cn}\n"
-                f" 持仓 {_hold_str} | PnL +{pnl:.2f}U\n"
-                f" TP1{_tp1_mark} TP2{_tp2_mark}"
-            )
-        else:
-            _close_line = (
-                f"{_emoji} {_hhmm()} 平仓完成 {_reason_cn}\n"
-                f" 持仓 {_hold_str} | PnL {pnl:.2f}U\n"
-                f" TP1{_tp1_mark} 止损✓"
-            )
+        # exit_price 从 pos 取实际出场价（WS 路径）
+        _exit_p    = float(pos.get("exit_price", close_price)) if pos else float(close_price)
+        _pnl_pct   = (pnl / float(pos.get("notional", 1))) * 100 if pos and pos.get("notional") else 0.0
+        _close_line = fmt_node_close(
+            close_reason = close_reason,
+            exit_price   = _exit_p,
+            hold_minutes = _hold_min,
+            pnl_usdt     = pnl,
+            pnl_pct      = _pnl_pct,
+            tp1_filled   = _tp1_ok,
+            tp2_filled   = _tp2_ok,
+        )
         if _sig_id_ws:
             import asyncio as _aio_ws
             _aio_ws.ensure_future(card_append_async(_sig_id_ws, _close_line))
@@ -1715,10 +1714,7 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
         # 向开仓卡片追加节点
         try:
             _sig_id_r = signal.get("_sig_id", "")
-            _recheck_line = (
-                f"🟡 {_hhmm()} 开仓后立即平仓\n"
-                f" 原因：{recheck_result.get('reason', '')}"
-            )
+            _recheck_line = fmt_node_immediate_close(recheck_result.get('reason', ''))
             if _sig_id_r:
                 await card_append_async(_sig_id_r, _recheck_line)
             else:
@@ -1751,23 +1747,22 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
     # 开仓通知：向信号卡片追加开仓成交行
     try:
         _sig_id = signal.get("_sig_id", "")
-        _slippage_pct = 0.0
-        if params.get("entry_price") and params["entry_price"] > 0:
-            _slippage_pct = abs(fill_price - params["entry_price"]) / params["entry_price"] * 100
-        _slip_str = f"+{_slippage_pct:.2f}%" if _slippage_pct >= 0.05 else ""
-        _deg_mark = " ⚠️降级" if params.get("sl_degraded") or params.get("tp_degraded") else ""
-        _tp2_str  = f"{tp2_price:.6g}" if tp2_price else "单TP"
-        _rr_str   = f"{params['rr_tp1']:.1f}" + (f"/{params['rr_tp2']:.1f}" if params.get('rr_tp2') else "")
-        _open_line = (
-            f"✅ {_hhmm()} 开仓成交 成交价 {fill_price:.6g}"
-            + (f" | 滑点{_slip_str}" if _slip_str else "")
-            + f"\n 止损 {sl_price:.6g}{_deg_mark} | TP1 {tp1_price:.6g} | TP2 {_tp2_str}"
-            + f"\n 杠杆 {leverage}x | 仓位 {params.get('notional', fill_price * fill_qty):.0f}U | RR {_rr_str}"
+        _open_line = fmt_node_open(
+            fill_price  = fill_price,
+            sl_price    = sl_price,
+            tp1_price   = tp1_price,
+            tp2_price   = tp2_price,
+            leverage    = leverage,
+            notional    = params.get("notional", fill_price * fill_qty),
+            rr_tp1      = params.get("rr_tp1", 0),
+            rr_tp2      = params.get("rr_tp2"),
+            entry_price = params.get("entry_price"),
+            sl_degraded = bool(params.get("sl_degraded") or params.get("tp_degraded")),
         )
         if _sig_id:
             await card_append_async(_sig_id, _open_line)
         else:
-            # immediate 模式没有卡片，和 imm_ 前缀创建一张臨时卡片
+            # immediate 模式没有卡片，用 imm_ 前缀创建一张临时卡片
             from shared.notifier import make_card_header, card_create
             _hdr = make_card_header(symbol, direction, mode, signal.get("signal_strength", "medium"))
             _imm_sig_id = f"{symbol}_imm_{int(time.time())}"

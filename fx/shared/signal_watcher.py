@@ -490,12 +490,9 @@ class SignalWatcher:
                     self._watched.pop(old_sym, None)
                     # 向被驱逐信号的卡片追加驱逐行
                     try:
-                        from shared.notifier import card_append, _hhmm
+                        from shared.notifier import card_append, fmt_node_evicted
                         _old_sig_id = f"{old_sym}_{lowest.signal.get('_scan_ts', '')}"
-                        card_append(
-                            _old_sig_id,
-                            f"⬇️ {_hhmm()} 被驱逐 {symbol}(评分{entry.pending_score:.0f})替换，本信号结束"
-                        )
+                        card_append(_old_sig_id, fmt_node_evicted(symbol, entry.pending_score))
                     except Exception as _sw_e:
                         logger.debug(f"[signal_watcher] 驱逐卡片追加失败: {_sw_e}")
                     if lowest.limit_order_id:
@@ -532,7 +529,7 @@ class SignalWatcher:
             )
             # ── 创建信号卡片（进入监控节点）─────────────────────────────────
             try:
-                from shared.notifier import card_create, _hhmm, make_card_header, _DIR_CN, _STRENGTH_CN
+                from shared.notifier import card_create, make_card_header, fmt_node_monitor
                 _sig       = entry.signal
                 _dir       = _sig.get("direction", "LONG").upper()
                 _mode      = entry.mode
@@ -543,18 +540,12 @@ class SignalWatcher:
                 _scan_ts   = str(_sig.get("_scan_ts", int(time.time())))
                 _sig_id    = f"{symbol}_{_scan_ts}"
                 _sig["_sig_id"] = _sig_id   # 写回 signal，供后续节点使用
-                _expire_min = int(max(0, expire_ts - time.time()) / 60)
-                _score_str  = f"{int(_score_val)}" if _score_val else "—"
-                _line = (
-                    f"✅ {_hhmm()} 进入监控 评分{_score_str} | "
-                    f"预估入场 {entry_price:.6g} | {_expire_min}min后过期"
-                )
+                _expire_min   = int(max(0, expire_ts - time.time()) / 60)
+                _sl_deg       = bool(_sig.get("sl_degraded") or (_sig.get("params") or {}).get("sl_degraded"))
+                _monitor_line = fmt_node_monitor(_score_val, entry_price, _expire_min, _sl_deg)
                 card_create(_sig_id, _header)
                 from shared.notifier import card_append
-                card_append(_sig_id, _line)
-                # sl_degraded 提示
-                if _sig.get("sl_degraded") or (_sig.get("params") or {}).get("sl_degraded"):
-                    card_append(_sig_id, "⚠️ 止损非结构位（降级），风险略高")
+                card_append(_sig_id, _monitor_line)
             except Exception as _ne:
                 logger.debug(f"[signal_watcher] 信号卡片创建失败（非致命）: {_ne}")
 
@@ -802,13 +793,10 @@ class SignalWatcher:
         try:
             # ── 卡片追加：价格触发挂单行 ─────────────────────────────────────
             try:
-                from shared.notifier import card_append, _hhmm
+                from shared.notifier import card_append, fmt_node_trigger
                 _sig_id_t = entry.signal.get("_sig_id", "")
                 if _sig_id_t:
-                    card_append(
-                        _sig_id_t,
-                        f"⏳ {_hhmm()} 价格触发 市价{price:.6g} → 限价单挂出 {entry.entry_price:.6g}"
-                    )
+                    card_append(_sig_id_t, fmt_node_trigger(price, entry.entry_price))
             except Exception as _tc_e:
                 logger.debug(f"[signal_watcher] 触发卡片追加失败: {_tc_e}")
 
@@ -900,13 +888,10 @@ class SignalWatcher:
                 logger.warning(f"[signal_watcher] 撤销过期挂单失败 {symbol}: {ce}")
 
         try:
-            from shared.notifier import card_append, _hhmm
+            from shared.notifier import card_append, fmt_node_timeout
             _sig_id = entry.signal.get("_sig_id", "")
             if _sig_id:
-                card_append(
-                    _sig_id,
-                    f"⏰ {_hhmm()} 超时撤销 等待{int(waited_min)}分钟未触发，监控结束"
-                )
+                card_append(_sig_id, fmt_node_timeout(int(waited_min)))
         except Exception as _sw_e:
             logger.debug(f"[signal_watcher] 超时卡片追加失败: {_sw_e}")
 
