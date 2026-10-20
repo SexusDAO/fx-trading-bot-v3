@@ -54,6 +54,7 @@ from config import (
     PM_HEALTH_EARLY_HOURS, PM_HEALTH_LATE_HOURS,
 )
 from shared import binance_api as api
+from shared.async_utils import _run_sync   # [v3.89 #61] 同步调用移出事件循环的统一封装
 from shared.risk_manager import record_pnl as _record_pnl
 from shared.state import (
     get_all_positions, update_position, remove_position,
@@ -2345,6 +2346,45 @@ async def _maybe_tighten_tp2(pos: dict) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 加仓逻辑(Pyramiding,v3.72)
 # ═══════════════════════════════════════════════════════════════════════════════
+def _safe_float(v, default: float = 0.0) -> float:
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return default
+    return f if math.isfinite(f) else default
+
+
+async def _confirm_market_fill(symbol: str, resp: dict, retries: int = 2):
+    """
+    [v3.89 #58] 市价加仓的成交确认：受理回执（orderId）不等于已成交。
+    先查订单快照，非 FILLED 时间隔 0.5s 重查，共 1+retries 次。
+    返回 (confirmed, status, executed_qty, avg_price)；只有 FILLED 且数量、均价均有效才算确认。
+    均价缺失或为 0 时，用 cumQuote / executedQty 兜底。
+    """
+    oid = (resp or {}).get("orderId")
+    snap = resp or {}
+    for attempt in range(retries + 1):
+        if oid:
+            try:
+                q = await asyncio.get_running_loop().run_in_executor(
+                    None, lambda: api.get_order(symbol, int(oid))
+                )
+                if q:
+                    snap = q
+            except Exception as e:
+                logger.warning(f"[pm] {symbol} 加仓订单查询失败 orderId={oid}: {e}")
+        status = snap.get("status", "")
+        executed = _safe_float(snap.get("executedQty"))
+        avg = _safe_float(snap.get("avgPrice"))
+        if avg <= 0 and executed > 0:
+            avg = _safe_float(snap.get("cumQuote")) / executed
+        if status == "FILLED" and executed > 0 and avg > 0:
+            return True, status, executed, avg
+        if attempt < retries:
+            await asyncio.sleep(0.5)
+    return False, snap.get("status", ""), _safe_float(snap.get("executedQty")), _safe_float(snap.get("avgPrice"))
+
+
 async def _maybe_pyramid(pos: dict) -> None:
     """
     浮盈 >= PYRAMID_FLOAT_PROFIT_ATR × ATR 时,顺势加一笔 PYRAMID_SIZE_RATIO × 原仓位。
@@ -2393,8 +2433,12 @@ async def _maybe_pyramid(pos: dict) -> None:
         try:
             from shared import binance_api as _api2
             from shared.indicators import rsi as _calc_rsi2
-            _k1h = _api2.get_klines(symbol, "1h", limit=20)
+            _k1h = await _run_sync(_api2.get_klines, symbol, "1h", limit=20, timeout=10.0)   # [v3.89 #61]
             _closes = [float(k[4]) for k in _k1h]
+            # [v3.89 #60] 空 K 线或样本不足时 rsi() 会返回 50，掩盖数据缺失而绕过失败封闭分支。
+            #   这里只检测数据是否可用（RSI 周期 14 至少需要 15 根收盘价），RSI 阈值与开关判断不变。
+            if len(_closes) < 15:
+                raise ValueError(f"RSI 数据不足: {len(_closes)}/15")
             _rsi1h = _calc_rsi2(_closes, 14)
             if direction == "LONG" and _rsi1h > PYRAMID_RSI_LONG_MAX:
                 logger.debug(f"[pm] {symbol} 加仓跳过: RSI1H={_rsi1h:.0f} > {PYRAMID_RSI_LONG_MAX}(超买)")
@@ -2414,7 +2458,7 @@ async def _maybe_pyramid(pos: dict) -> None:
                 return
 
         # 持仓槽位检查
-        all_pos = get_all_positions()
+        all_pos = await _run_sync(get_all_positions, timeout=10.0)   # [v3.89 #61]
         open_cnt = sum(1 for p in all_pos if p.get("status") == "open")
         if open_cnt >= RISK_MAX_POSITIONS:
             logger.debug(f"[pm] {symbol} 加仓跳过: 槽位已满({open_cnt}/{RISK_MAX_POSITIONS})")
@@ -2426,7 +2470,7 @@ async def _maybe_pyramid(pos: dict) -> None:
 
         # 简单余额预检
         try:
-            acc = api.get_account()
+            acc = await _run_sync(api.get_account, timeout=10.0)   # [v3.89 #61]
             avail = float(acc.get("availableBalance", 0) or 0)
             lev   = int(pos.get("leverage", 10) or 10)
             margin_needed = addup_notional / lev * 1.1
@@ -2446,6 +2490,14 @@ async def _maybe_pyramid(pos: dict) -> None:
         if addup_qty <= 0:
             return
 
+        # [v3.89 #59] 区分原始数量与当前剩余数量：TP1 之后剩余量小于 quantity，
+        #   加仓后的剩余量必须在当前剩余量上累加，不能直接写成 quantity + 加仓量。
+        _rem_raw = pos.get("quantity_remaining")
+        remaining = _safe_float(_rem_raw, qty) if _rem_raw not in (None, "") else qty
+        if remaining <= 0:
+            logger.debug(f"[pm] {symbol} 加仓跳过: 当前剩余数量为 0")
+            return
+
         # 市价加仓(顺势,不挂限价单避免滑点窗口问题)
         buy_side = "BUY" if direction == "LONG" else "SELL"
         loop     = asyncio.get_running_loop()
@@ -2458,15 +2510,32 @@ async def _maybe_pyramid(pos: dict) -> None:
             )
         )
         if resp.get("orderId") or resp.get("status") == "FILLED":
-            # 标记已加仓,更新数量
-            fill_p = float(resp.get("avgPrice") or price)
+            # [v3.89 #58] 受理 ≠ 成交：以订单快照里的实际成交量和均价记账。
+            #   未确认 FILLED 时不改仓位、不补单，只保存订单号供人工核对。
+            _ok, _st, _exec_q, _avg = await _confirm_market_fill(symbol, resp)
+            if not _ok:
+                _oid_p = resp.get("orderId")
+                logger.warning(
+                    f"[pm] {symbol} 加仓订单未确认成交 orderId={_oid_p} status={_st} "
+                    f"executedQty={_exec_q} avgPrice={_avg}，不更新仓位，请人工核对"
+                )
+                update_position(pid, {"pyramid_pending_order_id": _oid_p, "pyramid_pending_status": _st})
+                await _notify_async(
+                    f"⚠️ {symbol} 加仓订单 {_oid_p} 未确认成交（status={_st}，已成交={_exec_q}），"
+                    f"本地仓位未更新，请核对交易所持仓。"
+                )
+                return
+            addup_qty = _exec_q
+            fill_p = _avg
             new_total_qty  = qty + addup_qty
-            new_avg_entry  = (entry * qty + fill_p * addup_qty) / new_total_qty
+            new_remaining  = remaining + addup_qty
+            # 均价按当前剩余量加权：反映实际持仓成本，不含已止盈部分
+            new_avg_entry  = (entry * remaining + fill_p * addup_qty) / new_remaining
             # 加仓后 SL 设到原入场价(保本线)
             new_sl = entry
             update_position(pid, {
                 "quantity":          new_total_qty,
-                "quantity_remaining": new_total_qty,
+                "quantity_remaining": new_remaining,
                 "entry_price":       round(new_avg_entry, 8),
                 "sl_target_price":   new_sl,
                 "sl_sync_status":    "pending",
@@ -2480,7 +2549,7 @@ async def _maybe_pyramid(pos: dict) -> None:
             # 立刻同步把交易所 Algo SL 移到保本线(不等 trail_sl 下轮巡检)
             try:
                 _pos_updated = dict(pos)
-                _pos_updated["quantity_remaining"] = new_total_qty
+                _pos_updated["quantity_remaining"] = new_remaining
                 synced = await _execute_trail_sl(_pos_updated, new_sl)
                 if synced:
                     logger.info(f"[pm] {symbol} 加仓后 Algo SL 已同步移至保本线 {new_sl:.6g}")
