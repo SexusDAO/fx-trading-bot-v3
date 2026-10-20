@@ -2485,6 +2485,14 @@ async def _maybe_pyramid(pos: dict) -> None:
         if addup_qty <= 0:
             return
 
+        # [v3.89 #59] 区分原始数量与当前剩余数量：TP1 之后剩余量小于 quantity，
+        #   加仓后的剩余量必须在当前剩余量上累加，不能直接写成 quantity + 加仓量。
+        _rem_raw = pos.get("quantity_remaining")
+        remaining = _safe_float(_rem_raw, qty) if _rem_raw not in (None, "") else qty
+        if remaining <= 0:
+            logger.debug(f"[pm] {symbol} 加仓跳过: 当前剩余数量为 0")
+            return
+
         # 市价加仓(顺势,不挂限价单避免滑点窗口问题)
         buy_side = "BUY" if direction == "LONG" else "SELL"
         loop     = asyncio.get_running_loop()
@@ -2515,12 +2523,14 @@ async def _maybe_pyramid(pos: dict) -> None:
             addup_qty = _exec_q
             fill_p = _avg
             new_total_qty  = qty + addup_qty
-            new_avg_entry  = (entry * qty + fill_p * addup_qty) / new_total_qty
+            new_remaining  = remaining + addup_qty
+            # 均价按当前剩余量加权：反映实际持仓成本，不含已止盈部分
+            new_avg_entry  = (entry * remaining + fill_p * addup_qty) / new_remaining
             # 加仓后 SL 设到原入场价(保本线)
             new_sl = entry
             update_position(pid, {
                 "quantity":          new_total_qty,
-                "quantity_remaining": new_total_qty,
+                "quantity_remaining": new_remaining,
                 "entry_price":       round(new_avg_entry, 8),
                 "sl_target_price":   new_sl,
                 "sl_sync_status":    "pending",
@@ -2534,7 +2544,7 @@ async def _maybe_pyramid(pos: dict) -> None:
             # 立刻同步把交易所 Algo SL 移到保本线(不等 trail_sl 下轮巡检)
             try:
                 _pos_updated = dict(pos)
-                _pos_updated["quantity_remaining"] = new_total_qty
+                _pos_updated["quantity_remaining"] = new_remaining
                 synced = await _execute_trail_sl(_pos_updated, new_sl)
                 if synced:
                     logger.info(f"[pm] {symbol} 加仓后 Algo SL 已同步移至保本线 {new_sl:.6g}")
