@@ -9,9 +9,22 @@ fx/shared/indicators.py — 统一指标计算库
 
 from __future__ import annotations
 
+import numbers
+
+
+def _require_positive_int(value, name: str = "n") -> int:
+    """
+    [v3.89 #71] 周期/桶数必须是正整数（bool 不算）。零、负数、浮点、None、字符串一律抛 ValueError，
+    避免到计算深处才以除零、空切片或静默的错误结果暴露。合法参数的计算结果完全不变。
+    """
+    if isinstance(value, bool) or not isinstance(value, numbers.Integral) or value <= 0:
+        raise ValueError(f"{name} 必须是正整数，收到 {value!r}")
+    return int(value)
+
 
 def ema(closes: list, n: int) -> float:
     """指数移动均线"""
+    _require_positive_int(n, "ema.n")
     if len(closes) < n:
         return closes[-1] if closes else 0.0
     k = 2 / (n + 1)
@@ -23,6 +36,7 @@ def ema(closes: list, n: int) -> float:
 
 def rsi(closes: list, n: int = 14) -> float:
     """RSI，使用已闭合K线收盘价列表"""
+    _require_positive_int(n, "rsi.n")
     if len(closes) < n + 1:
         return 50.0
     gains, losses = [], []
@@ -43,6 +57,7 @@ def atr_status(klines: list, n: int = 14) -> dict:
     [v3.89 #68] ATR 及样本充足性：{"value": float, "samples": int, "sufficient": bool}。
     samples = 实际参与平均的有效 TR 个数；少于 n 个时 sufficient=False，调用方可据此识别预热期。
     """
+    _require_positive_int(n, "atr.n")
     trs = []
     for i in range(1, len(klines)):
         h  = float(klines[i][2])
@@ -72,6 +87,7 @@ def vol_ma(klines: list, n: int = 20) -> float:
 
 def bb_pct(closes: list, n: int = 20) -> float:
     """布林带 %B（0=下轨，1=上轨）"""
+    _require_positive_int(n, "bb_pct.n")
     if len(closes) < n:
         return 0.5
     w = closes[-n:]
@@ -86,6 +102,7 @@ def bb_pct(closes: list, n: int = 20) -> float:
 
 def bollinger(closes: list, n: int = 20) -> dict:
     """布林带上中下轨 + %B，返回 {upper, mid, lower, pct}"""
+    _require_positive_int(n, "bollinger.n")
     if len(closes) < n:
         mid = closes[-1] if closes else 0
         return {"upper": mid, "mid": mid, "lower": mid, "pct": 0.5}
@@ -138,6 +155,7 @@ def calc_volume_profile(klines: list, bins: int = 40) -> dict:
       }
     返回 valid=False 时，poc/vah/val 均为 0.0，调用方应跳过 VP 逻辑。
     """
+    _require_positive_int(bins, "calc_volume_profile.bins")
     if not klines or len(klines) < 20:
         return {"poc": 0.0, "vah": 0.0, "val": 0.0, "bins": 0, "valid": False}
 
