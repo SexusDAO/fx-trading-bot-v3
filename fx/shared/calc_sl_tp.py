@@ -1482,7 +1482,12 @@ def calc_sl_tp(
         } if momentum_data else None,
         "consistency_score":  consistency_data.get("consistency_score"),
         "consistency_note":   consistency_data.get("consistency_note"),
-        "tp_vs_dynamic_atr":  consistency_data.get("tp_vs_dynamic_atr"),
+        "tp_vs_dynamic_atr":  consistency_data.get("tp_vs_dynamic_atr"),   # 绝对距离（>=0）
+        # [v3.89 #74] 有方向偏差字段，只记录、不参与任何决策（正=TP1 更近/保守，负=更远/激进）
+        "tp_vs_dynamic_signed_dist": consistency_data.get("tp_vs_dynamic_signed_dist"),
+        "tp_vs_dynamic_signed_atr":  consistency_data.get("tp_vs_dynamic_signed_atr"),
+        "tp_relative":               consistency_data.get("tp_relative"),
+        "consistency_schema_version": consistency_data.get("consistency_schema_version"),
         # [v3.88 OPT-14d] 只记录、不参与决策：入场侧最近清算区与 TP1 侧最近清算区在三种分母下的相对强度
         "liq_metrics":        _collect_liq_metrics(entry, atr, direction, liq_long, liq_short, _liq_ctx),
         # [v3.88 OPT-14e] 本次 TP1 实际采用的清算区缓冲（ATR 倍数），写入持仓供重算时锁定；None=未锚定清算区

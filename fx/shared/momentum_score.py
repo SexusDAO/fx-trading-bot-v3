@@ -229,8 +229,13 @@ def calc_tp_consistency(
       两者距离 > 1.0 ATR → consistency_score = "low"    （仓位减半信号）
 
     返回：
-      tp_vs_dynamic_dist  : float  TP1 与动态目标的距离（正=TP1更近/保守，负=TP1更远）
-      tp_vs_dynamic_atr   : float  距离折算成 ATR 倍数
+      tp_vs_dynamic_dist  : float  TP1 与动态目标的【绝对】距离，始终 >= 0（不含方向）
+      tp_vs_dynamic_atr   : float  绝对距离折算成 ATR 倍数，始终 >= 0
+      [v3.89 #74] 有方向的偏差另设新字段（原字段与评分计算不变）：
+      tp_vs_dynamic_signed_dist : float  正=TP1 比动态目标更近（保守），负=TP1 更远（激进），0=重合
+      tp_vs_dynamic_signed_atr  : float  同上，折算成 ATR 倍数
+      tp_relative               : str    "conservative" | "aggressive" | "aligned"
+      consistency_schema_version: int    字段口径版本（2 = 含有方向偏差字段）
       consistency_score   : str    "high" | "medium" | "low"
       consistency_note    : str    人类可读说明
     """
@@ -256,9 +261,18 @@ def calc_tp_consistency(
             f"{'TP1偏近，力度估算认为行情可以更远' if relative == 'conservative' else 'TP1偏远，力度估算认为动能不足以到达'}"
         )
 
+    # [v3.89 #74] 有方向偏差：LONG 取 目标-TP1，SHORT 取 TP1-目标；正=TP1 更近（保守）
+    signed = (dynamic_target - tp1_price) if direction == "LONG" else (tp1_price - dynamic_target)
+    signed_atr = signed / (atr + 1e-9)
+    tp_rel = "conservative" if signed > 0 else ("aggressive" if signed < 0 else "aligned")
+
     return {
         "tp_vs_dynamic_dist": round(dist, 8),
         "tp_vs_dynamic_atr":  round(dist_atr, 3),
         "consistency_score":  score,
         "consistency_note":   note,
+        "tp_vs_dynamic_signed_dist": round(signed, 8),
+        "tp_vs_dynamic_signed_atr":  round(signed_atr, 3),
+        "tp_relative":               tp_rel,
+        "consistency_schema_version": 2,
     }
