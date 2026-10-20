@@ -300,9 +300,13 @@ class TestOICache:
         assert "BTCUSDT" in cache
         assert cache["BTCUSDT"][-1]["oi"] == 12345.0
 
-    def test_oi_cache_capped_at_48(self):
-        """超过 48 条时自动清理最旧的"""
+    def test_oi_cache_retained_by_time_window(self):
+        """[v3.89 #99] 按时间窗口（25H）保留，不再按 48 条截断：窗口内的 60 次写入全部保留，超出窗口的被清理"""
+        import time as _t
+        now = int(_t.time() * 1000)
+        st._save_oi({"BTCUSDT": [{"timestamp": now - 26 * 3600 * 1000, "oi": -1.0}]})
         for i in range(60):
             st.update_oi("BTCUSDT", float(i))
         cache = json.loads(st._OI_FILE.read_text())
-        assert len(cache["BTCUSDT"]) == st.OI_CACHE_KEEP
+        assert len(cache["BTCUSDT"]) == 60
+        assert all(r["oi"] >= 0 for r in cache["BTCUSDT"])

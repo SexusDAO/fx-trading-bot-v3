@@ -51,6 +51,10 @@ class TestValidateWindow(unittest.TestCase):
 
 
 class TestOutcome(unittest.TestCase):
+    def setUp(self):
+        TR._clear_kline_cache()      # [v3.89 #47] 行情合并缓存跨用例会复用上一个用例的 K 线
+        self.addCleanup(TR._clear_kline_cache)
+
     def test_complete_touch(self):
         with mock.patch.object(TR, "_get_klines", return_value=full(hi=103)):
             r = TR._check_rejected_outcome(rec("LONG"))

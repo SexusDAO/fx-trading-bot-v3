@@ -38,12 +38,27 @@ class TestCalcSlTpFallback(unittest.TestCase):
         self.assertEqual(m._SL_MAX_PCT, 0.12)
         self.assertEqual(m._TP1_MAX_PCT, 0.15)
 
-    def test_existing_fallback_values_untouched(self):
+    def test_fallback_values_aligned_with_config(self):
+        """[v3.89] 回退值对齐 config.py：SL 倍数 1.5/1.5/2.0，RR_MIN_TP1=2.0；其余回退值不变。"""
         m = self.m
-        self.assertEqual((m._CFG_LOW, m._CFG_MID, m._CFG_HIGH), (1.2, 1.5, 2.0))
+        self.assertEqual((m._CFG_LOW, m._CFG_MID, m._CFG_HIGH), (1.5, 1.5, 2.0))
+        self.assertEqual(m._CFG_RR_MIN_TP1, 2.0)
         self.assertEqual((m._CFG_SL_LOW, m._CFG_SL_MID, m._CFG_SL_HIGH), (0.12, 0.15, 0.20))
-        self.assertEqual((m._CFG_TP1_HIGH, m._CFG_RR_MIN_TP1), (0.25, 1.5))
+        self.assertEqual((m._CFG_TP1_HIGH, m._CFG_RR_MIN_TP1_HIGH), (0.25, 1.5))
+        self.assertEqual(m._SL_MULT, {"low": 1.5, "mid": 1.5, "high": 2.0})
         self.assertTrue(callable(m.calc_sl_tp))
+
+    def test_fallback_equals_real_config_when_available(self):
+        """回归：只要 config 能加载，回退值必须与其当前值一致，防止两处再次漂移。"""
+        try:
+            import config as C
+        except Exception:
+            self.skipTest("config 无法加载（缺环境变量）")
+        m = self.m
+        self.assertEqual((m._CFG_LOW, m._CFG_MID, m._CFG_HIGH), (C.SL_MULT_LOW, C.SL_MULT_MID, C.SL_MULT_HIGH))
+        self.assertEqual((m._CFG_SL_LOW, m._CFG_SL_MID, m._CFG_SL_HIGH), (C.SL_MAX_PCT_LOW, C.SL_MAX_PCT_MID, C.SL_MAX_PCT_HIGH))
+        self.assertEqual((m._CFG_SL_MAX, m._CFG_TP1_MAX, m._CFG_TP1_HIGH), (C.SL_MAX_PCT, C.TP1_MAX_PCT, C.TP1_MAX_PCT_HIGH))
+        self.assertEqual((m._CFG_RR_MIN_TP1, m._CFG_RR_MIN_TP1_HIGH), (C.RR_MIN_TP1, C.RR_MIN_TP1_HIGH))
 
 
 if __name__ == "__main__":
