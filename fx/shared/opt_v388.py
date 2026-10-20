@@ -6,6 +6,14 @@ shared/opt_v388.py — v3.88 清算区「相对强度」：用 24H 成交额做�
 """
 from __future__ import annotations
 
+import math as _math
+
+
+def _finite(x) -> bool:
+    """[v3.89 #73] 是有限实数（排除 NaN/Inf/bool/非数值）。"""
+    return (isinstance(x, (int, float)) and not isinstance(x, bool)
+            and _math.isfinite(x))
+
 
 def liq_relative_strength(liq_amount: float, vol24_usd: float) -> float | None:
     """返回相对强度；金额或成交额缺失 / 非正时返回 None（调用方应回退到原逻辑）。"""
@@ -14,7 +22,8 @@ def liq_relative_strength(liq_amount: float, vol24_usd: float) -> float | None:
         v = float(vol24_usd or 0)
     except (TypeError, ValueError):
         return None
-    if a <= 0 or v <= 0:
+    # [v3.89 #73] NaN/Inf 视为缺失（旧版 NaN 会通过 <=0 判断并产出 NaN）；合法输入结果不变
+    if not (_finite(a) and _finite(v)) or a <= 0 or v <= 0:
         return None
     return a / v
 
@@ -22,7 +31,11 @@ def liq_relative_strength(liq_amount: float, vol24_usd: float) -> float | None:
 def liq_weight(rel: float | None, ref_ratio: float = 0.10,
                w_min: float = 0.5, w_max: float = 3.0, base: float = 2.0) -> float:
     """清算区锚点权重 = base × (相对强度 / 参考相对强度)，截断到 [w_min, w_max]；相对强度未知时返回 base（原权重）。"""
-    if rel is None or ref_ratio <= 0:
+    # [v3.89 #73] 相对强度/参考值非有限，或上下界反向时返回 base。
+    #   旧版 NaN 经 min/max 会落成 w_max（边界权重）；合法输入结果不变。
+    if rel is None or not _finite(rel) or not _finite(ref_ratio) or ref_ratio <= 0:
+        return base
+    if not (_finite(w_min) and _finite(w_max)) or w_min > w_max:
         return base
     return max(w_min, min(w_max, base * rel / ref_ratio))
 
@@ -31,7 +44,8 @@ def tp1_buffer_atr(rel: float | None, strong: float = 0.20, mid: float = 0.05,
                    buf_strong: float = 0.20, buf_mid: float = 0.35, buf_weak: float = 0.50,
                    legacy: float = 0.30) -> float:
     """TP1 距清算区前沿的缓冲（ATR 倍数）。相对强度越大，价格越可能打到甚至穿过清算区，缓冲越小。未知时返回原值。"""
-    if rel is None:
+    # [v3.89 #73] NaN/Inf 按未知处理返回原值（旧版 NaN 会落到最宽缓冲 buf_weak）；合法输入结果不变
+    if rel is None or not _finite(rel):
         return legacy
     if rel >= strong:
         return buf_strong
@@ -50,9 +64,9 @@ def liq_concentration(amount: float, zones: list) -> float | None:
     try:
         total = sum(_zsize(z) for z in (zones or []))
         a = float(amount or 0)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, AttributeError):
         return None
-    if a <= 0 or total <= 0:
+    if not (_finite(a) and _finite(total)) or a <= 0 or total <= 0:   # [v3.89 #73]
         return None
     return a / total
 

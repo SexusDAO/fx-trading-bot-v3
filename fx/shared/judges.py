@@ -146,6 +146,52 @@ def _atr_ratio(atr: float, price: float) -> float:
 # ══════════════════════════════════════════════════════════════════════════════
 # judge_pullback - 结构回踩型
 # ══════════════════════════════════════════════════════════════════════════════
+def _judge_error_result(judge_name: str, mode: str, e: BaseException) -> tuple:
+    """
+    [v3.89 #26] 七个 judge 外层异常包装的统一返回契约：
+      reject_reason  —— 文案与旧版一致（"内部异常: {e}"），下游按文案归类的统计不受影响
+      mode           —— 路线名（旧版前四个路线缺失，现统一带上）
+      internal_error —— True：与「正常拒绝」区分，统计可据此把程序错误从拒绝漏斗里剥离
+      error_type     —— 异常类名
+    只改异常路径，任何正常拒绝条件与阈值不变。
+    """
+    return False, {
+        "reject_reason": f"内部异常: {e}",
+        "mode": mode,
+        "internal_error": True,
+        "error_type": type(e).__name__,
+    }
+
+
+
+_JUDGE_ERR_LAST: dict = {}
+_JUDGE_ERR_INTERVAL = 60.0   # 同一路线同一类异常的完整堆栈最小间隔（秒）
+
+
+def _log_judge_failure(judge_name: str, e: BaseException, k1h=None, k4h=None, k15=None, ind=None) -> None:
+    """
+    [v3.89 #27] 判定异常日志：带标的与 K 线长度等定位上下文；完整堆栈按 (路线, 异常类型) 限频，
+    其余只记一行摘要。不记录整个行情载荷。
+    """
+    import time as _t
+    import traceback as _tb
+    def _ln(x):
+        try:
+            return len(x)
+        except Exception:
+            return None
+    symbol = ind.get("symbol", "?") if isinstance(ind, dict) else "?"
+    ctx = f"symbol={symbol} k1h={_ln(k1h)} k4h={_ln(k4h)} k15={_ln(k15)}"
+    key = (judge_name, type(e).__name__)
+    now = _t.time()
+    if now - _JUDGE_ERR_LAST.get(key, 0) >= _JUDGE_ERR_INTERVAL:
+        _JUDGE_ERR_LAST[key] = now
+        logger.warning(f"[{judge_name}] 异常 {type(e).__name__}: {e} | {ctx}\n{''.join(_tb.format_exception(type(e), e, e.__traceback__))}")
+    else:
+        logger.warning(f"[{judge_name}] 异常 {type(e).__name__}: {e} | {ctx}（堆栈限频，{_JUDGE_ERR_INTERVAL:.0f}s 内同类异常不重复）")
+
+
+
 def judge_pullback(k1h: list, k4h: list, k15: list, ind: dict,
                    chg24: float, funding: float) -> tuple[bool, dict]:
     """
@@ -155,8 +201,8 @@ def judge_pullback(k1h: list, k4h: list, k15: list, ind: dict,
     try:
         return _judge_pullback_impl(k1h, k4h, k15, ind, chg24, funding)
     except Exception as e:
-        logger.warning(f"[judge_pullback] 异常: {e}")
-        return False, {"reject_reason": f"内部异常: {e}"}
+        _log_judge_failure("judge_pullback", e, k1h, k4h, k15, ind)
+        return _judge_error_result("judge_pullback", "pullback", e)
 
 
 def _judge_pullback_impl(k1h, k4h, k15, ind, chg24, funding):
@@ -825,8 +871,8 @@ def judge_breakout(k1h: list, k4h: list, k15: list, ind: dict,
     try:
         return _judge_breakout_impl(k1h, k4h, k15, ind, chg24, funding)
     except Exception as e:
-        logger.warning(f"[judge_breakout] 异常: {e}")
-        return False, {"reject_reason": f"内部异常: {e}"}
+        _log_judge_failure("judge_breakout", e, k1h, k4h, k15, ind)
+        return _judge_error_result("judge_breakout", "breakout", e)
 
 
 def _judge_breakout_impl(k1h, k4h, k15, ind, chg24, funding):
@@ -1151,8 +1197,8 @@ def judge_reversal(k1h: list, k4h: list, k15: list, ind: dict,
     try:
         return _judge_reversal_impl(k1h, k4h, k15, ind, chg24, funding)
     except Exception as e:
-        logger.warning(f"[judge_reversal] 异常: {e}")
-        return False, {"reject_reason": f"内部异常: {e}"}
+        _log_judge_failure("judge_reversal", e, k1h, k4h, k15, ind)
+        return _judge_error_result("judge_reversal", "reversal", e)
 
 
 def _judge_reversal_impl(k1h, k4h, k15, ind, chg24, funding):
@@ -2403,8 +2449,8 @@ def judge_range_bounce(k1h: list, k4h: list, k15: list, ind: dict,
     try:
         return _judge_range_bounce_impl(k1h, k4h, k15, ind, chg24, funding)
     except Exception as e:
-        logger.warning(f"[judge_range_bounce] 异常: {e}")
-        return False, {"reject_reason": f"内部异常: {e}"}
+        _log_judge_failure("judge_range_bounce", e, k1h, k4h, k15, ind)
+        return _judge_error_result("judge_range_bounce", "range_bounce", e)
 
 
 def _judge_range_bounce_impl(k1h, k4h, k15, ind, chg24, funding):
@@ -2539,8 +2585,8 @@ def judge_stop_hunt(k1h: list, k4h: list, k15: list, ind: dict,
     try:
         return _judge_stop_hunt_impl(k1h, k4h, k15, ind, chg24, funding)
     except Exception as e:
-        logger.warning(f"[judge_stop_hunt] 异常: {e}")
-        return False, {"reject_reason": f"内部异常: {e}", "mode": "stop_hunt"}
+        _log_judge_failure("judge_stop_hunt", e, k1h, k4h, k15, ind)
+        return _judge_error_result("judge_stop_hunt", "stop_hunt", e)
 
 
 def _judge_stop_hunt_impl(k1h, k4h, k15, ind, chg24, funding):
@@ -3061,8 +3107,8 @@ def judge_oi_divergence(k1h: list, k4h: list, k15: list, ind: dict,
     try:
         return _judge_oi_divergence_impl(k1h, k4h, k15, ind, chg24, funding)
     except Exception as e:
-        logger.warning(f"[judge_oi_divergence] 异常: {e}")
-        return False, {"reject_reason": f"内部异常: {e}", "mode": "oi_divergence"}
+        _log_judge_failure("judge_oi_divergence", e, k1h, k4h, k15, ind)
+        return _judge_error_result("judge_oi_divergence", "oi_divergence", e)
 
 
 def _judge_oi_divergence_impl(k1h, k4h, k15, ind, chg24, funding):
@@ -3632,8 +3678,8 @@ def judge_ema_trend(k1h: list, k4h: list, k15: list, ind: dict,
     try:
         return _judge_ema_trend_impl(k1h, k4h, k15, ind, chg24, funding)
     except Exception as e:
-        logger.warning(f"[judge_ema_trend] 异常: {e}")
-        return False, {"reject_reason": f"内部异常: {e}", "mode": "ema_trend"}
+        _log_judge_failure("judge_ema_trend", e, k1h, k4h, k15, ind)
+        return _judge_error_result("judge_ema_trend", "ema_trend", e)
 
 
 def _judge_ema_trend_impl(k1h, k4h, k15, ind, chg24, funding):
