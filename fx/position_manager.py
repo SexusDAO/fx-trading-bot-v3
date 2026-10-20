@@ -2434,6 +2434,10 @@ async def _maybe_pyramid(pos: dict) -> None:
             from shared.indicators import rsi as _calc_rsi2
             _k1h = _api2.get_klines(symbol, "1h", limit=20)
             _closes = [float(k[4]) for k in _k1h]
+            # [v3.89 #60] 空 K 线或样本不足时 rsi() 会返回 50，掩盖数据缺失而绕过失败封闭分支。
+            #   这里只检测数据是否可用（RSI 周期 14 至少需要 15 根收盘价），RSI 阈值与开关判断不变。
+            if len(_closes) < 15:
+                raise ValueError(f"RSI 数据不足: {len(_closes)}/15")
             _rsi1h = _calc_rsi2(_closes, 14)
             if direction == "LONG" and _rsi1h > PYRAMID_RSI_LONG_MAX:
                 logger.debug(f"[pm] {symbol} 加仓跳过: RSI1H={_rsi1h:.0f} > {PYRAMID_RSI_LONG_MAX}(超买)")
