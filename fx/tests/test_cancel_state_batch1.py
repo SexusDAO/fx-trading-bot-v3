@@ -200,3 +200,79 @@ class TestReconcile(unittest.TestCase):
             asyncio.run(w._reconcile_orphans())
         self.assertEqual(w._orphan_orders, {})
         self.assertEqual(e.cancel_state, "none")
+
+
+class TestIdentityChecks(unittest.TestCase):
+    """[v3.89 #41] 快照过期：条目被替换/触发/撤单中时，不得误删新条目、不得误撤、不得误触发。"""
+
+    def test_cancel_skips_when_entry_was_replaced(self):
+        w = make(cancel_result=CANCELED)
+
+        async def run():
+            old = await _add(w, tag="old")
+            await w.add_signal(_sig(tag="new"), replace=True, **_kwargs())
+            new = w._watched["XUSDT"]
+            await w._cancel_and_remove("XUSDT", old, "stale")
+            return old, new
+        old, new = asyncio.run(run())
+        self.assertIs(w._watched["XUSDT"], new)       # 新条目没被误删
+        self.assertEqual(w.calls, [])                  # 也没有对旧快照的订单发撤单
+
+    def test_cancel_skips_triggered_entry(self):
+        w = make(cancel_result=CANCELED)
+
+        async def run():
+            e = await _add(w)
+            e.triggered = True
+            await w._cancel_and_remove("XUSDT", e, "t")
+        asyncio.run(run())
+        self.assertIn("XUSDT", w._watched)
+        self.assertEqual(w.calls, [])
+
+    def test_cancel_skips_when_already_cancelling(self):
+        w = make(cancel_result=CANCELED)
+
+        async def run():
+            e = await _add(w)
+            e.cancel_state = "cancelling"
+            await w._cancel_and_remove("XUSDT", e, "t")
+        asyncio.run(run())
+        self.assertEqual(w.calls, [])
+
+    def test_stale_reference_cannot_trigger(self):
+        w = make()
+        fired = []
+
+        async def on_trig(sig):
+            fired.append(sig["tag"])
+
+        async def run():
+            await w.add_signal(_sig(tag="old"), **_kwargs(is_reorder=False, on_trigger=on_trig))
+            old = w._watched["XUSDT"]
+            await w.add_signal(_sig(tag="new"), replace=True, **_kwargs(on_trigger=on_trig))
+            await w._trigger("XUSDT", 100.0, old)
+            return w._watched["XUSDT"]
+        new = asyncio.run(run())
+        self.assertEqual(fired, [])
+        self.assertFalse(new.triggered)
+
+    def test_recheck_pass_snapshot_excludes_non_normal_entries(self):
+        w = make()
+        seen = []
+
+        async def fake_one(sym, entry, bull, loop):
+            seen.append(sym)
+        w._recheck_one = fake_one
+        orig = _api.get_klines
+        _api.get_klines = lambda *a, **k: (_ for _ in ()).throw(Exception("no net"))
+
+        async def run():
+            for sym, st in (("AUSDT", "none"), ("BUSDT", "cancelling"), ("CUSDT", "cancel_unknown")):
+                await w.add_signal(_sig(sym), **_kwargs(is_reorder=False))
+                w._watched[sym].cancel_state = st
+            await w._recheck_pass()
+        try:
+            asyncio.run(run())
+        finally:
+            _api.get_klines = orig
+        self.assertEqual(seen, ["AUSDT"])

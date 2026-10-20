@@ -766,6 +766,9 @@ class SignalWatcher:
             e = self._watched.get(symbol)
             if e is None or e.triggered or e.is_expired():
                 return
+            if e is not entry:   # [v3.89 #41] 队列里已是别的条目（被重挂/淘汰替换），旧引用不得触发
+                logger.info(f"[signal_watcher] {symbol} 触发跳过：条目已被替换 entry_id={entry.entry_id}")
+                return
             if e.cancel_state != "none":   # [v3.89 #40] 撤单进行中/结果未知，不得触发
                 return
             if not e.price_in_range(price):
@@ -1197,8 +1200,9 @@ class SignalWatcher:
 
         # 快照当前 pending 列表（不持锁做 IO）
         async with self._lock:
+            # [v3.89 #41] 快照只含正常条目：撤单进行中/结果未知的条目交给撤单与对账流程，recheck 不再碰
             entries = [(sym, e) for sym, e in self._watched.items()
-                       if not e.triggered and not e.is_expired()]
+                       if not e.triggered and not e.is_expired() and e.cancel_state == "none"]
 
         if not entries:
             return
@@ -1358,6 +1362,12 @@ class SignalWatcher:
         from shared.indicators import atr as _atr, ema as _ema, rsi as _rsi
         from shared.liq_cache import get_liq_zones_cached
         from shared.calc_sl_tp import _nearest_liq_above, _zone_size
+
+        # [v3.89 #41] 快照可能已过期：进入慢速 IO 前先在锁内复核条目仍是队列里的同一个对象且状态正常
+        async with self._lock:
+            if self._watched.get(sym) is not entry or entry.triggered or entry.cancel_state != "none":
+                logger.info(f'[recheck] {sym} 条目已变化（触发/替换/撤单中），跳过本次检查 entry_id={entry.entry_id}')
+                return
 
         direction = entry.signal.get('direction', 'LONG').upper()
         mode      = entry.mode  # pullback / reversal / breakout
@@ -1652,6 +1662,12 @@ class SignalWatcher:
         oid = entry.limit_order_id
         async with self._lock:
             if sym not in self._watched:
+                return
+            # [v3.89 #41] 身份与状态复核：队列里必须还是传入的这个条目，且未触发、未在撤单中；
+            #   否则可能误删同品种的新条目，或对已成交/已触发的条目撤单。
+            if self._watched.get(sym) is not entry or entry.triggered or entry.cancel_state != "none":
+                logger.info(f'[signal_watcher] {sym} 撤单跳过：条目已变化 entry_id={entry.entry_id} '
+                            f'triggered={entry.triggered} cancel_state={entry.cancel_state} 原因={reason}')
                 return
             if not oid:
                 self._watched.pop(sym, None)   # 没有交易所订单，无需确认
