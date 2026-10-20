@@ -35,15 +35,30 @@ def rsi(closes: list, n: int = 14) -> float:
     return 100.0 if al == 0 else round(100.0 - 100.0 / (1 + ag / al), 2)
 
 
-def atr(klines: list, n: int = 14) -> float:
-    """ATR14，klines 格式：[open_time, open, high, low, close, ...]"""
+def atr_status(klines: list, n: int = 14) -> dict:
+    """
+    [v3.89 #68] ATR 及样本充足性：{"value": float, "samples": int, "sufficient": bool}。
+    samples = 实际参与平均的有效 TR 个数；少于 n 个时 sufficient=False，调用方可据此识别预热期。
+    """
     trs = []
     for i in range(1, len(klines)):
         h  = float(klines[i][2])
         lo = float(klines[i][3])
         pc = float(klines[i - 1][4])
         trs.append(max(h - lo, abs(h - pc), abs(lo - pc)))
-    return sum(trs[-n:]) / n if trs else 0.0
+    window = trs[-n:]
+    samples = len(window)
+    return {"value": sum(window) / samples if samples else 0.0,
+            "samples": samples, "sufficient": samples >= n}
+
+
+def atr(klines: list, n: int = 14) -> float:
+    """
+    ATR14，klines 格式：[open_time, open, high, low, close, ...]
+    [v3.89 #68] 有效 TR 少于 n 个时按实际个数求平均（不再除以完整周期 n 而压低数值）；
+    需要识别样本不足请用 atr_status()。样本充足（>= n）时结果与之前完全一致。
+    """
+    return atr_status(klines, n)["value"]
 
 
 def vol_ma(klines: list, n: int = 20) -> float:
