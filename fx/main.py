@@ -21,29 +21,23 @@ import shutil
 import subprocess
 from pathlib import Path
 
-# ── 启动前依赖检查：确保 SOCKS 代理依赖可用 ─────────────────────────────────
+# ── 启动前依赖检查：只检查，不在运行时安装 ───────────────────────────────────
 def _ensure_deps():
-    """检查关键依赖，缺失时自动安装，防止沙箱重建后包丢失。"""
+    """
+    [v3.89 #24] 只做依赖健康检查：缺少关键依赖时 logger.critical 并退出，不在启动阶段修改运行环境。
+    原写法在模块加载时运行未固定版本的 pip install（无超时），重启恢复时间取决于外网，
+    且同一提交可能得到不同依赖。依赖应在构建/部署阶段安装（requests[socks]、PySocks）。
+    """
+    missing = []
     try:
         import socks  # noqa: F401
     except ImportError:
-        print("[startup] PySocks 缺失，自动安装...", flush=True)
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install",
-             "requests[socks]", "PySocks", "-q", "--break-system-packages"],
-            check=True,
-        )
-        print("[startup] PySocks 安装完成，重建代理 Session", flush=True)
-        # 重建 binance_api 的 Session，让 SOCKS 代理立即生效
-        try:
-            ROOT_PATH = Path(__file__).parent
-            sys.path.insert(0, str(ROOT_PATH))
-            sys.path.insert(0, str(ROOT_PATH / "shared"))
-            from shared.binance_api import reset_session
-            reset_session()
-            print("[startup] Session 重建完成", flush=True)
-        except Exception as e:
-            print(f"[startup] Session 重建失败（将在下次 import 时自动修复）: {e}", flush=True)
+        missing.append("PySocks（pip install 'requests[socks]' PySocks）")
+    if missing:
+        msg = "[startup] 缺少必需依赖: " + "; ".join(missing) + "。请在部署阶段安装后重新启动，系统不会在启动时自动安装。"
+        logging.getLogger("fx.startup").critical(msg)
+        print(msg, file=sys.stderr, flush=True)
+        sys.exit(1)
 
 _ensure_deps()
 from datetime import datetime, timezone
