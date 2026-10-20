@@ -332,8 +332,8 @@ def _check_liquidity_gate(
 ) -> tuple[bool, str]:
     """
     检查订单簿深度是否足够承载本次开仓。
-    - 拉 limit=20 深度，统计以挂单价（entry_price）为中心 ±0.5% 区间内的挂单金额
-      若 entry_price 未提供，回退到 mark_price（兼容旧调用路径）
+    - 拉 limit=20 深度，统计以 mark_price 为中心 ±2% 区间内的挂单金额
+      entry_price 参数保留但不参与窗口计算，仅用于日志记录
     - LONG 做多：看 ask 侧深度（需要有人卖给我们）
     - SHORT 做空：看 bid 侧深度（需要有人买我们卖出的仓）
     - 阈值 = max(OI×0.1%, 3000U, notional×DEPTH_MULT)，对小币相对化
@@ -351,10 +351,11 @@ def _check_liquidity_gate(
         if mark_p <= 0:
             return True, ""  # 拉不到价格，降级放行
 
-        # 以挂单价为中心检查深度；entry_price 缺失时回退 mark_price
-        center = entry_price if (entry_price and entry_price > 0) else mark_p
-        low  = center * 0.995
-        high = center * 1.005
+        # 窗口以 mark_price 为中心 ±2%，覆盖 entry_price 偏离场景
+        # entry_price 仅用于日志，不参与窗口计算
+        center = mark_p
+        low  = center * 0.98
+        high = center * 1.02
 
         ob = api.get_order_book(symbol, limit=20)
 
@@ -378,10 +379,11 @@ def _check_liquidity_gate(
         oi_usdt   = oi_now * mark_p if (oi_now > 0 and mark_p > 0) else 0.0
         oi_based  = oi_usdt * 0.001 if oi_usdt > 0 else 0.0
         threshold = max(LIQUIDITY_GATE_MIN_U, oi_based, notional * LIQUIDITY_GATE_DEPTH_MULT)
-        center_label = f"entry={center:.6g}" if (entry_price and entry_price > 0) else f"mark={center:.6g}"
+        entry_label = f" entry={entry_price:.6g}" if (entry_price and entry_price > 0) else ""
+        center_label = f"mark={center:.6g}{entry_label}"
         if depth_u < threshold:
             return False, (
-                f"流动性不足: {direction} 侧±0.5%深度={depth_u:.0f}U "
+                f"流动性不足: {direction} 侧±2%深度={depth_u:.0f}U "
                 f"< 阈值{threshold:.0f}U（{center_label} OI={oi_usdt:.0f}U notional={notional:.0f}U×{LIQUIDITY_GATE_DEPTH_MULT}）"
             )
         return True, ""
