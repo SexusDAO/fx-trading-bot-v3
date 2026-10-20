@@ -910,7 +910,7 @@ class SignalWatcher:
         except Exception as e_:
             # [v3.89 #102] 其他异常可能发生在已下单之后（结果未知）：标记待对账，不自动清理
             _keep_entry = True
-            logger.error(f"[signal_watcher] {symbol} on_trigger 异常（触发结果未知）: {_e}", exc_info=True)
+            logger.error(f"[signal_watcher] {symbol} on_trigger 异常（触发结果未知）: {e_}", exc_info=True)
             async with self._lock:
                 if self._watched.get(symbol) is entry:
                     entry.trigger_state = "unknown"
@@ -918,7 +918,7 @@ class SignalWatcher:
             try:
                 self._append_trigger_reconcile({
                     "ts": time.time(), "symbol": symbol, "entry_id": entry.entry_id,
-                    "error": repr(_e), "order_id_if_known": _oid,
+                    "error": repr(e_), "order_id_if_known": _oid,
                     "mode": entry.mode, "direction": entry.signal.get("direction", ""),
                     "entry_price": entry.entry_price, "reason": "on_trigger 异常，触发结果未知",
                 })
