@@ -248,13 +248,26 @@ def _load_card_state() -> dict:
 
 
 def _save_card_state(state: dict) -> None:
+    """
+    [v3.90 #19] 卡片状态落盘改为原子写入：先写同目录 .tmp，再 os.replace 覆盖。
+    os.replace 在 POSIX 上是原子操作，进程若在写中途崩溃，旧文件仍然完整可用，
+    不会留下半截 JSON（旧实现 write_text 直接覆盖，崩溃即损坏）。
+    写入失败从静默 pass 改为 warn 日志，便于发现磁盘/权限问题。
+    """
+    tmp_path = _CARD_STATE_PATH.with_suffix(".json.tmp")
     try:
         _CARD_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _CARD_STATE_PATH.write_text(
+        tmp_path.write_text(
             json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-    except Exception:
-        pass
+        os.replace(tmp_path, _CARD_STATE_PATH)
+    except Exception as e:
+        logger.warning(f"[notifier] card_state 写入失败: {e}")
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except Exception:
+            pass
 
 
 def _init_card_cache() -> None:
