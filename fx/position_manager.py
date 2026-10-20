@@ -2345,6 +2345,45 @@ async def _maybe_tighten_tp2(pos: dict) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 # 加仓逻辑(Pyramiding,v3.72)
 # ═══════════════════════════════════════════════════════════════════════════════
+def _safe_float(v, default: float = 0.0) -> float:
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return default
+    return f if math.isfinite(f) else default
+
+
+async def _confirm_market_fill(symbol: str, resp: dict, retries: int = 2):
+    """
+    [v3.89 #58] 市价加仓的成交确认：受理回执（orderId）不等于已成交。
+    先查订单快照，非 FILLED 时间隔 0.5s 重查，共 1+retries 次。
+    返回 (confirmed, status, executed_qty, avg_price)；只有 FILLED 且数量、均价均有效才算确认。
+    均价缺失或为 0 时，用 cumQuote / executedQty 兜底。
+    """
+    oid = (resp or {}).get("orderId")
+    snap = resp or {}
+    for attempt in range(retries + 1):
+        if oid:
+            try:
+                q = await asyncio.get_running_loop().run_in_executor(
+                    None, lambda: api.get_order(symbol, int(oid))
+                )
+                if q:
+                    snap = q
+            except Exception as e:
+                logger.warning(f"[pm] {symbol} 加仓订单查询失败 orderId={oid}: {e}")
+        status = snap.get("status", "")
+        executed = _safe_float(snap.get("executedQty"))
+        avg = _safe_float(snap.get("avgPrice"))
+        if avg <= 0 and executed > 0:
+            avg = _safe_float(snap.get("cumQuote")) / executed
+        if status == "FILLED" and executed > 0 and avg > 0:
+            return True, status, executed, avg
+        if attempt < retries:
+            await asyncio.sleep(0.5)
+    return False, snap.get("status", ""), _safe_float(snap.get("executedQty")), _safe_float(snap.get("avgPrice"))
+
+
 async def _maybe_pyramid(pos: dict) -> None:
     """
     浮盈 >= PYRAMID_FLOAT_PROFIT_ATR × ATR 时,顺势加一笔 PYRAMID_SIZE_RATIO × 原仓位。
@@ -2458,8 +2497,23 @@ async def _maybe_pyramid(pos: dict) -> None:
             )
         )
         if resp.get("orderId") or resp.get("status") == "FILLED":
-            # 标记已加仓,更新数量
-            fill_p = float(resp.get("avgPrice") or price)
+            # [v3.89 #58] 受理 ≠ 成交：以订单快照里的实际成交量和均价记账。
+            #   未确认 FILLED 时不改仓位、不补单，只保存订单号供人工核对。
+            _ok, _st, _exec_q, _avg = await _confirm_market_fill(symbol, resp)
+            if not _ok:
+                _oid_p = resp.get("orderId")
+                logger.warning(
+                    f"[pm] {symbol} 加仓订单未确认成交 orderId={_oid_p} status={_st} "
+                    f"executedQty={_exec_q} avgPrice={_avg}，不更新仓位，请人工核对"
+                )
+                update_position(pid, {"pyramid_pending_order_id": _oid_p, "pyramid_pending_status": _st})
+                await _notify_async(
+                    f"⚠️ {symbol} 加仓订单 {_oid_p} 未确认成交（status={_st}，已成交={_exec_q}），"
+                    f"本地仓位未更新，请核对交易所持仓。"
+                )
+                return
+            addup_qty = _exec_q
+            fill_p = _avg
             new_total_qty  = qty + addup_qty
             new_avg_entry  = (entry * qty + fill_p * addup_qty) / new_total_qty
             # 加仓后 SL 设到原入场价(保本线)
