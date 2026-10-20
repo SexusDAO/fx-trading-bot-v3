@@ -321,8 +321,9 @@ import json, subprocess, sys
 with open('{tmp}') as f:
     msg = f.read()
 # 直接用 notifier
-sys.path.insert(0, '/root/.openclaw/workspace/fx')
-sys.path.insert(0, '/root/.openclaw/workspace/fx/shared')
+_FX = Path(__file__).resolve().parent
+sys.path.insert(0, str(_FX))
+sys.path.insert(0, str(_FX / 'shared'))
 import asyncio
 from shared.notifier import notify_async
 asyncio.run(notify_async(msg))

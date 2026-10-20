@@ -3,14 +3,16 @@
 回测 v5：2026-10-17 全天，v3.29 最新逻辑
 两阶段：① 并发预拉 K 线缓存 → ② 读缓存跑逻辑，全天跑完预计 10~15 分钟
 """
+from pathlib import Path
 import sys, json, datetime, os, time, concurrent.futures, requests
-sys.path.insert(0, '/root/.openclaw/workspace/fx')
+_FX = Path(__file__).resolve().parent
+sys.path.insert(0, str(_FX))
 
 START_UTC = datetime.datetime(2026, 10, 17,  0, 0, 0, tzinfo=datetime.timezone.utc)
 END_UTC   = datetime.datetime(2026, 10, 18,  0, 0, 0, tzinfo=datetime.timezone.utc)
-CACHE_DIR = "/root/.openclaw/workspace/fx/logs/bt17_cache"
-LOG       = "/root/.openclaw/workspace/fx/logs/backtest_oct17.log"
-OUT       = "/root/.openclaw/workspace/fx/logs/backtest_oct17.json"
+CACHE_DIR = str(_FX / "logs" / "bt17_cache")
+LOG       = str(_FX / "logs" / "backtest_oct17.log")
+OUT       = str(_FX / "logs" / "backtest_oct17.json")
 VOL_MIN   = 1_000_000
 API_TIMEOUT = 8
 MAX_WORKERS = 20   # 并发拉取线程数

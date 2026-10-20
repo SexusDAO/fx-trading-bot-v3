@@ -345,8 +345,9 @@ def main():
                 ["python3", "-c",
                  f"""
 import sys
-sys.path.insert(0, '/root/.openclaw/workspace/fx')
-sys.path.insert(0, '/root/.openclaw/workspace/fx/shared')
+_FX = Path(__file__).resolve().parent
+sys.path.insert(0, str(_FX))
+sys.path.insert(0, str(_FX / 'shared'))
 with open('{tmp}') as f:
     msg = f.read()
 import asyncio

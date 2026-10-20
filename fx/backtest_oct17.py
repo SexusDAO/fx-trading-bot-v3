@@ -5,16 +5,18 @@
   - 00:00~19:59 UTC：工作日模式（ATR 2.0/2.5%，振幅 2.5%）
   - 20:00~24:00 UTC：周末模式（ATR 1.0/1.5%，振幅 1.0%）
 """
+from pathlib import Path
 import sys, json, datetime, time, os
-sys.path.insert(0, '/root/.openclaw/workspace/fx')
+_FX = Path(__file__).resolve().parent
+sys.path.insert(0, str(_FX))
 
 # ── 参数 ──────────────────────────────────────────────────────────────
 START_UTC = datetime.datetime(2026, 10, 17,  0, 0, 0, tzinfo=datetime.timezone.utc)
 END_UTC   = datetime.datetime(2026, 10, 18,  0, 0, 0, tzinfo=datetime.timezone.utc)
 VOL_MIN   = 1_000_000
 API_TIMEOUT = 6
-LOG = "/root/.openclaw/workspace/fx/logs/backtest_oct17.log"
-OUT = "/root/.openclaw/workspace/fx/logs/backtest_oct17.json"
+LOG = str(_FX / "logs" / "backtest_oct17.log")
+OUT = str(_FX / "logs" / "backtest_oct17.json")
 
 # ── weekend 判断（与 scanner.py v3.29 完全一致）─────────────────────
 def _is_weekend_period(now: datetime.datetime) -> bool:

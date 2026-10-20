@@ -3,8 +3,10 @@
 回测脚本 v3：上周末（2026-10-11 00:00 ~ 2026-10-13 00:00 UTC）
 ATR/振幅门槛 1.0%，RSI极端通道 chg24 -3%，calc_sl_tp 接口修正
 """
+from pathlib import Path
 import sys, json, datetime, time, re, types, os, signal as _signal
-sys.path.insert(0, '/root/.openclaw/workspace/fx')
+_FX = Path(__file__).resolve().parent
+sys.path.insert(0, str(_FX))
 
 # ── 参数 ──────────────────────────────────────────────────────────────
 START_UTC    = datetime.datetime(2026, 10, 11, 0,  0, 0, tzinfo=datetime.timezone.utc)
@@ -13,14 +15,14 @@ AMP_MIN      = 1.0    # 日内振幅预筛
 ATR_OVERRIDE = 1.0    # judge 层 ATR 门槛
 VOL_MIN      = 1_000_000
 API_TIMEOUT  = 6      # 每次 API 请求超时秒数
-LOG          = "/root/.openclaw/workspace/fx/logs/backtest_weekend.log"
-OUT          = "/root/.openclaw/workspace/fx/logs/backtest_weekend.json"
+LOG          = str(_FX / "logs" / "backtest_weekend.log")
+OUT          = str(_FX / "logs" / "backtest_weekend.json")
 
 # ── 打 ATR patch（在 import judges 之前）─────────────────────────────
 import shared.judges as _jm
 
 def _patch_judges_atr(thr):
-    src = open('/root/.openclaw/workspace/fx/shared/judges.py', encoding='utf-8').read()
+    src = open(_FX / 'shared' / 'judges.py', encoding='utf-8').read()
     src_p = re.sub(r'(if atr_r <) (2\.0|2\.5)(:)', lambda m: f'{m.group(1)} {thr}{m.group(3)}', src)
     ns = {**_jm.__dict__}
     exec(compile(src_p, 'judges_patched', 'exec'), ns)

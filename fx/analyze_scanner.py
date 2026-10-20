@@ -7,7 +7,7 @@ from collections import defaultdict, Counter
 from pathlib import Path
 from datetime import datetime
 
-ROOT = Path("/root/.openclaw/workspace")
+ROOT = Path(__file__).resolve().parent.parent
 FX_LOG    = ROOT / "fx/logs/scanner.log"
 V3_LOG    = ROOT / "v3/logs/scanner.log"
 FX_MAIN   = ROOT / "fx/logs/main.log"

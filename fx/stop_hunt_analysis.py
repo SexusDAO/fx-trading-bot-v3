@@ -6,11 +6,12 @@ Stop Hunt Statistics Analysis
 - 低波动: BTCUSDT, ETHUSDT  — 2026-07-01 ~ 2026-10-18
 """
 
+from pathlib import Path
 import sys, requests, json, math
 from datetime import datetime, timezone, timedelta
 import numpy as np
 
-sys.path.insert(0, '/root/.openclaw/workspace/fx')
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config import PROXY_URL, BINANCE_BASE_URL
 
 proxies = {'https': PROXY_URL, 'http': PROXY_URL} if PROXY_URL else {}
@@ -442,7 +443,7 @@ def main():
     print(block_low)
     
     # ── Write output ─────────────────────────────────────────────────────────
-    out_path = '/root/.openclaw/workspace/fx/stop_hunt_stats.txt'
+    out_path = str(Path(__file__).resolve().parent / 'stop_hunt_stats.txt')
     full_output = "\n".join(output_lines)
     with open(out_path, 'w') as f:
         f.write(full_output)

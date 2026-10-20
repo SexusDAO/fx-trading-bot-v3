@@ -1,6 +1,7 @@
 # 临时测试：REST 轮询能否替代 WS
+from pathlib import Path
 import asyncio, sys, time
-sys.path.insert(0, '/root/.openclaw/workspace/fx')
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from shared import binance_api as api
 from shared.signal_watcher import SignalWatcher
 

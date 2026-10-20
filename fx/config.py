@@ -38,7 +38,7 @@ WS_RECONNECT_MAX      = 60        # 断线重连最大等待，秒
 
 # Clawby Pro（已于 2026-08-28 迁移，旧 keystore.com.cn 代理已废弃）
 # 接口配置集中在 fx/shared/clawby_adapter.py
-COINGLASS_CACHE_TTL = 300   # 清算图缓存，秒，5 分钟（供 clawby_adapter 引用）  # [v3.85 DOC-2] 代码未引用此常量，修改无效
+# COINGLASS_CACHE_TTL 已删除 —— clawby_adapter.py 内部用自己的 CACHE_TTL=15*60，此常量从未被引用。
 
 # Telegram
 # TELEGRAM_BOT_TOKEN — Telegram 推送已弃用，改用 Jarvis notifier
