@@ -799,7 +799,9 @@ class SignalWatcher:
             )
             # 触发已标记，直接返回不挂单
             async with self._lock:
-                self._watched.pop(symbol, None)
+                # [v3.89 #102-partial] pop 前核对身份：队列里若已是别的条目（被重挂/淘汰替换）不得误删
+                if self._watched.get(symbol) is entry:
+                    self._watched.pop(symbol, None)
             return
         if _dir_key:
             self._dir_last_trigger[_dir_key] = _now_ts
@@ -877,7 +879,9 @@ class SignalWatcher:
             logger.error(f"[signal_watcher] {symbol} on_trigger 异常: {e_}", exc_info=True)
         finally:
             async with self._lock:
-                self._watched.pop(symbol, None)
+                # [v3.89 #102-partial] pop 前核对身份，避免删掉同品种被替换进来的新条目
+                if self._watched.get(symbol) is entry:
+                    self._watched.pop(symbol, None)
 
     async def _handle_expired(self, symbol: str, entry: WatchEntry) -> None:
         """处理过期信号：撤单 + 移除。"""
