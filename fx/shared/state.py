@@ -595,14 +595,33 @@ def _save_oi(d: dict) -> None:
     _write_json(_OI_FILE, d)
 
 
+# [v3.89 #99] OI 历史按时间窗口保留（最近 25 小时），不再按固定条数截断：
+#   旧写法（最多 OI_CACHE_KEEP=48 条）假设「每 30 分钟一条」，调用更频繁时旧样本被提前挤掉，
+#   get_oi_24h_ago 所需的 24H 前样本长期取不到。25H = 24H 查询点 + 1H 容差，超出窗口的记录在写入时清理。
+#   注意：不再有条数上限，单标的条目数 = 25H 内的写入次数（调用频率越高文件越大）。
+OI_RETAIN_SEC = 25 * 3600
+
+
+def _prune_oi_series(series: list, now_ms: int) -> list:
+    """保留 timestamp 在最近 OI_RETAIN_SEC 内的记录（保持原有顺序）；缺 timestamp 的坏记录丢弃。"""
+    cutoff = now_ms - OI_RETAIN_SEC * 1000
+    out = []
+    for r in series or []:
+        try:
+            if int(r["timestamp"]) >= cutoff:
+                out.append(r)
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
+
+
 def update_oi(symbol: str, oi: float) -> None:
+    now = int(time.time() * 1000)
     with _locks["oi"]:
         d = _load_oi_cache()
         series = d.get(symbol, [])
-        series.append({"timestamp": int(time.time() * 1000), "oi": float(oi)})
-        if len(series) > OI_CACHE_KEEP:
-            series = series[-OI_CACHE_KEEP:]
-        d[symbol] = series
+        series.append({"timestamp": now, "oi": float(oi)})
+        d[symbol] = _prune_oi_series(series, now)
         _save_oi(d)
 
 
@@ -616,9 +635,14 @@ def update_all_oi(oi_data: dict) -> None:
                 continue
             series = d.get(symbol, [])
             series.append({"timestamp": now, "oi": float(oi_val)})
-            if len(series) > OI_CACHE_KEEP:
-                series = series[-OI_CACHE_KEEP:]
             d[symbol] = series
+        # [v3.89 #99] 对所有标的统一按时间窗口清理；整段过期（如已下架）的标的整体移除
+        for symbol in list(d.keys()):
+            kept = _prune_oi_series(d[symbol], now)
+            if kept:
+                d[symbol] = kept
+            else:
+                d.pop(symbol, None)
         _save_oi(d)
 
 
