@@ -6,6 +6,7 @@ shared/binance_api.py — 所有币安 API 请求唯一出口
 """
 
 import time
+import threading
 import logging
 import os
 import sys
@@ -80,13 +81,29 @@ _SESSION        = _make_session(use_proxy=True)   # 签名接口（代理）
 _SESSION_DIRECT = _make_session(use_proxy=False)  # 公开行情（直连）
 _PROXY_HEALTHY  = True   # 代理健康标志；False 时签名接口也降级直连（告警）
 
+_SESSION_LOCK        = threading.Lock()   # [v3.89 #86] 保护 Session 替换过程，多线程同时 reset 只有一个在换
+_SESSION_RESET_COUNT = 0                  # [v3.89 #86] 累计重建次数（排查连接池反复重建用）
+
 def reset_session():
-    """重建 Session（代理配置变更后调用）。"""
-    global _SESSION, _SESSION_DIRECT, _PROXY_HEALTHY
-    _SESSION        = _make_session(use_proxy=True)
-    _SESSION_DIRECT = _make_session(use_proxy=False)
-    _PROXY_HEALTHY  = True
-    logger.info("[api] Session 已重建")
+    """
+    重建 Session（代理配置变更后 / 连接类错误后调用）。
+    [v3.89 #86] 加锁串行化替换；先创建新会话并替换引用，再关闭旧会话释放连接池。
+    说明：旧会话上仍在途的请求在 close() 后可能报连接错误，由 _retry 的重试路径兜底。
+    """
+    global _SESSION, _SESSION_DIRECT, _PROXY_HEALTHY, _SESSION_RESET_COUNT
+    with _SESSION_LOCK:
+        old_sessions    = (_SESSION, _SESSION_DIRECT)
+        _SESSION        = _make_session(use_proxy=True)
+        _SESSION_DIRECT = _make_session(use_proxy=False)
+        _PROXY_HEALTHY  = True
+        _SESSION_RESET_COUNT += 1
+        count = _SESSION_RESET_COUNT
+        for _old in old_sessions:
+            try:
+                _old.close()
+            except Exception as e:
+                logger.warning(f"[api] 关闭旧 Session 失败（忽略）: {e}")
+    logger.info(f"[api] Session 已重建（累计第 {count} 次），旧会话已关闭")
 
 # ── 内部重试装饰器 ────────────────────────────────────────────────────────────
 class WriteTimeoutError(Exception):
