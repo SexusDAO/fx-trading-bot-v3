@@ -165,7 +165,7 @@ def calc_volume_profile(klines: list, bins: int = 40) -> dict:
         if vol <= 0 or hi <= lo:
             # 零量或无效 K 线：成交量全给中价桶
             mid_idx = min(int((( hi + lo) / 2 - p_min) / bin_size), bins - 1)
-            bucket_vol[max(0, mid_idx)] += vol
+            bucket_vol[max(0, mid_idx)] += max(vol, 0.0)   # [v3.89 #70] 负成交量不计入
             continue
         # 均匀分配：计算该 K 线跨越的桶范围
         lo_idx = max(0,        int((lo - p_min) / bin_size))
@@ -174,6 +174,10 @@ def calc_volume_profile(klines: list, bins: int = 40) -> dict:
         vol_per_bin = vol / span
         for b in range(lo_idx, hi_idx + 1):
             bucket_vol[b] += vol_per_bin
+
+    # [v3.89 #70] 总有效成交量为 0：没有成交证据，不生成任意桶的 POC/VAH/VAL
+    if sum(bucket_vol) <= 0:
+        return {"poc": 0.0, "vah": 0.0, "val": 0.0, "bins": 0, "valid": False, "reason": "zero_volume"}
 
     # POC：成交量最大的桶
     poc_idx  = bucket_vol.index(max(bucket_vol))
