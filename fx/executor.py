@@ -241,8 +241,12 @@ def _precheck(signal: dict) -> tuple[bool, str]:
         pass   # 拉取失败不拦截，留给步骤5精确检查
 
     # 1-10: 流动性 Gate（v3.57）——检查 ±0.5% 挂单深度，过滤极薄标的
-    # 用保守名义估算（假设100U仓位），精确值在步骤4计算；这里只过滤极端情况
-    _liq_ok, _liq_reason = _check_liquidity_gate(symbol, direction, notional=100.0)
+    # 以挂单价（pre_entry_price）为中心检查，贴近真实入场区域；阈值相对 OI 动态化
+    _liq_ok, _liq_reason = _check_liquidity_gate(
+        symbol, direction, notional=100.0,
+        entry_price=signal.get("pre_entry_price"),
+        oi_now=signal.get("ind", {}).get("oi_now", 0.0),
+    )
     if not _liq_ok:
         return False, _liq_reason
 
@@ -305,19 +309,27 @@ def _precheck(signal: dict) -> tuple[bool, str]:
 # ─────────────────────────────────────────────────────────────────────────────
 # 流动性 Gate：开仓前检查 ±0.5% 挂单深度，过滤极薄标的（v3.57）
 # ─────────────────────────────────────────────────────────────────────────────
-def _check_liquidity_gate(symbol: str, direction: str, notional: float) -> tuple[bool, str]:
+def _check_liquidity_gate(
+    symbol: str,
+    direction: str,
+    notional: float,
+    entry_price: float | None = None,
+    oi_now: float = 0.0,
+) -> tuple[bool, str]:
     """
     检查订单簿深度是否足够承载本次开仓。
-    - 拉 limit=20 深度，统计 ±0.5% 区间内的挂单金额
+    - 拉 limit=20 深度，统计以挂单价（entry_price）为中心 ±0.5% 区间内的挂单金额
+      若 entry_price 未提供，回退到 mark_price（兼容旧调用路径）
     - LONG 做多：看 ask 侧深度（需要有人卖给我们）
     - SHORT 做空：看 bid 侧深度（需要有人买我们卖出的仓）
-    - 深度 < max(notional*5, MIN_LIQUIDITY_U) 时拒绝
+    - 阈值 = max(OI×0.1%, 3000U, notional×DEPTH_MULT)，对小币相对化
+      若 oi_now=0（未传入），退化为 max(MIN_LIQUIDITY_U, notional×DEPTH_MULT)
     - 查询失败时降级放行（不因网络问题阻断开仓）
     """
     try:
         from config import LIQUIDITY_GATE_MIN_U, LIQUIDITY_GATE_DEPTH_MULT
     except ImportError:
-        LIQUIDITY_GATE_MIN_U   = 10_000   # 最小深度 1 万 U
+        LIQUIDITY_GATE_MIN_U   = 3_000    # 最小绝对深度 3000U（原 10000U，相对化后降低硬底）
         LIQUIDITY_GATE_DEPTH_MULT = 5     # 深度需 >= 名义仓位 × 5
 
     try:
@@ -325,9 +337,12 @@ def _check_liquidity_gate(symbol: str, direction: str, notional: float) -> tuple
         if mark_p <= 0:
             return True, ""  # 拉不到价格，降级放行
 
+        # 以挂单价为中心检查深度；entry_price 缺失时回退 mark_price
+        center = entry_price if (entry_price and entry_price > 0) else mark_p
+        low  = center * 0.995
+        high = center * 1.005
+
         ob = api.get_order_book(symbol, limit=20)
-        low  = mark_p * 0.995
-        high = mark_p * 1.005
 
         if direction == "LONG":
             # 做多：需要 ask 深度（卖方挂单，我方吃掉）
@@ -344,11 +359,14 @@ def _check_liquidity_gate(symbol: str, direction: str, notional: float) -> tuple
                 if float(b[0]) >= low
             )
 
-        threshold = max(LIQUIDITY_GATE_MIN_U, notional * LIQUIDITY_GATE_DEPTH_MULT)
+        # 阈值相对化：OI 的 0.1% 为动态底线，对小币友好；硬底 3000U 防止极端值
+        oi_based = oi_now * 0.001 if oi_now > 0 else 0.0
+        threshold = max(LIQUIDITY_GATE_MIN_U, oi_based, notional * LIQUIDITY_GATE_DEPTH_MULT)
+        center_label = f"entry={center:.6g}" if (entry_price and entry_price > 0) else f"mark={center:.6g}"
         if depth_u < threshold:
             return False, (
                 f"流动性不足: {direction} 侧±0.5%深度={depth_u:.0f}U "
-                f"< 阈值{threshold:.0f}U（notional={notional:.0f}U×{LIQUIDITY_GATE_DEPTH_MULT}）"
+                f"< 阈值{threshold:.0f}U（{center_label} OI={oi_now:.0f}U notional={notional:.0f}U×{LIQUIDITY_GATE_DEPTH_MULT}）"
             )
         return True, ""
     except Exception as _lge:
