@@ -25,6 +25,31 @@ import os, sys, time, signal, subprocess, json
 from pathlib import Path
 from datetime import datetime, timezone
 
+
+def _load_dot_env() -> None:
+    """启动前将 fx/.env（或上级 .env）注入 os.environ。
+    优先级：已有系统环境变量 > .env 文件（不覆盖已设置的值）。
+    不依赖任何第三方库，与 shared/binance_api.py 中的实现保持一致。
+    """
+    _fx_root = Path(__file__).parent
+    for _env_path in [_fx_root / ".env", _fx_root.parent / ".env"]:
+        if _env_path.exists():
+            try:
+                with open(_env_path) as _f:
+                    for _line in _f:
+                        _line = _line.strip()
+                        if not _line or _line.startswith("#") or "=" not in _line:
+                            continue
+                        _k, _, _v = _line.partition("=")
+                        _k = _k.strip()
+                        _v = _v.strip().strip('"').strip("'")
+                        if _k and _k not in os.environ:
+                            os.environ[_k] = _v
+            except Exception:
+                pass
+    # 仅在第一个可读的 .env 文件处停止
+
+
 FX_DIR        = Path(__file__).parent
 DAEMON_PID    = FX_DIR / "logs" / "daemon.pid"
 MAIN_PID      = FX_DIR / "logs" / "main.pid"
@@ -422,6 +447,7 @@ def cmd_start():
     MAIN_PID.unlink(missing_ok=True)
 
     print("正在启动 fx trading daemon...")
+    _load_dot_env()   # 确保 .env 已注入 os.environ，daemon fork 后子进程自动继承
     is_daemon = _daemonize()
     if is_daemon:
         _daemon_loop()
