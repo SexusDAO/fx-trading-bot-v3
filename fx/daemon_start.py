@@ -211,6 +211,11 @@ def _daemon_loop():
         _child_env = os.environ.copy()
         _child_env.setdefault("OPENAI_API_KEY",  os.environ.get("OPENAI_API_KEY", ""))
         _child_env.setdefault("OPENAI_BASE_URL", "https://novaapi.ai")
+        # Binance API Key + 代理（硬编码兜底，.env 同步保留双重保险）
+        _child_env["BINANCE_API_KEY"]    = "E621Obw9P1hFy90HhgrXVDwOwqcbKIPCw22tGDQ73r7j3tezSXu6OhrGpQhdDZhG"
+        _child_env["BINANCE_API_SECRET"] = "ACLFzjjYD67Q2RTjmZn1PcG6wBeVqWQvXc0VFAmofKaYy5t4Whdvek7zJwSdTloX"
+        _child_env["BINANCE_PROXY"]      = "socks5://sG4jNMrhURhe:UjdV95PtwdgE@64.105.162.230:6688"
+        _child_env["PROXY_URL"]          = "socks5://sG4jNMrhURhe:UjdV95PtwdgE@64.105.162.230:6688"
         with open(SYSTEM_LOG, "a") as out:
             proc = subprocess.Popen(
                 [sys.executable, str(MAIN_PY)],

@@ -85,6 +85,12 @@ while [ $restarts -lt $MAX_RESTARTS ]; do
     export OPENAI_BASE_URL="https://novaapi.ai"
     export OPENAI_MODEL="claude-opus-4-8-medium"  # 默认（妖币+边界），新闻语义见 LLM_API_MODEL_FAST
 
+    # Binance API Key + 代理（硬编码兜底，.env 同步保留双重保险）
+    export BINANCE_API_KEY="E621Obw9P1hFy90HhgrXVDwOwqcbKIPCw22tGDQ73r7j3tezSXu6OhrGpQhdDZhG"
+    export BINANCE_API_SECRET="ACLFzjjYD67Q2RTjmZn1PcG6wBeVqWQvXc0VFAmofKaYy5t4Whdvek7zJwSdTloX"
+    export BINANCE_PROXY="socks5://sG4jNMrhURhe:UjdV95PtwdgE@64.105.162.230:6688"
+    export PROXY_URL="socks5://sG4jNMrhURhe:UjdV95PtwdgE@64.105.162.230:6688"
+
     python3 main.py >> "$LOG" 2>&1
     EXIT_CODE=$?
 
