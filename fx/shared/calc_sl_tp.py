@@ -761,6 +761,7 @@ def _orderbook_tp(entry: float, atr: float, direction: str, symbol: str) -> floa
         from shared import binance_api as _api
         book  = _api.get_order_book(symbol, limit=100)
         if not book:
+            _OB_TP_CACHE[cache_key] = (_t.time(), None)  # #33 正常空结果负缓存
             return None
 
         bucket_pct = 0.01   # 1% 价格桶
@@ -773,6 +774,7 @@ def _orderbook_tp(entry: float, atr: float, direction: str, symbol: str) -> floa
                    if float(p) < entry]
 
         if not raw:
+            _OB_TP_CACHE[cache_key] = (_t.time(), None)  # #33 正常空结果负缓存
             return None
 
         # 按 1% 区间聚合 USD 挂单量
@@ -791,6 +793,7 @@ def _orderbook_tp(entry: float, atr: float, direction: str, symbol: str) -> floa
         # 要求密集区 USD 量至少是平均桶的 1.5 倍，否则不算"密集"
         avg_usd = sum(b[2] for b in buckets.values()) / len(buckets)
         if usd < avg_usd * 1.5:
+            _OB_TP_CACHE[cache_key] = (_t.time(), None)  # #33 正常空结果负缓存
             return None
 
         # TP 定在密集区前沿（做多：bucket 低端 - 缓冲；做空：bucket 高端 + 缓冲）
