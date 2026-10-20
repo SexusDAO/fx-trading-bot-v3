@@ -1978,8 +1978,9 @@ def _set_cooldown_safe(symbol: str, hours: float, reason: str) -> None:
     try:
         from shared.state import set_cooldown
         set_cooldown(symbol, hours, reason)
-    except Exception:
-        pass
+    except Exception as e:
+        # [v3.89 #28] 冷却写入失败不再静默丢弃：调用方依赖的冷却可能没生效，必须留下记录
+        logger.warning(f"[judges] 冷却写入失败，冷却可能未生效 {symbol} {hours}h reason={reason}: {e}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
