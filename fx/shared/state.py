@@ -50,7 +50,34 @@ _locks = {
 # ═══════════════════════════════════════════════════════════════════════════════
 # 原子读写工具
 # ═══════════════════════════════════════════════════════════════════════════════
+# [v3.89 #11] 持仓文件损坏标志：损坏时置 True，add_position / update_position 拒绝写入。
+#   仅模块级内存标志，进程重启后恢复 False。
+_POS_STATE_CORRUPTED = False
+
+
+def _backup_corrupted_pos(path: Path, err) -> None:
+    """[v3.89 #11] 把损坏的持仓文件重命名保留，记录错误并设置损坏标志。"""
+    global _POS_STATE_CORRUPTED
+    _POS_STATE_CORRUPTED = True
+    backup = path.with_name(f"{path.name}.corrupted_{int(time.time() * 1000)}")
+    try:
+        path.replace(backup)
+        logger.error(f"[state] {path.name} 已损坏，已备份为 {backup.name}，持仓写入已被阻止，请人工检查: {err}")
+    except Exception as e:
+        logger.error(f"[state] {path.name} 已损坏且备份失败（原文件保留）: {err} / 备份错误: {e}")
+
+
 def _read_json(path: Path, default):
+    # [v3.89 #11] 仅持仓文件区分「不存在」与「损坏」；其他状态文件保持原有行为。
+    if "pos_state" in path.name:
+        if not path.exists():
+            return default
+        try:
+            raw = path.read_text(encoding="utf-8").strip()
+            return json.loads(raw) if raw else default
+        except Exception as e:
+            _backup_corrupted_pos(path, e)
+            return default
     try:
         if not path.exists():
             return default
@@ -126,6 +153,9 @@ def get_pending_order(symbol: str) -> dict | None:
 
 
 def add_position(record: dict) -> bool:
+    if _POS_STATE_CORRUPTED:  # [v3.89 #11]
+        logger.error("[state] 持仓文件曾损坏，拒绝写入，请人工检查")
+        return False
     sym = record.get("symbol", "")
     with _locks["pos"]:
         data = _load_pos()
@@ -146,6 +176,9 @@ def add_pending_order(record: dict) -> bool:
 
 
 def update_position(pos_id: str, updates: dict) -> bool:
+    if _POS_STATE_CORRUPTED:  # [v3.89 #11]
+        logger.error("[state] 持仓文件曾损坏，拒绝写入，请人工检查")
+        return False
     with _locks["pos"]:
         data = _load_pos()
         for i, p in enumerate(data):
@@ -618,8 +651,12 @@ def _ensure_files() -> None:
                 raw = path.read_text(encoding="utf-8").strip()
                 if raw:
                     json.loads(raw)   # 格式校验
-            except Exception:
-                logger.warning(f"[state] {path.name} 格式损坏，重置")
+            except Exception as e:
+                if path == _POS_FILE:
+                    # [v3.89 #11] 持仓文件损坏：备份保留 + 设标志，再写默认值维持启动
+                    _backup_corrupted_pos(path, e)
+                else:
+                    logger.error(f"[state] {path.name} 格式损坏，重置: {e}")
                 _write_json(path, default)
 
 
