@@ -1116,6 +1116,14 @@ def analyze_symbol(symbol: str, ticker: dict,
             "oi_now":    oi_now,
             "ts":        int(time.time() * 1000),
         }
+        # [fix] 提升 reason 里的 position_size_cap / signal_strength 到顶层
+        # 后续的 funding_synergy、post_shock、市场情绪降仓都读 sig.get("position_size_cap", 0.5)
+        # 如果 judge 给的0.3（range_bounce medium）但顶层没有这个字段，降仓逻辑会从错误的00.5开始计算
+        _sig["position_size_cap"] = float(
+            (reason or {}).get("position_size_cap") or 0.5
+        )
+        # 评分环节和周末过滤现在有两套读法，统一提升为 sig.get("signal_strength", "medium")
+        _sig["signal_strength"] = (reason or {}).get("signal_strength", "medium")
         # v3.62: Volume Profile 注入——用建好的 1H K 线计算 VP 结构位
         # 放入 signal["vp"]  executor 传入 calc_sl_tp，供 SL/TP 增强使用
         try:
