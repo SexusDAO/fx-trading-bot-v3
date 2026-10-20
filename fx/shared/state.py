@@ -8,13 +8,15 @@ shared/state.py — 全局状态管理中心（V3.0 完整版）
     pending_confirm_state.json — breakout 待确认
     oi_cache.json           — OI 历史缓存
 
-所有读写：线程锁 + 文件锁 + 原子写入（先写 .tmp 再 os.replace）
+所有读写：线程锁 + 原子写入（先写唯一临时文件再替换）。
+[v3.89 #10] 线程锁只保证进程内线程安全，不保证跨进程；多进程同时读改写同一文件仍可能丢更新。
 """
 
 import json
 import os
 import threading
 import time
+import uuid
 import logging
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -60,11 +62,20 @@ def _read_json(path: Path, default):
 
 
 def _write_json(path: Path, data) -> None:
-    """原子写入：先写 .tmp 再 os.replace"""
+    """原子写入：先写唯一临时文件再替换。进程内线程安全，不保证跨进程。"""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    os.replace(tmp, path)
+    # [v3.89 #10] 原临时文件名固定为 .tmp，两个写者会互相覆盖临时文件。改为 pid+毫秒+随机串唯一命名，
+    #   替换失败时删除临时文件，不留残留。
+    tmp = path.with_suffix(f".tmp_{os.getpid()}_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}")
+    try:
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+    except Exception:
+        try:
+            tmp.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
