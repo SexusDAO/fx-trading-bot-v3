@@ -1065,8 +1065,6 @@ async def _on_position_closed(pos_id: str, symbol: str,
             # fix: card_remove 必须在 card_append_async 完成后执行，否则缓存已空追加失败
             async def _append_then_remove(_sid=_sig_id_ws, _line=_close_line):
                 await card_append_async(_sid, _line)
-                # [v3.90 通知聚合] 平仓节点后明确丢弃缓冲，避免残留条目被兜底 flush
-                discard_signal(_sid)
                 card_remove(_sid)
             _aio_ws.ensure_future(_append_then_remove())
         else:
