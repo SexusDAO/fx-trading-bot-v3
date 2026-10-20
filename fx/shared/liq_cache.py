@@ -28,6 +28,11 @@ _CACHE_LOCK = threading.Lock()
 #   写回只接受不比现有结果旧的数据，避免较早发出的慢响应覆盖较新的结果。网络请求期间不持有全局锁。
 _INFLIGHT: dict = {}
 _INFLIGHT_WAIT = 30.0   # 等待他人在途请求的上限（秒）
+# [v3.89 #38] 三级数据源全失败：短期负缓存 + 告警节流，避免上游重复调用时反复重拉数据源、反复同步等告警进程
+_FAIL_CACHE: dict = {}
+_FAIL_TTL = 30.0           # 负缓存时长（秒）
+_ALERT_LAST: dict = {}
+_ALERT_INTERVAL = 1800.0   # 同一标的告警最小间隔（秒）
 _bg_started = False
 _bg_lock    = threading.Lock()
 
@@ -86,6 +91,32 @@ def _fetch_from_bykaranteli(symbol: str, current_price: float) -> dict:
     return {}
 
 
+def _alert_all_failed(symbol: str) -> None:
+    """[v3.89 #38] 全失败告警：每标的 30 分钟最多一次，放后台线程发送，不阻塞数据路径；
+    拉取失败（调用方已记 warning）与告警投递失败分开记录。"""
+    now = time.time()
+    with _CACHE_LOCK:
+        if now - _ALERT_LAST.get(symbol, 0) < _ALERT_INTERVAL:
+            return
+        _ALERT_LAST[symbol] = now
+
+    def _send():
+        try:
+            import subprocess as _sp
+            r = _sp.run(
+                ["openclaw", "message", "send", "--channel", "jarvis",
+                 "--message", f"⚠️ liq_cache {symbol} 三级数据源全部失败，清算图不可用，止损将降级为ATR公式"],
+                timeout=5, capture_output=True,
+            )
+            if r.returncode != 0:
+                logger.warning(f"[liq_cache] {symbol} 告警投递失败 rc={r.returncode} "
+                               f"stderr={(r.stderr or b'')[:200]!r}")
+        except Exception as e:
+            logger.warning(f"[liq_cache] {symbol} 告警投递异常: {e}")
+
+    threading.Thread(target=_send, name="liq-alert", daemon=True).start()
+
+
 def _fetch_from_clawby(symbol: str, current_price: float,
                         range_: str = "3d") -> dict:
     """
@@ -135,15 +166,7 @@ def _fetch_from_clawby(symbol: str, current_price: float,
         logger.debug(f"[liq_cache] {symbol} CG liq_orders 失败: {e}")
 
     logger.warning(f"[liq_cache] {symbol} 三级数据源全部失败，止损将降级为ATR公式")
-    try:
-        import subprocess as _sp
-        _sp.run(
-            ["openclaw", "message", "send", "--channel", "jarvis",
-             "--message", f"⚠️ liq_cache {symbol} 三级数据源全部失败，清算图不可用，止损将降级为ATR公式"],
-            timeout=5, capture_output=True,
-        )
-    except Exception:
-        pass
+    _alert_all_failed(symbol)
     return {}
 
 
@@ -177,9 +200,19 @@ def _fetch_dedup(symbol: str, price: float, range_: str, key: str) -> dict:
             return {}
     data: dict = {}
     try:
+        # [v3.89 #38] 30 秒内刚全失败过：直接返回空，不重复拉三个数据源
+        with _CACHE_LOCK:
+            _failed_at = _FAIL_CACHE.get(key, 0)
+        if time.time() - _failed_at < _FAIL_TTL:
+            return {}
         data = _fetch_from_clawby(symbol, price, range_=range_)
         if data:
             _store_if_newer(key, data)
+            with _CACHE_LOCK:
+                _FAIL_CACHE.pop(key, None)
+        else:
+            with _CACHE_LOCK:
+                _FAIL_CACHE[key] = time.time()
         return data
     finally:
         fut.set_result(data)
