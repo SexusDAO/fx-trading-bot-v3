@@ -824,7 +824,13 @@ class PositionManager:
         try:
             live = await asyncio.get_running_loop().run_in_executor(
                 None, lambda: api.get_position(symbol)
-            ) or []
+            )
+            # [fix] 第一道保护：API 返回 None 或空列表时，跳过判定，避免网络不通误判为已平仓
+            if live is None or live == []:
+                logger.warning(
+                    f"[pm] {symbol} get_position 返回空，跳过平仓判定，避免误清仓"
+                )
+                return
             live_qty = sum(
                 abs(float(p.get("positionAmt", 0)))
                 for p in live
@@ -836,6 +842,36 @@ class PositionManager:
             return
 
         if live_qty > qty * 0.05:   # 持仓量 > 5% → 仓位仍存在,跳过
+            return
+
+        # [fix] 第二道保护：live_qty 为零时，3 秒后二次确认，防止瞬时 API 抗平误判
+        try:
+            await asyncio.sleep(3)
+            live2 = await asyncio.get_running_loop().run_in_executor(
+                None, lambda: api.get_position(symbol)
+            )
+            if live2 is None or live2 == []:
+                logger.warning(
+                    f"[pm] {symbol} 二次确认 get_position 返回空，跳过平仓判定"
+                )
+                return
+            live_qty2 = sum(
+                abs(float(p.get("positionAmt", 0)))
+                for p in live2
+                if p.get("symbol") == symbol
+                and p.get("positionSide", "").upper() == pos_side
+            )
+            if live_qty2 > qty * 0.05:
+                logger.info(
+                    f"[pm] {symbol} 二次确认持仓存在(二次={live_qty2:.4f})，取消平仓判定"
+                )
+                return
+            # 两次都为零，才继续清理流程
+            logger.info(
+                f"[pm] {symbol} 二次确认持仓仍为零(一次={live_qty:.4f} 二次={live_qty2:.4f})，继续清理"
+            )
+        except Exception as e2:
+            logger.debug(f"[pm] {symbol} 二次确认查持仓失败，跳过平仓判定: {e2}")
             return
 
         # ── 系统撤单锁:系统正在更新保护单时,跳过误判 ──────────────────────
