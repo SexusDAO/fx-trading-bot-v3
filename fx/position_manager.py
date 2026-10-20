@@ -2130,17 +2130,18 @@ async def _close_position_post_static(
         ).start()
 
     # 步骤6:发送 Jarvis 通知 → 追加到信号卡片
+    # fix: 步骤4 已 remove_position，不能再用 get_all_positions 找 pos；
+    #      直接用函数顶部读入的 pos 变量，确保 _sig_id / tp1_filled / tp2_filled 正确。
     try:
-        _pos_close  = next((p for p in get_all_positions() if p.get("symbol") == symbol), {})
-        _sig_id_cls = _pos_close.get("_sig_id", "")
+        _sig_id_cls = pos.get("_sig_id", "")
         _close_line = fmt_node_close(
             close_reason = close_reason,
             exit_price   = exit_price,
             hold_minutes = hold_minutes,
             pnl_usdt     = pnl_usdt,
             pnl_pct      = pnl_pct,
-            tp1_filled   = _pos_close.get("tp1_filled", False),
-            tp2_filled   = _pos_close.get("tp2_filled", False),
+            tp1_filled   = pos.get("tp1_filled", False),
+            tp2_filled   = pos.get("tp2_filled", False),
         )
         if _sig_id_cls:
             await card_append_async(_sig_id_cls, _close_line)
