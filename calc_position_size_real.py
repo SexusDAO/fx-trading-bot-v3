@@ -101,6 +101,7 @@ def _dynamic_cap(net_value: float, hard_cap: float, max_positions: int = None) -
     """
     MAX_MARGIN_PCT_PER_POS = 0.30   # 单仓保证金最多占本金30%
 
+    _explicit_slots = max_positions is not None
     if max_positions is None:
         try:
             import sys as _s, pathlib as _p
@@ -109,6 +110,16 @@ def _dynamic_cap(net_value: float, hard_cap: float, max_positions: int = None) -
             max_positions = _n
         except Exception:
             max_positions = _DEFAULT_MAX_POSITIONS
+
+    # [v3.89 #82] 显式传入的槽位数/权益必须有效，否则抛 ValueError（不再除零或产出非法上限被最小仓位逻辑掩盖）；
+    #   由配置读取到的非法槽位数回退默认值。正常输入的仓位公式不变。
+    import math as _m
+    if isinstance(net_value, bool) or not isinstance(net_value, (int, float)) or not _m.isfinite(net_value) or net_value <= 0:
+        raise ValueError(f"net_value 必须是有限正数，收到 {net_value!r}")
+    if isinstance(max_positions, bool) or not isinstance(max_positions, int) or max_positions <= 0:
+        if _explicit_slots:
+            raise ValueError(f"max_positions 必须是正整数，收到 {max_positions!r}")
+        max_positions = _DEFAULT_MAX_POSITIONS
 
     per_slot  = net_value / max_positions          # 每仓应占保证金
     notional  = per_slot * LEVERAGE               # 每仓最大名义
