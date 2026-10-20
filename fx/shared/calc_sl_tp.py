@@ -753,7 +753,7 @@ def _orderbook_tp(entry: float, atr: float, direction: str, symbol: str) -> floa
     v3.6: 加 30s 本地缓存，避免每次信号都发同步 HTTP 请求。
     """
     import time as _t
-    cache_key = (symbol, direction, round(entry / (atr + 1e-9)))
+    cache_key = (symbol, direction, entry, atr)  # #32 完整输入身份，保留精确入场价与 ATR
     cached = _OB_TP_CACHE.get(cache_key)
     if cached and _t.time() - cached[0] < _OB_TP_TTL:
         return cached[1]
