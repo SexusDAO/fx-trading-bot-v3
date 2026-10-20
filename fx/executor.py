@@ -620,7 +620,8 @@ def _account_final_check(notional: float, notifier_fn=None) -> tuple[bool, str]:
 def _apply_leverage_budget(symbol: str, direction: str, nominal: float, equity: float) -> tuple[bool, float, str]:
     """
     返回 (放行?, 截断后的名义仓位, 原因)。
-    LEVERAGE_UTILIZATION_ENABLED 关闭时原样放行；剩余预算 <= 0 拒绝开仓；否则 nominal = min(nominal, 剩余预算)。
+    LEVERAGE_UTILIZATION_ENABLED 关闭时原样放行；剩余预算 <= 0 拒绝开仓；否则 nominal = min(nominal, 剩余预算)，
+    截断后若低于 MIN_NOTIONAL_GUARD 同样拒绝开仓（"杠杆预算不足最小名义"）。
     计算本身出现任何异常都降级放行（不阻断开仓）。不调用交易所接口。
     """
     try:
@@ -634,6 +635,11 @@ def _apply_leverage_budget(symbol: str, direction: str, nominal: float, equity: 
             return False, nominal, "杠杆预算已用满"
         nominal = min(nominal, lev_remaining)
         logger.info(f"[leverage] {symbol} {direction} remaining={lev_remaining:.0f}U → nominal={nominal:.0f}U")
+        # 截断后低于最小名义（MIN_NOTIONAL_GUARD 的检查在本步骤之前，截断后需再核一次）→ 拒绝本次开仓
+        if nominal < MIN_NOTIONAL_GUARD:
+            logger.warning(f"[leverage] {symbol} {direction} 杠杆预算截断后低于最小名义，跳过开仓 "
+                           f"(截断后={nominal:.2f}U < 最小名义={MIN_NOTIONAL_GUARD}U)")
+            return False, nominal, "杠杆预算不足最小名义"
         return True, nominal, ""
     except Exception as e:
         logger.warning(f"[leverage] {symbol} 杠杆预算检查异常，降级放行: {e}")

@@ -146,6 +146,29 @@ class TestExecutorHelper(Base):
             ok, n, _ = self._call(800.0)
         self.assertTrue(ok); self.assertEqual(n, 300.0)
 
+    def test_rejects_when_truncated_below_min_notional(self):
+        """截断后低于 MIN_NOTIONAL_GUARD → 拒绝本次开仓，原因为「杠杆预算不足最小名义」。"""
+        guard = EX.MIN_NOTIONAL_GUARD
+        with mock.patch.object(RM, "calc_leverage_remaining", return_value=guard - 1):
+            with self.assertLogs(EX.logger, level="WARNING") as cm:
+                logging.disable(logging.NOTSET)
+                ok, n, reason = self._call(guard * 8)
+        self.assertFalse(ok)
+        self.assertEqual(reason, "杠杆预算不足最小名义")
+        self.assertEqual(n, guard - 1)
+        self.assertTrue(any("杠杆预算截断后低于最小名义，跳过开仓" in m for m in cm.output))
+
+    def test_truncated_exactly_at_min_notional_passes(self):
+        guard = EX.MIN_NOTIONAL_GUARD
+        with mock.patch.object(RM, "calc_leverage_remaining", return_value=guard):
+            ok, n, reason = self._call(guard * 8)
+        self.assertTrue(ok); self.assertEqual(n, guard); self.assertEqual(reason, "")
+
+    def test_min_notional_check_end_to_end(self):
+        self.market("range"); self.positions([pos(qty=24.5, price=100)])     # used 2450 → remaining 50 < guard
+        ok, n, reason = self._call(nominal=500.0, equity=1000.0)
+        self.assertFalse(ok); self.assertEqual(reason, "杠杆预算不足最小名义"); self.assertEqual(n, 50.0)
+
     def test_nominal_kept_when_remaining_larger(self):
         with mock.patch.object(RM, "calc_leverage_remaining", return_value=1500.0):
             ok, n, _ = self._call(800.0)
