@@ -809,6 +809,42 @@ def _api_fail_rate_recent() -> float:
     return sum(1 for _, f in tail if f) / len(tail)
 
 
+LAST_USDT_PEG_STATUS: dict = {"status": "unknown", "rate": None, "ts": 0.0, "error": None}
+_PEG_WARN_INTERVAL = 600.0   # 数据不可用告警最小间隔（秒）
+_peg_last_warn = 0.0
+
+
+def get_usdt_peg_observation() -> dict:
+    """
+    [v3.89 #66] 取 USDCUSDT 标记价格，返回 {"status": "ok"|"unavailable", "rate": float|None, "error": str|None}。
+    markPrice 缺失、为零、非数字或请求异常 → unavailable（不用 1.0 代替）。同时写入 LAST_USDT_PEG_STATUS。
+    """
+    import math
+    obs = {"status": "unavailable", "rate": None, "error": None, "ts": time.time()}
+    try:
+        from shared import binance_api as _api
+        data = _api.get_mark_price("USDCUSDT")
+        raw = data.get("markPrice") if isinstance(data, dict) else None
+        rate = float(raw) if raw not in (None, "") else None
+        if rate is None or not math.isfinite(rate) or rate <= 0:
+            obs["error"] = f"markPrice 无效: {raw!r}"
+        else:
+            obs.update(status="ok", rate=rate)
+    except Exception as e:
+        obs["error"] = f"查询异常: {e}"
+    LAST_USDT_PEG_STATUS.update(obs)
+    return obs
+
+
+def _warn_peg_unavailable(obs: dict) -> None:
+    global _peg_last_warn
+    now = time.time()
+    if now - _peg_last_warn >= _PEG_WARN_INTERVAL:
+        _peg_last_warn = now
+        logger.warning(f"[risk] USDT 脱锚检查数据不可用（{obs.get('error')}），本次跳过该项检查")
+
+
+
 def check_systemic_risk() -> tuple[bool, str]:
     """
     检查系统性风险事件。返回 (ok, reason)。
@@ -827,14 +863,13 @@ def check_systemic_risk() -> tuple[bool, str]:
         SYSTEMIC_FUNDING_EXTREME_THRESH  = 0.010
 
     # ① USDT 脱锚（用 USDCUSDT 标记价格判断）
-    try:
-        from shared import binance_api as _api
-        usdc_data = _api.get_mark_price("USDCUSDT")
-        usdt_rate = float(usdc_data.get("markPrice", 1.0) or 1.0)
-        if abs(usdt_rate - 1.0) > SYSTEMIC_USDT_DEPEG_THRESH:
-            return False, f"USDT 脱锚警告: USDC/USDT={usdt_rate:.4f}"
-    except Exception:
-        pass
+    # [v3.89 #66] 价格缺失/为零/查询异常 → 记录「数据不可用」状态，不再用 1.0 伪造平价观测。
+    #   降级策略保持原行为（该项不单独阻断开仓，其他检查照常），但状态可见：LAST_USDT_PEG_STATUS + warning。
+    _peg = get_usdt_peg_observation()
+    if _peg["status"] == "unavailable":
+        _warn_peg_unavailable(_peg)
+    elif abs(_peg["rate"] - 1.0) > SYSTEMIC_USDT_DEPEG_THRESH:
+        return False, f"USDT 脱锚警告: USDC/USDT={_peg['rate']:.4f}"
 
     # ② API 响应异常
     fail_rate = _api_fail_rate_recent()

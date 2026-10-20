@@ -31,5 +31,40 @@ class TestRecordPnl(unittest.TestCase):
         self.assertIsNone(r["daily_loss"])
 
 
+class TestUsdtPeg(unittest.TestCase):
+    def _obs(self, ret=None, exc=None):
+        from shared import binance_api as api
+        f = mock.Mock(side_effect=exc) if exc else mock.Mock(return_value=ret)
+        with mock.patch.object(api, "get_mark_price", f):
+            return R.get_usdt_peg_observation()
+
+    def test_missing_zero_invalid_and_exception_are_unavailable(self):
+        for ret in ({}, {"markPrice": None}, {"markPrice": "0"}, {"markPrice": ""}, {"markPrice": "nan"}, None):
+            self.assertEqual(self._obs(ret)["status"], "unavailable", ret)
+        self.assertEqual(self._obs(exc=OSError("net"))["status"], "unavailable")
+        self.assertEqual(R.LAST_USDT_PEG_STATUS["status"], "unavailable")
+
+    def test_valid_rate(self):
+        o = self._obs({"markPrice": "0.9995"})
+        self.assertEqual((o["status"], o["rate"]), ("ok", 0.9995))
+
+    def test_unavailable_not_treated_as_peg_ok_nor_blocking(self):
+        from shared import binance_api as api
+        with mock.patch.object(api, "get_mark_price", return_value={}), \
+             mock.patch.object(R, "_api_fail_rate_recent", return_value=0.0, create=True), \
+             mock.patch.object(R.logger, "warning") as w:
+            R._peg_last_warn = 0.0
+            ok, reason = R.check_systemic_risk()
+        self.assertTrue(w.called)                          # 数据不可用被记录
+        self.assertNotIn("脱锚", reason)                    # 没有用 1.0 伪造观测，也没有因此阻断
+
+    def test_depeg_still_detected(self):
+        from shared import binance_api as api
+        with mock.patch.object(api, "get_mark_price", return_value={"markPrice": "0.98"}):
+            ok, reason = R.check_systemic_risk()
+        self.assertFalse(ok)
+        self.assertIn("脱锚", reason)
+
+
 if __name__ == "__main__":
     unittest.main()
