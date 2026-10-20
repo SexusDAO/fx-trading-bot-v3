@@ -54,6 +54,7 @@ from config import (
     PM_HEALTH_EARLY_HOURS, PM_HEALTH_LATE_HOURS,
 )
 from shared import binance_api as api
+from shared.async_utils import _run_sync   # [v3.89 #61] 同步调用移出事件循环的统一封装
 from shared.risk_manager import record_pnl as _record_pnl
 from shared.state import (
     get_all_positions, update_position, remove_position,
@@ -2432,7 +2433,7 @@ async def _maybe_pyramid(pos: dict) -> None:
         try:
             from shared import binance_api as _api2
             from shared.indicators import rsi as _calc_rsi2
-            _k1h = _api2.get_klines(symbol, "1h", limit=20)
+            _k1h = await _run_sync(_api2.get_klines, symbol, "1h", limit=20, timeout=10.0)   # [v3.89 #61]
             _closes = [float(k[4]) for k in _k1h]
             # [v3.89 #60] 空 K 线或样本不足时 rsi() 会返回 50，掩盖数据缺失而绕过失败封闭分支。
             #   这里只检测数据是否可用（RSI 周期 14 至少需要 15 根收盘价），RSI 阈值与开关判断不变。
@@ -2457,7 +2458,7 @@ async def _maybe_pyramid(pos: dict) -> None:
                 return
 
         # 持仓槽位检查
-        all_pos = get_all_positions()
+        all_pos = await _run_sync(get_all_positions, timeout=10.0)   # [v3.89 #61]
         open_cnt = sum(1 for p in all_pos if p.get("status") == "open")
         if open_cnt >= RISK_MAX_POSITIONS:
             logger.debug(f"[pm] {symbol} 加仓跳过: 槽位已满({open_cnt}/{RISK_MAX_POSITIONS})")
@@ -2469,7 +2470,7 @@ async def _maybe_pyramid(pos: dict) -> None:
 
         # 简单余额预检
         try:
-            acc = api.get_account()
+            acc = await _run_sync(api.get_account, timeout=10.0)   # [v3.89 #61]
             avail = float(acc.get("availableBalance", 0) or 0)
             lev   = int(pos.get("leverage", 10) or 10)
             margin_needed = addup_notional / lev * 1.1
