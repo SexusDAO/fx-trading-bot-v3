@@ -254,11 +254,9 @@ def _precheck(signal: dict) -> tuple[bool, str]:
     except Exception:
         pass   # 拉取失败不拦截，留给步骤5精确检查
 
-    # 1-10: 流动性 Gate（v3.57）——检查 ±0.5% 挂单深度，过滤极薄标的
-    # 以挂单价（pre_entry_price）为中心检查，贴近真实入场区域；阈值相对 OI 动态化
+    # 1-10: 流动性 Gate（v3.57）——检查 mark_price ±0.5% 挂单深度，过滤极薄标的
     _liq_ok, _liq_reason = _check_liquidity_gate(
         symbol, direction, notional=100.0,
-        entry_price=signal.get("pre_entry_price"),
         oi_now=signal.get("ind", {}).get("oi_now", 0.0),
     )
     if not _liq_ok:
@@ -327,13 +325,11 @@ def _check_liquidity_gate(
     symbol: str,
     direction: str,
     notional: float,
-    entry_price: float | None = None,
     oi_now: float = 0.0,
 ) -> tuple[bool, str]:
     """
     检查订单簿深度是否足够承载本次开仓。
-    - 拉 limit=20 深度，统计以挂单价（entry_price）为中心 ±2% 区间内的挂单金额
-      若 entry_price 未提供，回退到 mark_price（兼容旧调用路径）
+    - 拉 limit=20 深度，统计以 mark_price 为中心 ±0.5% 区间内的挂单金额
     - LONG 做多：看 ask 侧深度（需要有人卖给我们）
     - SHORT 做空：看 bid 侧深度（需要有人买我们卖出的仓）
     - 阈值 = max(OI×0.1%, 3000U, notional×DEPTH_MULT)，对小币相对化
@@ -351,11 +347,9 @@ def _check_liquidity_gate(
         if mark_p <= 0:
             return True, ""  # 拉不到价格，降级放行
 
-        # [fix] 窗口以挂单价（entry_price）为中心 ±2%
-        # 覆盖 entry 相对 mark 偏离 2~4% 的场景；entry 缺失时回退 mark_price
-        center = entry_price if (entry_price and entry_price > 0) else mark_p
-        low  = center * 0.980
-        high = center * 1.020
+        center = mark_p
+        low  = center * 0.995
+        high = center * 1.005
 
         ob = api.get_order_book(symbol, limit=20)
 
@@ -379,11 +373,10 @@ def _check_liquidity_gate(
         oi_usdt   = oi_now * mark_p if (oi_now > 0 and mark_p > 0) else 0.0
         oi_based  = oi_usdt * 0.001 if oi_usdt > 0 else 0.0
         threshold = max(LIQUIDITY_GATE_MIN_U, oi_based, notional * LIQUIDITY_GATE_DEPTH_MULT)
-        center_label = f"entry={center:.6g}" if (entry_price and entry_price > 0) else f"mark={center:.6g}"
         if depth_u < threshold:
             return False, (
-                f"流动性不足: {direction} 侧±2%深度={depth_u:.0f}U "
-                f"< 阈值{threshold:.0f}U（{center_label} OI={oi_usdt:.0f}U notional={notional:.0f}U×{LIQUIDITY_GATE_DEPTH_MULT}）"
+                f"流动性不足: {direction} 侧±0.5%深度={depth_u:.0f}U "
+                f"< 阈值{threshold:.0f}U（mark={center:.6g} OI={oi_usdt:.0f}U notional={notional:.0f}U×{LIQUIDITY_GATE_DEPTH_MULT}）"
             )
         return True, ""
     except Exception as _lge:
