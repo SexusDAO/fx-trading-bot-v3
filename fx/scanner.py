@@ -161,6 +161,7 @@ def _write_signal_analytics(
     entry_params: dict | None = None,
     route_quality: int | None = None,
     competing_routes: list | None = None,
+    entry_params_ok: bool | None = None,
 ) -> None:
     """每次 judge 结果（通过或拒绝）写入一条结构化记录到 signal_analytics.jsonl。"""
     import time as _t
@@ -218,6 +219,11 @@ def _write_signal_analytics(
             "sl_pct":       None, "rr_tp1":     None,
             "sl_degraded":  None, "entry_mode": None,
         },
+        # [add] entry_params_ok: calc_sl_tp 是否成功返回完整参数
+        # None = judge 通过但 calc_sl_tp 尚未运行（analyze_symbol 阶段写入时）
+        # True = calc_sl_tp 成功，信号真正进入等待成交队列
+        # False = calc_sl_tp 返回 {"error": ...}，信号被静默丢弃
+        "entry_params_ok": entry_params_ok,
         "outcome": {
             "filled":            None,
             "fill_price":        None,
@@ -2527,6 +2533,29 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
                         if "error" not in params:
                             sig["pre_entry_price"] = params["entry_price"]
                             sig["pre_params"] = params
+                            sig["_entry_params_ok"] = True
+                        else:
+                            sig["_entry_params_ok"] = False
+                            sig["_calc_sl_tp_error"] = params.get("error", "")
+                            logger.debug(
+                                f"[scanner] {sym} calc_sl_tp 拒绝: {params.get('error','')}"
+                            )
+                        # [add] 追记 entry_params_ok 到 signal_analytics（patch 行， type=entry_params_patch）
+                        try:
+                            import json as _json
+                            _patch = {
+                                "type":            "entry_params_patch",
+                                "ts":              int(__import__('time').time() * 1000),
+                                "symbol":          sym,
+                                "mode":            mode,
+                                "direction":       sig.get("direction", ""),
+                                "entry_params_ok": sig["_entry_params_ok"],
+                                "calc_sl_tp_error": sig.get("_calc_sl_tp_error", None),
+                            }
+                            with open(SIGNAL_ANALYTICS_FILE, "a", encoding="utf-8") as _af:
+                                _af.write(_json.dumps(_patch, ensure_ascii=False) + "\n")
+                        except Exception as _wp:
+                            logger.debug(f"[scanner] {sym} entry_params_patch 写入失败: {_wp}")
                     except Exception as _pe:
                         logger.debug(f"[scanner] {sym} 预算 entry_price 失败，用 mark_price: {_pe}")
 

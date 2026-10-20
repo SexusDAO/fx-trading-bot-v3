@@ -2330,6 +2330,13 @@ def judge_funding_arb(symbol: str, funding: float, funding_hist: list,
             out["signal_strength"]   = "medium"
             out["position_size_cap"] = FUNDING_ARB_SIZE_MEDIUM
 
+
+    # [add] 补写 volatility_tier / atr_ratio（供 signal_analytics 完整记录，低优先级）
+    # funding_arb 的 calc_sl_tp 分支在 tier 判断前已 return，不影响交易逻辑
+    _fa_atr   = ind.get("atr_1h", 0)
+    _fa_price = ind.get("price", 1) or 1
+    out["volatility_tier"] = _volatility_tier(_fa_atr, _fa_price)
+    out["atr_ratio"]       = round(_atr_ratio(_fa_atr, _fa_price), 4)
     return True, out
 
 
