@@ -24,6 +24,10 @@ TRACK_WINDOW_H  = 8     # 追踪窗口
 CORRECT_MOVE    = 2.0   # 方向触达幅度门槛（%）
 KLINE_MS        = 15 * 60 * 1000   # [v3.89 #44] 15m K 线间隔
 
+# [v3.89 #46] 方向必须是明确枚举，其余值一律按 invalid 处理，
+#   不得落入 LONG 分支（旧实现任何非空且非 SHORT 的值都会走 LONG）。
+VALID_DIRECTIONS = ("LONG", "SHORT")
+
 
 def _get_klines(symbol, start_ms, limit=32):
     try:
@@ -81,18 +85,36 @@ def _check_rejected_outcome(rec: dict) -> dict:
     [v3.89 #45] direction_touched 仅表示「参考价之后的最大有利波动达到门槛」，
     不检验候选入场是否触达、先后路径，也不代表成交或盈亏。
     """
-    direction = (rec.get("direction") or "").upper()
+    direction = (rec.get("direction") or "").strip().upper()
+    # [v3.89 #46] 校验方向枚举：非法/未知方向单独计为 invalid，不再默认走 LONG
+    if direction not in VALID_DIRECTIONS:
+        return {"status": "invalid", "reason": "bad_direction"}
+
     snap = rec.get("snapshot") or {}
     ref_price = snap.get("price")
-    if not ref_price or not direction:
-        return {"status": "invalid"}
+    # [v3.89 #46] 参考价需为正有限数，否则后续 (hi-ref)/ref 会除零或失真
+    try:
+        ref_price = float(ref_price)
+    except (TypeError, ValueError):
+        return {"status": "invalid", "reason": "bad_ref_price"}
+    if not (ref_price > 0) or ref_price != ref_price or ref_price in (float("inf"), float("-inf")):
+        return {"status": "invalid", "reason": "bad_ref_price"}
 
-    window_end = rec["ts"] + TRACK_WINDOW_H * 3600 * 1000
-    klines = _get_klines(rec["symbol"], rec["ts"], limit=TRACK_WINDOW_H * 4)
+    # [v3.89 #46] ts / symbol 由直接索引改为安全取值，缺字段的记录不再中断整份报告
+    try:
+        ts = int(rec.get("ts"))
+    except (TypeError, ValueError):
+        return {"status": "invalid", "reason": "bad_ts"}
+    symbol = rec.get("symbol")
+    if not symbol or not isinstance(symbol, str):
+        return {"status": "invalid", "reason": "bad_symbol"}
+
+    window_end = ts + TRACK_WINDOW_H * 3600 * 1000
+    klines = _get_klines(symbol, ts, limit=TRACK_WINDOW_H * 4)
     if not klines:
         return {"status": "insufficient", "reason": "no_klines"}
     klines = [k for k in klines if int(k[0]) < window_end]
-    why = _validate_window(klines, rec["ts"], window_end, int(time.time() * 1000))
+    why = _validate_window(klines, ts, window_end, int(time.time() * 1000))
     if why:
         return {"status": why}
 
@@ -145,6 +167,17 @@ def run(analytics_file: Path | None = None, days: int = 7) -> dict:
                 continue
             rejected_recs.append(rec)
 
+    # [v3.89 #47] 行情按「标的 + 追踪窗口」合并：同一标的同一窗口只请求一次。
+    #   klines 结果同时被窗口覆盖校验复用，避免同标相近记录重复打网络。
+    _kline_cache: dict = {}
+
+    def _get_klines_cached(_symbol: str, _start_ms: int, _limit: int) -> list:
+        _key = (_symbol, _start_ms, _limit)
+        if _key not in _kline_cache:
+            _kline_cache[_key] = _get_klines(_symbol, _start_ms, limit=_limit)
+            time.sleep(0.03)   # [v3.89 #47] 节流按实际发出的请求数计
+        return _kline_cache[_key]
+
     # 按拒绝原因分组统计
     groups: dict[str, list] = defaultdict(list)       # 仅 complete
     skipped: dict[str, Counter] = defaultdict(Counter)  # immature / insufficient / invalid
@@ -153,12 +186,17 @@ def run(analytics_file: Path | None = None, days: int = 7) -> dict:
         # 归类：取前半段（去掉动态数值部分）
         import re
         key = re.sub(r'[=:：].*', '', reason).strip()[:60]
-        result = _check_rejected_outcome(rec)
+        # [v3.89 #46] 逐条隔离：单条记录的字段类型异常不得中断整份报告，
+        #   记为 invalid 并继续处理后续记录。
+        try:
+            result = _check_rejected_outcome(rec)
+        except Exception as e:
+            logger.debug(f"[track_rejected] 记录处理失败(t={rec.get('ts')}): {e}")
+            result = {"status": "invalid", "reason": "exception"}
         if result.get("status") == "complete":
             groups[key].append(result)
         else:
             skipped[key][result.get("status", "invalid")] += 1
-        time.sleep(0.03)
 
     report = {}
     for reason in sorted(set(groups) | set(skipped), key=lambda k: -(len(groups.get(k, [])))):
