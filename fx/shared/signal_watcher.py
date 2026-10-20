@@ -500,13 +500,13 @@ class SignalWatcher:
                         f"竞争胜出，替换"
                     )
                     self._watched.pop(old_sym, None)
-                    # 向被驱逐信号的卡片追加驱逐行
+                    # [v3.90 通知聚合] 被驱逐信号不再补写卡片行，改为静默丢弃缓冲区
                     try:
-                        from shared.notifier import card_append, fmt_node_evicted
+                        from shared.notifier import discard_signal
                         _old_sig_id = f"{old_sym}_{lowest.signal.get('_scan_ts', '')}"
-                        card_append(_old_sig_id, fmt_node_evicted(symbol, entry.pending_score))
+                        discard_signal(_old_sig_id)
                     except Exception as _sw_e:
-                        logger.debug(f"[signal_watcher] 驱逐卡片追加失败: {_sw_e}")
+                        logger.debug(f"[signal_watcher] 驱逐卡片丢弃失败: {_sw_e}")
                     if lowest.limit_order_id:
                         # [v3.89 撤单检查] 原写法 ensure_future 发出去不看结果；改为锁外统一走
                         #   _cancel_exchange_order 并确认终态（这里仍在锁内，只登记待撤计划）
@@ -605,15 +605,15 @@ class SignalWatcher:
             logger.info(f"[signal_watcher] 共撤销 {cancelled} 个入场挂单 ({reason})")
             # cancel_all 的通知由调用方（btc_guard / 仓位满）负责携带上下文推送
             # 此处只向各被撤信号的卡片追加结束行
+            # [v3.90 通知聚合] 被撤销信号不再补写卡片行，改为静默丢弃缓冲区
             try:
-                from shared.notifier import card_append, _hhmm
+                from shared.notifier import discard_signal
                 for _sym, _e in to_cancel.items():
-                    _s = _e.signal
-                    _sid = _s.get("_sig_id", "")
+                    _sid = _e.signal.get("_sig_id", "")
                     if _sid:
-                        card_append(_sid, f"⏰ {_hhmm()} 监控已撤销（{reason}）")
+                        discard_signal(_sid)
             except Exception as _sw_e:
-                logger.debug(f"[signal_watcher] 批量撤单卡片追加失败: {_sw_e}")
+                logger.debug(f"[signal_watcher] 批量撤单卡片丢弃失败: {_sw_e}")
         return cancelled
 
     def pending_count(self) -> int:
@@ -833,10 +833,12 @@ class SignalWatcher:
         try:
             # ── 卡片追加：价格触发挂单行 ─────────────────────────────────────
             try:
-                from shared.notifier import card_append, fmt_node_trigger
+                from shared.notifier import card_append, fmt_node_trigger, flush_signal
                 _sig_id_t = entry.signal.get("_sig_id", "")
                 if _sig_id_t:
                     card_append(_sig_id_t, fmt_node_trigger(price, entry.entry_price))
+                    # [v3.90 通知聚合] 价格触发 → 挂单：确认值得推送，合并发出监控行 + 触发行
+                    flush_signal(_sig_id_t)
             except Exception as _tc_e:
                 logger.debug(f"[signal_watcher] 触发卡片追加失败: {_tc_e}")
 
@@ -950,13 +952,14 @@ class SignalWatcher:
         #   （撤单确认终态；结果未知时条目保留并登记 _orphan_orders，由 _reconcile_orphans 继续跟踪）
         await self._cancel_and_remove(symbol, entry, "信号过期")
 
+        # [v3.90 通知聚合] 过期信号不再补写超时卡片行，改为静默丢弃缓冲区
         try:
-            from shared.notifier import card_append, fmt_node_timeout
+            from shared.notifier import discard_signal
             _sig_id = entry.signal.get("_sig_id", "")
             if _sig_id:
-                card_append(_sig_id, fmt_node_timeout(int(waited_min)))
+                discard_signal(_sig_id)
         except Exception as _sw_e:
-            logger.debug(f"[signal_watcher] 超时卡片追加失败: {_sw_e}")
+            logger.debug(f"[signal_watcher] 超时卡片丢弃失败: {_sw_e}")
 
     async def _cancel_order(self, symbol: str, order_id: int) -> None:
         """异步撤单（在主 loop 里通过 run_in_executor 调同步 API）。"""
@@ -1869,6 +1872,13 @@ class SignalWatcher:
 
         for sym, e in expired_entries:
             await self._handle_expired(sym, e)
+
+        # [v3.90 通知聚合] 每轮 GC 兜底 flush 超时未决的信号缓冲
+        try:
+            from shared.notifier import tick_signal_buffer
+            tick_signal_buffer()
+        except Exception as _tb_e:
+            logger.debug(f"[signal_watcher] 信号缓冲兜底 flush 失败: {_tb_e}")
 
         if expired_entries:
             logger.info(f"[signal_watcher] GC 清理过期信号: {[s for s,_ in expired_entries]}")

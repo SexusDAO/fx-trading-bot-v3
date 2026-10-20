@@ -58,6 +58,7 @@ from shared.state import (
 )
 from shared.notifier import (
     notify, notify_async, card_append, card_append_async, card_remove,
+    flush_signal, discard_signal, buffer_signal,
     _hhmm, _CLOSE_REASON_CN, fmt_hold_time,
     fmt_node_immediate_close, fmt_node_open, fmt_node_close,
 )
@@ -1064,6 +1065,8 @@ async def _on_position_closed(pos_id: str, symbol: str,
             # fix: card_remove 必须在 card_append_async 完成后执行，否则缓存已空追加失败
             async def _append_then_remove(_sid=_sig_id_ws, _line=_close_line):
                 await card_append_async(_sid, _line)
+                # [v3.90 通知聚合] 平仓节点后明确丢弃缓冲，避免残留条目被兜底 flush
+                discard_signal(_sid)
                 card_remove(_sid)
             _aio_ws.ensure_future(_append_then_remove())
         else:
@@ -1843,15 +1846,19 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
         )
         if _sig_id:
             await card_append_async(_sig_id, _open_line)
+            # [v3.90 通知聚合] 开仓成交：确认值得推送，合并发出监控行 + 触发行 + 开仓行
+            await asyncio.get_event_loop().run_in_executor(None, lambda: flush_signal(_sig_id))
         else:
             # immediate 模式没有卡片，用 imm_ 前缀创建一张临时卡片
-            from shared.notifier import make_card_header, card_create
+            # [v3.90 通知聚合] 统一走缓冲区：先 buffer_signal 再立即 flush（行为等价，路径统一）
+            from shared.notifier import make_card_header, buffer_signal
             _hdr = make_card_header(symbol, direction, mode, signal.get("signal_strength", "medium"))
             _imm_sig_id = f"{symbol}_imm_{int(time.time())}"
             signal["_sig_id"] = _imm_sig_id
             await asyncio.get_event_loop().run_in_executor(
-                None, lambda: card_create(_imm_sig_id, _hdr)
+                None, lambda: buffer_signal(_imm_sig_id, _hdr)
             )
+            await asyncio.get_event_loop().run_in_executor(None, lambda: flush_signal(_imm_sig_id))
             await card_append_async(_imm_sig_id, _open_line)
     except Exception as _ne:
         logger.debug(f"[executor] 开仓卡片通知失败（非致命）: {_ne}")

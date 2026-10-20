@@ -280,6 +280,104 @@ _init_card_cache()
 
 
 # =============================================================================
+# 信号卡片缓冲（#信号聚合）：延迟 card_create，短命信号不再留下空气卡片
+# =============================================================================
+
+class SignalBuffer:
+    """
+    [v3.90 通知聚合] 线程安全的信号卡片暂存区。
+
+    card_create 不再立刻发消息，而是把 header 暂存在这里；
+    同一个 sig_id 的后续 card_append 也进缓冲区，直到：
+      · flush_signal(sig_id)   —— 确认值得推送（开仓成交 / 价格触发）时一次性合并发出
+      · discard_signal(sig_id) —— 确认不该推送（竞争淘汰 / 过期 / 预检拒绝）时静默丢弃
+      · tick_signal_buffer()   —— 超过 TTL 仍未 flush/discard 的兜底 flush（默认 30 分钟）
+    缓冲只存文本，不放锁跨网络调用，所以 flush/discard 都是 O(缓冲区长度)。
+    """
+
+    def __init__(self, ttl: float = 1800.0):
+        self._buf: dict = {}       # sig_id -> [header(line0), line, ...]
+        self._ts:  dict = {}       # sig_id -> 首次入缓冲时间
+        self._lock = threading.Lock()
+        self._ttl  = ttl
+
+    def has(self, sig_id: str) -> bool:
+        with self._lock:
+            return sig_id in self._buf
+
+    def start(self, sig_id: str, header: str) -> None:
+        with self._lock:
+            self._buf[sig_id] = [header]
+            self._ts.setdefault(sig_id, time.time())
+
+    def append(self, sig_id: str, line: str) -> bool:
+        with self._lock:
+            if sig_id not in self._buf:
+                return False
+            self._buf[sig_id].append(line)
+            return True
+
+    def pop(self, sig_id: str) -> list:
+        with self._lock:
+            self._ts.pop(sig_id, None)
+            return self._buf.pop(sig_id, [])
+
+    def discard(self, sig_id: str) -> bool:
+        with self._lock:
+            self._ts.pop(sig_id, None)
+            return self._buf.pop(sig_id, None) is not None
+
+    def stale(self, now: float = None) -> list:
+        now = time.time() if now is None else now
+        with self._lock:
+            return [k for k, t in self._ts.items() if now - t >= self._ttl]
+
+    def size(self) -> int:
+        with self._lock:
+            return len(self._buf)
+
+
+_signal_buffer = SignalBuffer()
+
+
+def buffer_signal(sig_id: str, header: str) -> None:
+    """[v3.90 通知聚合] 把卡片标题放入缓冲区，暂不推送。"""
+    _signal_buffer.start(sig_id, header)
+
+
+def flush_signal(sig_id: str) -> bool:
+    """[v3.90 通知聚合] 把缓冲区内容合并一次性推送（标题 + 所有追加行）。"""
+    lines = _signal_buffer.pop(sig_id)
+    if not lines:
+        return False
+    _card_create_now(sig_id, lines[0])
+    for ln in lines[1:]:
+        _card_append_now(sig_id, ln)
+    logger.debug(f"[card] flush sig_id={sig_id} 合并推送 {len(lines)} 行")
+    return True
+
+
+def discard_signal(sig_id: str) -> bool:
+    """[v3.90 通知聚合] 静默丢弃缓冲区内容（信号被淘汰/过期/预检拒绝）。"""
+    dropped = _signal_buffer.discard(sig_id)
+    if dropped:
+        logger.debug(f"[card] discard sig_id={sig_id} 缓冲区已静默丢弃")
+    return dropped
+
+
+def tick_signal_buffer() -> int:
+    """[v3.90 通知聚合] 兜底：把超过 TTL 仍未 flush/discard 的条目 flush 出去。"""
+    stale = _signal_buffer.stale()
+    for sid in stale:
+        logger.warning(f"[card] sig_id={sid} 缓冲超过 TTL 未决，兜底 flush")
+        try:
+            flush_signal(sid)
+        except Exception as e:
+            logger.warning(f"[card] 兜底 flush 失败 sig_id={sid}: {e}")
+    return len(stale)
+
+
+# =============================================================================
 # 公共 API
 # =============================================================================
 
@@ -304,11 +402,17 @@ async def notify_async(text: str) -> None:
 
 def card_create(sig_id: str, header: str) -> Optional[str]:
     """
-    创建新信号卡片，发出标题行消息。
-    若拿到 message_id，后续 card_append 走编辑路径（真正追加到同一条消息）。
-    否则 card_append 走独立消息路径。
-    返回 message_id 或 None。
+    [v3.90 通知聚合] 创建信号卡片：只把标题放入缓冲区，暂不推送。
+    真正发出消息在 flush_signal(sig_id) 时（开仓成交 / 价格触发）。
+    返回 None —— 因为此时还没有 message_id（延迟推送后由 _card_create_now 决定）。
     """
+    buffer_signal(sig_id, header)
+    logger.debug(f"[card] 缓冲卡片 sig_id={sig_id}（等待 flush）")
+    return None
+
+
+def _card_create_now(sig_id: str, header: str) -> Optional[str]:
+    """实际发出标题行并登记缓存（原 card_create 的即时行为）。"""
     mid = _send(header)
 
     with _card_lock_for(sig_id):
@@ -337,6 +441,16 @@ def card_append(sig_id: str, line: str) -> bool:
 
     返回 True 表示消息已发出（不论编辑还是新消息）。
     """
+    # [v3.90 通知聚合] 在缓冲区里就直接追加，等 flush 时一次发出
+    if _signal_buffer.append(sig_id, line):
+        logger.debug(f"[card] 缓冲追加 sig_id={sig_id}")
+        return True
+
+    return _card_append_now(sig_id, line)
+
+
+def _card_append_now(sig_id: str, line: str) -> bool:
+    """实际执行追加（编辑原消息或独立消息）。"""
     with _card_lock_for(sig_id):
         entry = dict(_card_cache.get(sig_id, {})) if sig_id in _card_cache else None
 
