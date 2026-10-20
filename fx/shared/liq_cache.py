@@ -22,6 +22,10 @@ logger = logging.getLogger("fx.liq_cache")
 _CACHE: dict[str, dict] = {}
 _CACHE_TTL = 15 * 60   # 15 分钟
 _CACHE_LOCK = threading.Lock()
+# [v3.89 #34] 容量上限：_CACHE 最多保留 500 个 key（key=「标的:区间」），写入后超出时按 ts 淘汰最旧的。
+#   TTL 只决定数据是否需要刷新，不会删除条目；标的池长期变化时过期条目会一直驻留内存。
+_CACHE_MAX_ENTRIES = 500
+_EVICTED_TOTAL = 0   # 累计淘汰条数（监控用）
 
 # ── 后台刷新线程状态 ───────────────────────────────────────────────────────
 # [v3.89 #35] 按 key 合并在途请求：同一 key 同时只有一个调用真正去拉数据，其余等待同一结果；
@@ -181,7 +185,22 @@ def _store_if_newer(key: str, data: dict) -> bool:
         if old and old.get("ts", 0) > (data or {}).get("ts", 0):
             return False
         _CACHE[key] = data
+        _evict_oldest_locked()
         return True
+
+
+def _evict_oldest_locked() -> int:
+    """[v3.89 #34] 调用方须已持有 _CACHE_LOCK。超出 _CACHE_MAX_ENTRIES 时按 ts 从旧到新淘汰，返回淘汰条数。"""
+    global _EVICTED_TOTAL
+    over = len(_CACHE) - _CACHE_MAX_ENTRIES
+    if over <= 0:
+        return 0
+    victims = sorted(_CACHE, key=lambda k: (_CACHE[k] or {}).get("ts", 0))[:over]
+    for k in victims:
+        _CACHE.pop(k, None)
+    _EVICTED_TOTAL += len(victims)
+    logger.info(f"[liq_cache] 缓存超过 {_CACHE_MAX_ENTRIES} 条，按 ts 淘汰最旧 {len(victims)} 条（累计 {_EVICTED_TOTAL}）")
+    return len(victims)
 
 
 def _fetch_dedup(symbol: str, price: float, range_: str, key: str) -> dict:
