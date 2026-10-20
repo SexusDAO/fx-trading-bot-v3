@@ -2,14 +2,14 @@
 """
 tools/track_rejected.py — 拒绝信号事后追踪（对照组）
 
-对 judge_passed=false 的记录，追踪信号产生后 8H 内价格
-是否往「正确方向」走，用于评估各拒绝原因的准确性。
-[v3.89 #44] 只有 K 线完整覆盖 8H 窗口的记录才计入样本分母；数据不足/未成熟单独计数。
+对 judge_passed=false 的记录，统计信号产生后 8H 内价格的「方向触达率」，
+仅作为观察证据（[v3.89 #45]：不输出「误拒/拒绝合理」之类的因果结论）。
 
-「方向正确」定义：
-  - SHORT：信号后 8H 最大跌幅 > 2%  → 拒绝可能是误拒
-  - LONG ：信号后 8H 最大涨幅 > 2%  → 拒绝可能是误拒
-  - 其余情况：拒绝是合理的
+「方向触达」定义：
+  - SHORT：参考价之后 8H 内最大跌幅 >= 2%
+  - LONG ：参考价之后 8H 内最大涨幅 >= 2%
+注意：它不检验候选入场价是否被触达、先后路径，也不代表成交或盈亏。
+[v3.89 #44] 只有 K 线完整覆盖 8H 窗口的记录才计入样本分母；数据不足/未成熟单独计数。
 """
 import sys, json, time, logging
 from pathlib import Path
@@ -74,11 +74,11 @@ def _validate_window(klines: list, start_ms: int, window_end: int, now_ms: int) 
 def _check_rejected_outcome(rec: dict) -> dict:
     """
     追踪一条拒绝记录。始终返回 dict，字段 status：
-      complete      窗口完整，附带 correct_direction / max_move_pct
+      complete      窗口完整，附带 direction_touched / max_move_pct
       immature      窗口未结束
       insufficient  K 线数据不足或有缺口（不纳入完成样本分母）
       invalid       记录缺参考价或方向
-    [v3.89 #45] correct_direction 仅表示「参考价之后的最大有利波动达到门槛」，
+    [v3.89 #45] direction_touched 仅表示「参考价之后的最大有利波动达到门槛」，
     不检验候选入场是否触达、先后路径，也不代表成交或盈亏。
     """
     direction = (rec.get("direction") or "").upper()
@@ -111,7 +111,7 @@ def _check_rejected_outcome(rec: dict) -> dict:
         touched = max_up_pct >= CORRECT_MOVE
         max_move = max_up_pct
 
-    return {"status": "complete", "correct_direction": touched, "max_move_pct": round(max_move, 2)}
+    return {"status": "complete", "direction_touched": touched, "max_move_pct": round(max_move, 2)}
 
 
 def run(analytics_file: Path | None = None, days: int = 7) -> dict:
@@ -164,17 +164,15 @@ def run(analytics_file: Path | None = None, days: int = 7) -> dict:
     for reason in sorted(set(groups) | set(skipped), key=lambda k: -(len(groups.get(k, [])))):
         results = groups.get(reason, [])
         n       = len(results)       # [v3.89 #44] 分母只含完整窗口样本
-        n_touch = sum(1 for r in results if r["correct_direction"])
+        n_touch = sum(1 for r in results if r["direction_touched"])
         sk      = skipped.get(reason, Counter())
         report[reason] = {
             "samples":             n,
-            "correct_pct": round(n_touch / n * 100, 1) if n else None,
+            "direction_touch_pct": round(n_touch / n * 100, 1) if n else None,
             "avg_move_pct":        round(sum(r["max_move_pct"] for r in results) / n, 2) if n else None,
             "immature":            sk.get("immature", 0),
             "insufficient":        sk.get("insufficient", 0),
             "invalid":             sk.get("invalid", 0),
-            "assessment":          ("—（无完整样本）" if not n else
-                                    ("⚠️ 可能误拒（正确率>55%）" if n_touch / n > 0.55 else "✅ 拒绝合理（正确率≤55%）")),
         }
 
     logger.info(f"[track_rejected] 分析完成: {len(rejected_recs)} 条拒绝记录，{len(report)} 种原因")
@@ -182,16 +180,19 @@ def run(analytics_file: Path | None = None, days: int = 7) -> dict:
 
 
 def print_report(report: dict) -> None:
-    print(f"\n{'═'*62}")
-    print(f"  被拒绝信号的事后表现")
-    print(f"{'═'*62}")
-    print(f"  {'拒绝原因':<35} {'样本':>4} {'正确率':>7} {'平均幅度':>8}  评估  (数据不足/未成熟)")
-    print(f"  {'-'*60}")
+    print(f"\n{'═'*74}")
+    print(f"  被拒绝信号的事后表现（方向触达率，仅作观察证据）")
+    print(f"{'═'*74}")
+    print(f"  {'拒绝原因':<35} {'样本':>4} {'方向触达率':>9} {'平均幅度':>8} {'数据不足':>6} {'未成熟':>5}")
+    print(f"  {'-'*72}")
     for reason, d in report.items():
-        rate = f"{d['correct_pct']:>6.0f}%" if d["correct_pct"] is not None else f"{'-':>7}"
+        rate = f"{d['direction_touch_pct']:>8.0f}%" if d["direction_touch_pct"] is not None else f"{'-':>9}"
         mv   = f"{d['avg_move_pct']:>7.2f}%" if d["avg_move_pct"] is not None else f"{'-':>8}"
-        print(f"  {reason:<35} {d['samples']:>4} {rate} {mv}  {d['assessment']}  ({d['insufficient']}/{d['immature']})")
-    print(f"{'═'*62}\n")
+        print(f"  {reason:<35} {d['samples']:>4} {rate} {mv} {d['insufficient']:>6} {d['immature']:>5}")
+    print("  说明：方向触达率 = 参考价之后 8H 内最大有利波动 ≥ 2% 的样本占比。")
+    print("        仅为观察证据：不检验候选入场是否触达，也不代表成交、盈利或拒绝规则对错；")
+    print("        样本分母只含窗口完整的记录，数据不足/未成熟的单独列出。")
+    print(f"{'═'*74}\n")
 
 
 if __name__ == "__main__":

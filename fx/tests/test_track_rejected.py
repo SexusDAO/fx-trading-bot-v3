@@ -120,8 +120,8 @@ class TestOutputWording(unittest.TestCase):
         self.assertNotIn("assessment", rep["R"])
 
 
-TOUCH = "correct_direction"
-RATE = "correct_pct"
+TOUCH = "direction_touched"
+RATE = "direction_touch_pct"
 
 if __name__ == "__main__":
     unittest.main()
