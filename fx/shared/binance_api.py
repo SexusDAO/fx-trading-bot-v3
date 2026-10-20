@@ -695,6 +695,14 @@ def get_server_time() -> int:
 # ─── Stop Loss Order（STOP_MARKET via /fapi/v1/order）──────────────────────────
 # 普通合约接口，比 Algo 更稳定，orderId 直接可撤，全账户可见
 
+def _to_float(v):
+    """[v3.89 #12] 安全转 float，失败返回 None。"""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
 def place_sl(symbol: str, side: str, position_side: str,
              trigger_price: float, quantity: float) -> dict:
     """
@@ -724,22 +732,47 @@ def place_sl(symbol: str, side: str, position_side: str,
     result = _retry(_call, suppress_codes=[-2021]) or {}
     if not result.get("algoId") and not result.get("orderId"):
         # 可能是超时后重试触发 -2021（第一次已成功），尝试查出已有的止损单
+        # [v3.89 #12] 原逻辑只按 symbol+side 取最新一单认领，可能认领到别的保护单（如旧仓位/其他价位的止损）。
+        #   现要求 symbol/side/positionSide(Hedge)/type/触发价(±0.1%)/数量(±1%) 全部匹配且唯一才认领；
+        #   多个匹配或字段缺失无法核对 → 不认领，返回 {}（未确认），由调用方重新处理。
         try:
             existing = _signed_get("/fapi/v1/algo/orders/open", {"symbol": symbol}) or {}
-            orders   = existing.get("orders", [])
-            if orders:
-                # 取最新一个同方向的止损单作为真实 id
-                for o in reversed(orders):
-                    if o.get("symbol") == symbol and o.get("side") == side:
-                        result = {"algoId": int(o["algoId"]), "orderId": int(o["algoId"]),
-                                  "_recovered": True}
-                        import logging as _log
-                        _log.getLogger(__name__).info(
-                            f"[api] place_sl {symbol} -2021重复，恢复已有algoId={o['algoId']}"
-                        )
-                        break
+            orders   = existing.get("orders", []) if isinstance(existing, dict) else []
+            matched  = []
+            for o in orders:
+                if o.get("symbol") != symbol or o.get("side") != side:
+                    continue
+                if hedge and o.get("positionSide") != position_side:
+                    continue
+                o_type = o.get("orderType") or o.get("type")
+                if o_type not in ("STOP_MARKET", "STOP"):
+                    continue
+                o_trig = _to_float(o.get("triggerPrice") if o.get("triggerPrice") is not None else o.get("stopPrice"))
+                o_qty  = _to_float(o.get("quantity") if o.get("quantity") is not None else o.get("origQty"))
+                if o_trig is None or o_qty is None:
+                    continue   # 字段缺失，无法核对，不认领
+                if abs(o_trig - float(trigger_price)) > abs(float(trigger_price)) * 0.001:
+                    continue
+                if abs(o_qty - float(quantity)) > abs(float(quantity)) * 0.01:
+                    continue
+                matched.append(o)
+            if len(matched) == 1:
+                o = matched[0]
+                result = {"algoId": int(o["algoId"]), "orderId": int(o["algoId"]),
+                          "_recovered": True}
+                logger.info(f"[api] place_sl {symbol} -2021重复，按完整属性恢复已有algoId={o['algoId']}")
+            elif len(matched) > 1:
+                logger.warning(
+                    f"[api] place_sl {symbol} 恢复失败：{len(matched)} 个止损单同时匹配 "
+                    f"(side={side} trigger={trigger_price} qty={quantity})，不认领，返回未确认状态"
+                )
+            else:
+                logger.warning(
+                    f"[api] place_sl {symbol} 未找到属性匹配的已有止损单 "
+                    f"(side={side} trigger={trigger_price} qty={quantity})，不认领"
+                )
         except Exception as _re:
-            pass
+            logger.warning(f"[api] place_sl {symbol} 恢复已有止损单查询异常: {_re}")
     # 兼容：让调用方用 orderId 也能取到 algoId
     if result.get("algoId") and not result.get("orderId"):
         result["orderId"] = result["algoId"]
