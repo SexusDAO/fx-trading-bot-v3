@@ -1347,7 +1347,7 @@ def refresh_pool() -> list:
         usdt = []
         for t in tickers:
             sym = t.get("symbol", "")
-            if not sym.endswith("USDT"):
+            if not (sym.endswith("USDT") or sym.endswith("USDC")):
                 continue
             if sym in POOL_STABLE_COINS:
                 continue
