@@ -1103,3 +1103,88 @@ def check_market_shock(notifier_fn=None) -> bool:
             pass
     logger.warning(f"[market_shock] {msg}")
     return True
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 杠杆利用率预算（v3.90）
+# ═══════════════════════════════════════════════════════════════════════════════
+_LEV_BULL_PHASE_KEY = {"early_bull": "BULL_EARLY", "mid_bull": "BULL_MID", "late_bull": "BULL_LATE"}
+_LEV_BEAR_KEY = {"weak": "BEAR_WEAK", "moderate": "BEAR_MODERATE", "strong": "BEAR_STRONG"}
+
+
+def _leverage_ratio(direction: str) -> float:
+    """
+    查表得到该方向的名义预算比例。
+      mode=bull  → 用 get_market_cycle_phase() 取 early/mid/late，取不到按 mid
+      mode=bear  → 用 get_bear_strength() 取 weak/moderate/strong，取不到（None）按 moderate
+      其他（range 等）→ range 档
+    direction 非 LONG/SHORT 抛 ValueError（由调用方降级处理）。
+    """
+    import config as _cfg
+    d = (direction or "").upper()
+    if d not in ("LONG", "SHORT"):
+        raise ValueError(f"direction 非法: {direction!r}")
+    mode = get_market_mode()
+    if mode == "bull":
+        key = _LEV_BULL_PHASE_KEY.get(get_market_cycle_phase(), "BULL_MID")
+    elif mode == "bear":
+        key = _LEV_BEAR_KEY.get(get_bear_strength(), "BEAR_MODERATE")
+    else:
+        key = "RANGE"
+    return float(getattr(_cfg, f"LEVERAGE_{d}_RATIO_{key}"))
+
+
+def calc_leverage_remaining(direction: str, equity: float) -> float:
+    """
+    返回该方向还能开的最大名义仓位（USDT）。
+      budget    = equity × LEVERAGE_TARGET × ratio(方向, 市场状态)
+      used      = Σ state 里同方向 open/pending/patching 仓位的 quantity_remaining × entry_price
+                  （tp1_filled=True 的仓位同样计入：不占槽位，但名义照算）
+      remaining = max(0, budget - used)
+      返回 min(remaining, equity × MAX_SINGLE_NOMINAL_RATIO)
+    任何异常都返回 equity × MAX_SINGLE_NOMINAL_RATIO（降级放行，不阻断开仓）；
+    equity 本身无法使用时返回 inf（不限制）。只读 state，不调用交易所接口。
+    """
+    import math
+    try:
+        _single_ratio = 1.5
+        try:
+            from config import MAX_SINGLE_NOMINAL_RATIO as _single_ratio
+        except Exception:
+            pass
+        try:
+            equity = float(equity)
+            if not math.isfinite(equity):
+                return float("inf")
+        except (TypeError, ValueError):
+            return float("inf")
+        single_cap = equity * float(_single_ratio)
+        try:
+            from config import LEVERAGE_TARGET as _target
+            ratio = _leverage_ratio(direction)
+            budget = equity * float(_target) * ratio
+            from shared.state import get_all_positions as _gap
+            d = (direction or "").upper()
+            used = 0.0
+            for p in _gap():
+                if p.get("status") not in ("open", "pending", "patching"):
+                    continue
+                if (p.get("direction") or "").upper() != d:
+                    continue
+                try:
+                    q = p.get("quantity_remaining")
+                    if q is None:
+                        q = p.get("quantity", 0)
+                    n = float(q) * float(p.get("entry_price", 0) or 0)
+                    if math.isfinite(n) and n > 0:
+                        used += n
+                except (TypeError, ValueError):
+                    continue
+            remaining = max(0.0, budget - used)
+            logger.debug(f"[leverage] {d} ratio={ratio} budget={budget:.0f} used={used:.0f} remaining={remaining:.0f}")
+            return min(remaining, single_cap)
+        except Exception as e:
+            logger.warning(f"[leverage] calc_leverage_remaining 异常，降级放行: {e}")
+            return single_cap
+    except Exception:
+        return float("inf")
