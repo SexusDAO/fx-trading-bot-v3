@@ -75,6 +75,25 @@ def _validate_window(klines: list, start_ms: int, window_end: int, now_ms: int) 
     return None
 
 
+# [v3.89 #47] 行情请求合并缓存：key=(symbol, start_ms, limit)。
+#   同一次 run() 内相同标的、相同追踪窗口的记录复用同一份 K 线，
+#   节流（time.sleep）只在真正发出请求时执行，不再按记录条数计。
+_KLINE_CACHE: dict = {}
+
+
+def _get_klines_cached(symbol: str, start_ms: int, limit: int) -> list:
+    key = (symbol, start_ms, limit)
+    if key not in _KLINE_CACHE:
+        _KLINE_CACHE[key] = _get_klines(symbol, start_ms, limit=limit)
+        time.sleep(0.03)   # [v3.89 #47] 节流按实际发出的请求数计
+    return _KLINE_CACHE[key]
+
+
+def _clear_kline_cache() -> None:
+    """每次 run() 开始时清空，避免跨批次复用过期行情。"""
+    _KLINE_CACHE.clear()
+
+
 def _check_rejected_outcome(rec: dict) -> dict:
     """
     追踪一条拒绝记录。始终返回 dict，字段 status：
@@ -110,7 +129,8 @@ def _check_rejected_outcome(rec: dict) -> dict:
         return {"status": "invalid", "reason": "bad_symbol"}
 
     window_end = ts + TRACK_WINDOW_H * 3600 * 1000
-    klines = _get_klines(symbol, ts, limit=TRACK_WINDOW_H * 4)
+    # [v3.89 #47] 走合并缓存（同标的+同窗口只请求一次），节流按实际请求数
+    klines = _get_klines_cached(symbol, ts, TRACK_WINDOW_H * 4)
     if not klines:
         return {"status": "insufficient", "reason": "no_klines"}
     klines = [k for k in klines if int(k[0]) < window_end]
@@ -167,16 +187,8 @@ def run(analytics_file: Path | None = None, days: int = 7) -> dict:
                 continue
             rejected_recs.append(rec)
 
-    # [v3.89 #47] 行情按「标的 + 追踪窗口」合并：同一标的同一窗口只请求一次。
-    #   klines 结果同时被窗口覆盖校验复用，避免同标相近记录重复打网络。
-    _kline_cache: dict = {}
-
-    def _get_klines_cached(_symbol: str, _start_ms: int, _limit: int) -> list:
-        _key = (_symbol, _start_ms, _limit)
-        if _key not in _kline_cache:
-            _kline_cache[_key] = _get_klines(_symbol, _start_ms, limit=_limit)
-            time.sleep(0.03)   # [v3.89 #47] 节流按实际发出的请求数计
-        return _kline_cache[_key]
+    # [v3.89 #47] 每次重跑清空行情缓存，仅在同一次分析内复用相同窗口的 K 线
+    _clear_kline_cache()
 
     # 按拒绝原因分组统计
     groups: dict[str, list] = defaultdict(list)       # 仅 complete
