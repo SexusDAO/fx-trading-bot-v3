@@ -52,6 +52,11 @@ except Exception as _cfg_e:
     _CFG_SL_LOW, _CFG_SL_MID, _CFG_SL_HIGH = 0.12, 0.15, 0.20
     _CFG_TP1_HIGH = 0.25
     _CFG_RR_MIN_TP1 = 1.5
+    # [v3.89] 回退路径漏定义的三个名字（下方 _SL_MAX_PCT / _TP1_MAX_PCT / RR 高层级处会直接引用，导致导入时 NameError）。
+    #   取值与 config.py 中同名项当前值一致；上面已有的回退值未改动。
+    _CFG_SL_MAX = 0.12
+    _CFG_TP1_MAX = 0.15
+    _CFG_RR_MIN_TP1_HIGH = 1.5
     _cfg_fb_exc = _cfg_e   # logger 在下面才创建，延后输出
 
 logger = logging.getLogger("fx.calc_sl_tp")
