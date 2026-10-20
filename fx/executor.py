@@ -1093,17 +1093,65 @@ async def _on_position_closed(pos_id: str, symbol: str,
         except Exception as _e:
             logger.error(f"[pm] _on_position_closed 冷却期处理失败: {_e}")
 
+def _persist_position_record(rec: dict, kind: str) -> bool:
+    """
+    [v3.89 #52] 写入持仓/挂单记录并检查 add_position 的返回值。成功返回 True。
+    失败分两类：
+      - 同品种已有 open/pending/patching 记录（正常的防重复逻辑）：只记 warning，不进 unpersisted 文件；
+      - 其他原因（如持仓文件损坏被拒、写入异常）：订单已在交易所，本地却无记录 →
+        追加写 logs/unpersisted_positions.jsonl + logger.critical + 通知；不写 pos_state.json。
+    失败时调用方拿到 None，不得继续发通知或打印「流程完成」。
+    """
+    sym = rec.get("symbol", "")
+    err = None
+    try:
+        if add_position(rec):
+            return True
+    except Exception as e:
+        err = repr(e)
+    try:
+        from shared import state as _st
+        corrupted = bool(getattr(_st, "_POS_STATE_CORRUPTED", False))
+        dup = [p for p in get_all_positions()
+               if p.get("symbol") == sym and p.get("status") in ("open", "pending", "patching")]
+    except Exception:
+        corrupted, dup = False, []
+    if err is None and not corrupted and dup:
+        logger.warning(f"[executor] {sym} {kind} 记录写入被拒：已有 open/pending/patching 记录"
+                       f"（防重复逻辑），pos_id={rec.get('pos_id')} order_id={rec.get('open_order_id')}")
+        return False
+    reason = err or ("pos_state 已损坏，写入被拒" if corrupted else "add_position 返回 False，原因未知")
+    try:
+        p = Path(__file__).parent / "logs" / "unpersisted_positions.jsonl"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with open(p, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"ts": time.time(), "kind": kind, "symbol": sym, "reason": reason,
+                                "open_order_id": rec.get("open_order_id"), "record": rec},
+                               ensure_ascii=False, default=str) + "\n")
+    except Exception as e:
+        logger.error(f"[executor] 写 unpersisted_positions.jsonl 失败: {e}")
+    logger.critical(f"[executor] {sym} {kind} 无法写入 pos_state（{reason}）：交易所订单 "
+                    f"{rec.get('open_order_id')} 已存在但本地无记录，请人工核查；完整记录见 logs/unpersisted_positions.jsonl")
+    try:
+        import threading as _thr
+        _thr.Thread(target=notify, daemon=True,
+                    args=(f"🚨 {sym} {kind} 已在交易所生效但本地持仓记录写入失败（{reason}），请人工核查！",)).start()
+    except Exception:
+        pass
+    return False
+
+
 def _write_position(
     signal: dict, fill_price: float, fill_qty: float,
     leverage: int, guard: dict, params: dict,
     open_order_id: int, atr: float = 0.0,
-) -> str:
-    """写入 pos_state.json，返回 pos_id。问题一修复：加入 atr 参数写入 atr_at_entry"""
+) -> str | None:
+    """写入 pos_state.json，返回 pos_id；写入失败返回 None（[v3.89 #52]）。问题一修复：加入 atr 参数写入 atr_at_entry"""
     pos_id = str(uuid.uuid4())[:8]
     tp1_qty = guard["tp1_qty"]
     tp2_qty = guard["tp2_qty"]
 
-    add_position({
+    _pos_rec = {
         "pos_id":                pos_id,
         "symbol":                signal["symbol"],
         "direction":             signal["direction"].lower(),
@@ -1173,7 +1221,9 @@ def _write_position(
         "funding_last_settle_hour": -1,
         # ── 推送卡片 ID（供 position_manager 追加进展行用）───────────────────
         "_sig_id":              signal.get("_sig_id", ""),
-    })
+    }
+    if not _persist_position_record(_pos_rec, "position"):
+        return None   # [v3.89 #52] 未落盘：不写交易日志/冷却，不返回假 pos_id
     _append_trade_log(pos_id, signal, fill_price, fill_qty, params)
     # v3.44: 写入同方向开仓冷協（防止同标的同方向短时间内连开）
     try:
@@ -1235,10 +1285,10 @@ def _append_trade_log(
 
 async def _write_pending(signal: dict, order_id: int, params: dict,
                           leverage: int, expire_ts: int | None,
-                          atr: float = 0.0) -> str:
-    """写入挂单状态（pending）。atr_at_entry 供 _calc_trail_sl 动态止损使用。"""
+                          atr: float = 0.0) -> str | None:
+    """写入挂单状态（pending）。atr_at_entry 供 _calc_trail_sl 动态止损使用。写入失败返回 None（[v3.89 #52]）。"""
     pos_id = str(uuid.uuid4())[:8]
-    add_position({
+    _pend_rec = {
         "pos_id":             pos_id,
         "symbol":             signal["symbol"],
         "direction":          signal["direction"].lower(),
@@ -1268,7 +1318,9 @@ async def _write_pending(signal: dict, order_id: int, params: dict,
         "status":             "pending",
         "expire_ts":          expire_ts,
         "open_time":          int(time.time() * 1000),
-    })
+    }
+    if not _persist_position_record(_pend_rec, "pending"):
+        return None
     return pos_id
 
 
@@ -1663,7 +1715,10 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
         jd = signal.get("judge_detail") or {}
         jd.setdefault("vol_ratio", signal.get("ind", {}).get("vol_ratio", 0))
         signal["judge_detail"] = jd
-        await _write_pending(signal, order_id, params, leverage, expire_ts, atr=atr)
+        _pend_id = await _write_pending(signal, order_id, params, leverage, expire_ts, atr=atr)
+        if _pend_id is None:   # [v3.89 #52]
+            logger.critical("[executor] 持仓写入失败，订单已成交但本地无记录，请人工核查")
+            return False
 
         # v3.6: 删除 ensure_future(_retry_confirm_30s)
         # 原实现在子线程 loop（execute_signal_sync 用 new_event_loop），
@@ -1755,6 +1810,9 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
     pos_id = _write_position(
         signal, fill_price, fill_qty, leverage, guard, params, order_id, atr=atr
     )
+    if pos_id is None:   # [v3.89 #52] 不继续发通知，不打印「流程完成」
+        logger.critical("[executor] 持仓写入失败，订单已成交但本地无记录，请人工核查")
+        return False
 
     # 开仓通知：向信号卡片追加开仓成交行
     try:
