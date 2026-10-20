@@ -48,10 +48,10 @@ try:
     from config import TP1_MAX_PCT_HIGH as _CFG_TP1_HIGH
     from config import RR_MIN_TP1 as _CFG_RR_MIN_TP1, RR_MIN_TP1_HIGH as _CFG_RR_MIN_TP1_HIGH
 except Exception as _cfg_e:
-    _CFG_LOW, _CFG_MID, _CFG_HIGH = 1.2, 1.5, 2.0
+    _CFG_LOW, _CFG_MID, _CFG_HIGH = 1.5, 1.5, 2.0   # [v3.89] low 档 1.2→1.5，对齐 config.SL_MULT_LOW
     _CFG_SL_LOW, _CFG_SL_MID, _CFG_SL_HIGH = 0.12, 0.15, 0.20
     _CFG_TP1_HIGH = 0.25
-    _CFG_RR_MIN_TP1 = 1.5
+    _CFG_RR_MIN_TP1 = 2.0   # [v3.89] 1.5→2.0，对齐 config.RR_MIN_TP1
     # [v3.89] 回退路径漏定义的三个名字（下方 _SL_MAX_PCT / _TP1_MAX_PCT / RR 高层级处会直接引用，导致导入时 NameError）。
     #   取值与 config.py 中同名项当前值一致；上面已有的回退值未改动。
     _CFG_SL_MAX = 0.12
