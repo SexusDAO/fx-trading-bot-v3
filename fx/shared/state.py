@@ -518,13 +518,19 @@ def set_open_dir_cooldown(symbol: str, direction: str, hours: float) -> None:
     until  = int(time.time() * 1000) + int(hours * 3600 * 1000)
     with _locks["cd"]:
         d = _load_cd()
-        d[key] = {
-            "cooldown_until": until,
-            "reason":         "open_dir",
-            "set_at":         int(time.time() * 1000),
-        }
+        # [v3.89 #98] 重复写入取 max(已有期限, 新期限)，不缩短已有的更长方向冷却
+        existing = d.get(key, {}).get("cooldown_until", 0)
+        if until > existing:
+            d[key] = {
+                "cooldown_until": until,
+                "reason":         "open_dir",
+                "set_at":         int(time.time() * 1000),
+            }
+            effective = until
+        else:
+            effective = existing
         _save_cd(d)
-    logger.info(f"[state] {symbol} {direction.upper()} 开仓冷却 {hours}h 已写入")
+    logger.info(f"[state] {symbol} {direction.upper()} 开仓冷却 {hours}h 已写入，实际到期 {effective}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
