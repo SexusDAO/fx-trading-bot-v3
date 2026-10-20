@@ -892,6 +892,10 @@ async def _place_guards_async(
     results: dict = {}
 
     async def _place(tag: str, kwargs: dict):
+        if kwargs.get("quantity", 0) <= 0:
+            results[tag] = None
+            await notify_async(f"⚠️ {symbol} {tag} 取整后数量为零，未提交；仓位处于部分保护状态")
+            return
         try:
             resp = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: api.place_order(**kwargs)
@@ -964,6 +968,8 @@ async def _place_guards_async(
     logger.info(f"[executor] {symbol} 保护单模式: {tp_mode}")
 
     return {
+        "protection_status": "complete" if results.get("sl") and results.get("tp1") and (not has_tp2 or results.get("tp2")) else "partial",
+        "unallocated_qty": max(0.0, fill_qty - sl_qty_f),
         "sl_id":   results.get("sl"),
         "tp1_id":  results.get("tp1"),
         "tp2_id":  results.get("tp2"),   # None if no tp2
