@@ -2454,6 +2454,11 @@ def _judge_range_bounce_impl(k1h, k4h, k15, ind, chg24, funding):
     out["c_low"]        = round(c_low, 8)
     out["zone_mid"]     = round(zone_mid, 6)
     out["gap_4h"]       = round(gap_4h, 1)
+    # [fix] range_bounce 漏写 volatility_tier，导致 calc_sl_tp 回退 mid 规则
+    # atr_ratio>6% 的高波动币被错误用 cap=15%/RR_min=2.0（应为 cap=25%/RR_min=1.5），
+    # 致使所有通过 judge 的 range_bounce 信号在 calc_sl_tp 被静默丢弃。
+    out["volatility_tier"] = _volatility_tier(ind.get("atr_1h", 0), price)
+    out["atr_ratio"]       = round(atr_r, 4)
     return True, out
 
 
@@ -2962,6 +2967,9 @@ def _judge_stop_hunt_impl(k1h, k4h, k15, ind, chg24, funding):
         # sweep_extreme: 刺穿的极端点（pierce_extreme 别名，供 calc_sl_tp 读取 SL）
         "sweep_extreme":          round(pierce_low or pierce_high or pivot_val, 8),
     })
+    # [fix] stop_hunt 同样漏写 volatility_tier（STOP_HUNT_ENABLED=False，但一并补齐）
+    out["volatility_tier"] = _volatility_tier(ind.get("atr_1h", 0), price)
+    out["atr_ratio"]       = round(_atr_ratio(ind.get("atr_1h", 0), price), 4)
     logger.debug(
         f"[judge_stop_hunt] {pierce_direction} {strength} "
         f"pivot={pivot_val:.6g} pierce_pct={p_pct:.2f}% "
