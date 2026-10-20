@@ -16,7 +16,7 @@ def _k(i, o=100.0, h=101.0, l=99.0, c=100.0, v=10.0):
 
 
 class TestIndicatorParams(unittest.TestCase):
-    BAD = [0, -1, 1.5, None, "14", True]
+    BAD = [0, -1, 1.5, 20.5, 0.0, -2.0, NAN, INF, None, "14", True]
 
     def test_bad_period_raises(self):
         closes = [float(i) for i in range(1, 60)]
@@ -30,6 +30,19 @@ class TestIndicatorParams(unittest.TestCase):
                     I.atr(kl, n)
                 with self.assertRaises(ValueError):
                     I.calc_volume_profile(kl, n)
+
+    def test_integral_float_accepted_same_result_as_int(self):
+        """配置里写成 20.0 的周期视为合法，结果与整数 20 完全一致。"""
+        closes = [float(i % 7 + i * 0.1) for i in range(1, 80)]
+        kl = [_k(i, h=101 + i % 5, l=99 - i % 3) for i in range(80)]
+        self.assertEqual(I.ema(closes, 20.0), I.ema(closes, 20))
+        self.assertEqual(I.rsi(closes, 14.0), I.rsi(closes, 14))
+        self.assertEqual(I.bb_pct(closes, 20.0), I.bb_pct(closes, 20))
+        self.assertEqual(I.bollinger(closes, 20.0), I.bollinger(closes, 20))
+        self.assertEqual(I.atr(kl, 14.0), I.atr(kl, 14))
+        self.assertEqual(I.calc_volume_profile(kl, 40.0), I.calc_volume_profile(kl, 40))
+        self.assertEqual(I._require_positive_int(20.0, "n"), 20)
+        self.assertIsInstance(I._require_positive_int(20.0, "n"), int)
 
     def test_legal_params_unchanged(self):
         closes = [float(i) for i in range(1, 60)]
