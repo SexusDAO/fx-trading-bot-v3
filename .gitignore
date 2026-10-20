@@ -70,3 +70,35 @@ square_config.json
 fomo_workflow/config.py
 *.pem
 *.key
+
+# ── 身份和 agent 配置文件（不进仓库）──────────────────────────────
+AGENTS.md
+SOUL.md
+IDENTITY.md
+USER.md
+HEARTBEAT.md
+BOOTSTRAP.md
+TOOLS.md
+MEMORY.md
+
+# ── 持仓 / 钱包 / 信号日志（敏感 + 运行时）─────────────────────
+positions.json
+*positions*.json
+manual_positions.json
+meme_new_launch_positions.json
+signal_log.jsonl
+bsc_kol_wallets*.json
+smart_watchlist.json
+
+# ── 备份文件 & nohup 输出 ──────────────────────────────────────────
+*.bak
+*.bak_*
+nohup.out
+
+# ── circuit breaker / watchlist（运行时状态）─────────────────────
+circuit_breaker.json
+**/circuit_breaker.json
+watchlist.json
+watchlist.json.bak
+**/watchlist.json
+v3/config/pos_state*.json

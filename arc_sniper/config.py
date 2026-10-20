@@ -96,12 +96,15 @@ POOL_CREATED_TOPIC = "0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b
 WALLET_ADDRESS = "0x8A966Db06aD9624a0E41bb4adfD817c5e7e55F54"
 
 # ═══════════════════════════════════════════════════════════════
-# 私钥 (从环境变量或 deploy_testnet.py fallback)
+# 私钥 — 必须通过环境变量注入，不接受默认值
+# export ARC_PRIVATE_KEY='0x你的私钥'
 # ═══════════════════════════════════════════════════════════════
-PRIVATE_KEY = os.getenv("ARC_PRIVATE_KEY", "")
-# Fallback: 之前用户提供过的私钥 (9/12)
+PRIVATE_KEY = os.environ.get("ARC_PRIVATE_KEY") or os.environ.get("ARC_SNIPER_CONFIG_PRIVATE_KEY")
 if not PRIVATE_KEY:
-    PRIVATE_KEY = os.environ.get("ARC_SNIPER_CONFIG_PRIVATE_KEY", "")
+    raise EnvironmentError(
+        "[arc_sniper] ARC_PRIVATE_KEY 未设置。"
+        " 请先 export ARC_PRIVATE_KEY='0x你的私钥' 再运行。"
+    )
 
 # ═══════════════════════════════════════════════════════════════
 # 买入参数

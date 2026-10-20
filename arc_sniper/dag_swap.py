@@ -761,7 +761,7 @@ def main():
     amount = float(sys.argv[2])
 
     import os
-    pk = os.environ.get("ARC_PRIVATE_KEY", "0xb1e6bc56444acb4f997bb7bd23ba707b258d6b7d8b889897fc4518afeb6be5c4")
+    pk = os.environ["ARC_PRIVATE_KEY"]  # 不接受默认值，必须在环境变量中设置
 
     swap = DagSwap(DEFAULT_RPC, pk)
 

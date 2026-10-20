@@ -25,7 +25,8 @@ BINANCE_WS_URL     = "wss://fstream.binance.com"
 WS_KEEPALIVE_INTERVAL = 20 * 60   # listenKey 续期间隔，秒（20 分钟）
 WS_RECONNECT_BASE     = 3         # 断线重连初始等待，秒
 WS_RECONNECT_MAX      = 60        # 断线重连最大等待，秒
-USE_TESTNET        = False   # True 时自动切换测试网，只改这一个地方  # [v3.85 DOC-2] 代码未引用此常量，修改无效
+# USE_TESTNET 已删除 —— 代码从未引用此常量，保留会造成"改了就切测试网"的错觉。
+# 如需切测试网，请修改 BINANCE_BASE_URL 和 BINANCE_WS_BASE_URL。
 
 # Clawby Pro（已于 2026-08-28 迁移，旧 keystore.com.cn 代理已废弃）
 # 接口配置集中在 fx/shared/clawby_adapter.py
@@ -264,7 +265,7 @@ MARGIN_SAFETY_AVAIL_MIN   = 0.1   # 可用余额/余额 < 10% → 禁止开仓
 MARGIN_SAFETY_SCALE_TIGHT = 0.5   # 偏紧时仓位缩减系数
 
 # 杠杆缓存
-LEVERAGE_CACHE_TTL = 600   # 秒，10 分钟  # [v3.85 DOC-2] 代码未引用此常量，修改无效
+# LEVERAGE_CACHE_TTL 已删除 —— 代码从未引用此常量，避免误导。
 
 # 执行参数（向后兼容）
 DEFAULT_LEVERAGE = 10

@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 Arc Auto Buy v2 — 多策略自动重试
@@ -10,7 +11,7 @@ import subprocess, json, time, sys, os
 from web3 import Web3
 
 RPC = "https://rpc.arc-scan.org"
-PK = "0xb1e6bc56444acb4f997bb7bd23ba707b258d6b7d8b889897fc4518afeb6be5c4"
+PK = os.environ["ARC_PK"]  # 不接受默认值，必须在环境变量中设置
 WALLET = Web3.to_checksum_address("0x8A966Db06aD9624a0E41bb4adfD817c5e7e55F54")
 WUSDC = Web3.to_checksum_address("0x3600000000000000000000000000000000000000")
 TOLLY_DEX = Web3.to_checksum_address("0x114d574247342eafea95b7a9234e62984d48cD9E")

@@ -118,5 +118,23 @@
       "entry_degraded_reason": null
     }
   ],
-  "open_positions_snapshot": []
+  "open_positions_snapshot": [],
+  "market_sentiment": {
+    "pct_positive": 0.5693,
+    "pct_negative": 0.1307,
+    "median_rate": 4.1e-05,
+    "extreme_positive_count": 3,
+    "extreme_negative_count": 14,
+    "sentiment": "neutral"
+  },
+  "portfolio_risk": {
+    "portfolio_beta": 0.0,
+    "btc_10pct_drop_loss_pct": 0.0,
+    "net_direction": "NEUTRAL",
+    "max_single_position_pct": 0.0,
+    "total_notional": 0.0,
+    "equity": 0.0,
+    "correlation_matrix": {},
+    "positions": []
+  }
 }

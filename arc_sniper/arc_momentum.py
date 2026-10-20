@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 Arc Pre-Pump Scanner v2 — 基于历史回测优化的信号检测 + 自动买入
@@ -22,7 +23,7 @@ import subprocess, json, time, sys, os, collections
 # ════════════════════════════════════════════════════════════
 RPC = "https://rpc.mainnet.arc.io"
 RPC_FALLBACK = "https://rpc.arc-scan.org"
-PK = os.environ.get("ARC_PK", "0xb1e6bc56444acb4f997bb7bd23ba707b258d6b7d8b889897fc4518afeb6be5c4")
+PK = os.environ["ARC_PK"]  # 不接受默认值，必须在环境变量中设置
 WALLET = "0x8A966Db06aD9624a0E41bb4adfD817c5e7e55F54"
 NATIVE_USDC = "0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE"
 DEX = "0x114d574247342eafea95b7a9234e62984d48cD9E"

@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 Arc Sniper — 完整买入流程 (使用 curl 绕过 web3.py 发送限制)
@@ -11,7 +12,7 @@ import subprocess, json, time, sys, os
 from web3 import Web3
 
 w3 = Web3(Web3.HTTPProvider("https://rpc.arc-scan.org", request_kwargs={"timeout": 15}))
-PK = "0xb1e6bc56444acb4f997bb7bd23ba707b258d6b7d8b889897fc4518afeb6be5c4"
+PK = os.environ["ARC_PK"]  # 不接受默认值，必须在环境变量中设置
 WALLET = Web3.to_checksum_address("0x8A966Db06aD9624a0E41bb4adfD817c5e7e55F54")
 WUSDC = Web3.to_checksum_address("0x3600000000000000000000000000000000000000")
 ROUTER = Web3.to_checksum_address("0xb99654A2537cDc4C65368262F9E03E2128dfd78B")

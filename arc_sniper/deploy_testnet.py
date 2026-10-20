@@ -10,7 +10,7 @@ from solcx import compile_source
 
 # 连接 testnet
 w3 = Web3(Web3.HTTPProvider('https://rpc.testnet.arc.io'))
-pk = os.environ.get('ARC_PRIVATE_KEY', '0xb1e6bc56444acb4f997bb7bd23ba707b258d6b7d8b889897fc4518afeb6be5c4')
+pk = os.environ['ARC_PRIVATE_KEY']  # 不接受默认值，必须在环境变量中设置
 acct = w3.eth.account.from_key(pk)
 addr = acct.address
 print(f'钱包: {addr}')
