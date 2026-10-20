@@ -75,41 +75,134 @@ def _read_pid(pid_file: Path) -> int | None:
     except Exception:
         return None
 
-def _is_alive(pid: int | None) -> bool:
-    """检查 PID 是否存活。"""
+# ── PID 身份校验（[v3.89 #104]）─────────────────────────────────────────────
+# 原写法只用 os.kill(pid, 0)：PID 被系统复用后会把无关进程当成目标并发信号；
+# PermissionError（进程存在但无权限）还被当成「不存在」。
+# 现在：PID 文件旁边写 .meta（启动时间令牌 + 命令行特征），校验时同时核对；
+# 严格区分 absent / alive / alive_no_permission / mismatch。
+
+def _proc_start_token(pid: int) -> str | None:
+    """进程启动时间令牌：Linux 取 /proc/<pid>/stat 第 22 字段，其他系统用 ps lstart。取不到返回 None。"""
+    try:
+        raw = Path(f"/proc/{pid}/stat").read_text()
+        return raw[raw.rindex(")") + 2:].split()[19]
+    except Exception:
+        pass
+    try:
+        r = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True, timeout=5)
+        out = r.stdout.strip()
+        return out or None
+    except Exception:
+        return None
+
+def _proc_cmdline(pid: int) -> str | None:
+    """进程命令行（空格拼接）。取不到返回 None。"""
+    try:
+        return Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\x00", b" ").decode(errors="replace").strip() or None
+    except Exception:
+        pass
+    try:
+        r = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True, timeout=5)
+        return r.stdout.strip() or None
+    except Exception:
+        return None
+
+def _meta_path(pid_file: Path) -> Path:
+    return Path(str(pid_file) + ".meta")
+
+def _write_pid_file(pid_file: Path, pid: int, cmd_hint: str) -> None:
+    """写 PID 文件，并在旁边写身份文件（启动时间令牌 + 命令行特征）。"""
+    pid_file.write_text(str(pid))
+    try:
+        _meta_path(pid_file).write_text(json.dumps(
+            {"pid": pid, "start": _proc_start_token(pid), "cmd": cmd_hint}))
+    except Exception as e:
+        log(f"[pid] 写身份文件失败（降级为仅命令行特征校验）: {e}")
+
+def _expected_identity(pid_file: Path, default_cmd: str) -> dict:
+    """读取期望身份；没有身份文件（旧版本写的 PID 文件）时只用默认命令行特征。"""
+    try:
+        m = json.loads(_meta_path(pid_file).read_text())
+        return {"start": m.get("start"), "cmd": m.get("cmd") or default_cmd, "pid": m.get("pid")}
+    except Exception:
+        return {"start": None, "cmd": default_cmd, "pid": None}
+
+def _pid_status(pid: int | None, expect: dict | None = None) -> str:
+    """
+    返回 absent / alive / alive_no_permission / mismatch。
+      absent              进程不存在
+      mismatch            PID 存在但启动时间或命令行与期望不符（PID 已被复用）
+      alive_no_permission 进程存在但无权限发信号（不是「不存在」）
+      alive               进程存在且身份相符（或没有可校验的期望）
+    """
     if pid is None:
-        return False
+        return "absent"
+    no_perm = False
     try:
         os.kill(pid, 0)
-        return True
-    except (ProcessLookupError, PermissionError):
-        return False
+    except ProcessLookupError:
+        return "absent"
+    except PermissionError:
+        no_perm = True
+    if expect:
+        if expect.get("pid") not in (None, pid):
+            return "mismatch"
+        want_start = expect.get("start")
+        if want_start:
+            cur = _proc_start_token(pid)
+            if cur is not None and cur != want_start:
+                return "mismatch"
+        want_cmd = expect.get("cmd")
+        if want_cmd:
+            cmd = _proc_cmdline(pid)
+            if cmd is not None and want_cmd not in cmd:
+                return "mismatch"
+    return "alive_no_permission" if no_perm else "alive"
 
-def _kill_pid(pid: int, label: str = "", wait_sec: int = STOP_WAIT_SEC) -> bool:
-    """发 SIGTERM，等待退出，超时则 SIGKILL。返回是否成功停止。"""
-    if not _is_alive(pid):
+def _is_alive(pid: int | None, expect: dict | None = None) -> bool:
+    """目标进程是否存活。PermissionError（存在但无权限）算存活；PID 被无关进程复用（mismatch）算不存在。"""
+    return _pid_status(pid, expect) in ("alive", "alive_no_permission")
+
+def _kill_pid(pid: int, label: str = "", wait_sec: int = STOP_WAIT_SEC, expect: dict | None = None) -> bool:
+    """发 SIGTERM，等待退出，超时则 SIGKILL。返回是否成功停止。身份不符的 PID 不会被发送信号。"""
+    st = _pid_status(pid, expect)
+    if st == "absent":
         return True
+    if st == "mismatch":
+        log(f"  {label} (PID={pid}) 已不是目标进程（PID 被复用），不发送信号，视为已退出")
+        return True
+    if st == "alive_no_permission":
+        log(f"  ❌ {label} (PID={pid}) 存在但无权限发送信号，未能停止")
+        return False
     log(f"正在停止 {label} (PID={pid})...")
     try:
         os.kill(pid, signal.SIGTERM)
     except ProcessLookupError:
         return True
+    except PermissionError:
+        log(f"  ❌ {label} (PID={pid}) 无权限发送 SIGTERM，未能停止")
+        return False
 
     deadline = time.time() + wait_sec
     while time.time() < deadline:
         time.sleep(0.5)
-        if not _is_alive(pid):
+        if not _is_alive(pid, expect):
             log(f"  {label} (PID={pid}) 已优雅退出")
             return True
 
-    # 超时，强杀
+    # 超时，强杀（再次核对身份，避免等待期间 PID 被复用）
+    if _pid_status(pid, expect) != "alive":
+        return not _is_alive(pid, expect)
     log(f"  {label} (PID={pid}) 未在 {wait_sec}s 内退出，发送 SIGKILL")
     try:
         os.kill(pid, signal.SIGKILL)
         time.sleep(1)
     except ProcessLookupError:
         pass
-    return not _is_alive(pid)
+    except PermissionError:
+        log(f"  ❌ {label} (PID={pid}) 无权限发送 SIGKILL")
+        return False
+    return not _is_alive(pid, expect)
 
 def _rotate_log():
     """system.log 超过 MAX_LOG_MB 时归档，防止无限膨胀。"""
@@ -141,21 +234,25 @@ def _stop_all_existing(verbose: bool = True) -> bool:
 
     # 1. 按 main.pid 精确停 main.py
     main_pid = _read_pid(MAIN_PID)
-    if _is_alive(main_pid):
-        ok = _kill_pid(main_pid, "main.py", wait_sec=STOP_WAIT_SEC)
+    _main_exp = _expected_identity(MAIN_PID, "main.py")
+    if _is_alive(main_pid, _main_exp):
+        ok = _kill_pid(main_pid, "main.py", wait_sec=STOP_WAIT_SEC, expect=_main_exp)
         if not ok:
             if verbose: log(f"  ⚠️ main.py PID={main_pid} 未能停止")
             stopped_all = False
     MAIN_PID.unlink(missing_ok=True)
+    _meta_path(MAIN_PID).unlink(missing_ok=True)
 
     # 2. 按 daemon.pid 精确停 daemon
     daemon_pid = _read_pid(DAEMON_PID)
-    if _is_alive(daemon_pid):
-        ok = _kill_pid(daemon_pid, "daemon", wait_sec=5)
+    _dm_exp = _expected_identity(DAEMON_PID, "daemon_start.py")
+    if _is_alive(daemon_pid, _dm_exp):
+        ok = _kill_pid(daemon_pid, "daemon", wait_sec=5, expect=_dm_exp)
         if not ok:
             if verbose: log(f"  ⚠️ daemon PID={daemon_pid} 未能停止")
             stopped_all = False
     DAEMON_PID.unlink(missing_ok=True)
+    _meta_path(DAEMON_PID).unlink(missing_ok=True)
 
     # 3. 兜底：pkill 扫描残余的 main.py 进程（防止 PID 文件丢失的情形）
     r = subprocess.run(
@@ -168,7 +265,7 @@ def _stop_all_existing(verbose: bool = True) -> bool:
         if pid == own_pid:
             continue
         if verbose: log(f"  兜底: 发现残余 main.py 进程 PID={pid}，强制清理")
-        _kill_pid(pid, f"残余main.py({pid})", wait_sec=5)
+        _kill_pid(pid, f"残余main.py({pid})", wait_sec=5, expect={"cmd": "main.py"})
 
     # 4. 同理兜底扫描 daemon_start.py 残余
     r2 = subprocess.run(
@@ -182,7 +279,7 @@ def _stop_all_existing(verbose: bool = True) -> bool:
         if pid == own_pid or pid == os.getppid():
             continue
         if verbose: log(f"  兜底: 发现残余 daemon 进程 PID={pid}，强制清理")
-        _kill_pid(pid, f"残余daemon({pid})", wait_sec=3)
+        _kill_pid(pid, f"残余daemon({pid})", wait_sec=3, expect={"cmd": "daemon_start.py"})
 
     return stopped_all
 
@@ -194,7 +291,7 @@ def _stop_all_existing(verbose: bool = True) -> bool:
 def _daemon_loop():
     """main.py 崩溃就重启，推送通知。"""
     DAEMON_PID.parent.mkdir(parents=True, exist_ok=True)
-    DAEMON_PID.write_text(str(os.getpid()))
+    _write_pid_file(DAEMON_PID, os.getpid(), "daemon_start.py")
 
     notify(f"✅ fx trading daemon 启动 (PID={os.getpid()})")
 
@@ -227,7 +324,7 @@ def _daemon_loop():
             )
 
         # 写 main.pid，供精确 kill 使用
-        MAIN_PID.write_text(str(proc.pid))
+        _write_pid_file(MAIN_PID, proc.pid, "main.py")
         log(f"main.py 已启动 (PID={proc.pid})")
 
         # v3.82: 内存守护 —— 每 60s 检查一次 RSS，超过阈值主动发 SIGTERM 优雅重启
@@ -315,7 +412,8 @@ def cmd_start():
     # 检查是否已有活跃进程
     daemon_pid = _read_pid(DAEMON_PID)
     main_pid_val = _read_pid(MAIN_PID)
-    if _is_alive(daemon_pid) or _is_alive(main_pid_val):
+    if (_is_alive(daemon_pid, _expected_identity(DAEMON_PID, "daemon_start.py"))
+            or _is_alive(main_pid_val, _expected_identity(MAIN_PID, "main.py"))):
         print(f"⚠️ 已有进程在运行 (daemon={daemon_pid}, main={main_pid_val})，先执行 stop 再 start")
         return
 
@@ -368,8 +466,8 @@ def cmd_status():
     daemon_pid = _read_pid(DAEMON_PID)
     main_pid_val = _read_pid(MAIN_PID)
 
-    daemon_alive = _is_alive(daemon_pid)
-    main_alive   = _is_alive(main_pid_val)
+    daemon_alive = _is_alive(daemon_pid, _expected_identity(DAEMON_PID, "daemon_start.py"))
+    main_alive   = _is_alive(main_pid_val, _expected_identity(MAIN_PID, "main.py"))
 
     print(f"daemon : {'✅ 运行中' if daemon_alive else '❌ 未运行'} (PID={daemon_pid})")
     print(f"main.py: {'✅ 运行中' if main_alive  else '❌ 未运行'} (PID={main_pid_val})")
@@ -392,8 +490,9 @@ def cmd_clean():
         if not f.exists():
             continue
         pid = _read_pid(f)
-        if not _is_alive(pid):
+        if not _is_alive(pid, _expected_identity(f, "daemon_start.py" if f == DAEMON_PID else "main.py")):
             f.unlink(missing_ok=True)
+            _meta_path(f).unlink(missing_ok=True)
             print(f"  清理失效 {label} (PID={pid})")
         else:
             print(f"  {label} 有效 (PID={pid} 在运行中)")
