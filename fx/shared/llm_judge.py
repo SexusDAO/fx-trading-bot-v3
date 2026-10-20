@@ -38,6 +38,19 @@ def _is_cooldown(key: str) -> bool:
     return time.time() - _llm_call_cache.get(key, 0) < _LLM_COOLDOWN_SEC
 
 
+def _cooldown_result(fallback: dict) -> dict:
+    """
+    [v3.89 #80] 冷却内没有调用模型：决策值仍是降级 skip（不改任何决策），
+    但带上 source="cooldown"、unavailable=True，调用方可据此区分「模型说 skip」与「没调用模型」。
+    返回副本，避免调用方改动污染降级常量。
+    """
+    r = dict(fallback)
+    r["source"] = "cooldown"
+    r["unavailable"] = True
+    r["reason"] = "冷却中未调用"
+    return r
+
+
 def _mark_called(key: str) -> None:
     _llm_call_cache[key] = time.time()
 
@@ -271,7 +284,7 @@ def judge_explosive_coin_llm(
         return _fallback
     if _is_cooldown(f"exp_{symbol}"):
         logger.debug(f"[llm_judge] {symbol} 妖币冷却中")
-        return _fallback
+        return _cooldown_result(_fallback)
 
     # 极简 prompt，< 60 tokens
     # 费率负值说明：负费率=空头付多头，市场空头拥挤，不代表利多
@@ -315,7 +328,7 @@ def judge_borderline_signal_llm(
     if not _is_enabled(LLM_JUDGE_BORDERLINE):
         return _fallback
     if _is_cooldown(f"bl_{symbol}"):
-        return _fallback
+        return _cooldown_result(_fallback)
 
     ema_bull = ind.get("ema_bull_1h") or (
         ind.get("ema20_1h", 0) > ind.get("ema50_1h", 0)
