@@ -75,7 +75,7 @@ def _remove_position_checked(pos_id: str, symbol: str = "") -> bool:
     只做日志，不改变任何业务行为。
     """
     try:
-        ok = _remove_position_checked(pos_id)
+        ok = remove_position(pos_id)
     except Exception as e:
         logger.error(f"[pm] _remove_position_checked({symbol or pos_id}) 抛异常，持仓文件可能损坏，请人工核查: {e}")
         return False
@@ -238,7 +238,7 @@ def _calc_trail_sl(pos: dict, current_price: float) -> float | None:
 # ─────────────────────────────────────────────────────────────────────────────
 # 移动止损执行(先挂新单再撤旧单,最小化裸仓窗口)
 # ─────────────────────────────────────────────────────────────────────────────
-async def _execute_trail_sl(pos: dict, new_sl: float) -> None:
+async def _execute_trail_sl(pos: dict, new_sl: float) -> bool:
     symbol    = pos["symbol"]
     # [v3.87 STEP7-5] 删除未使用的 direction 赋值
     pos_id    = pos.get("pos_id", pos.get("symbol","unknown"))
@@ -249,12 +249,12 @@ async def _execute_trail_sl(pos: dict, new_sl: float) -> None:
     lock = _guard_locks[pos_id]
     if lock.locked():
         logger.debug(f"[pm] {symbol} _execute_trail_sl 跳过:_guard_lock 被占用")
-        return
+        return False
     async with lock:
-        await _execute_trail_sl_inner(pos, new_sl, pos_id, old_sl_id, qty_remaining)
+        return await _execute_trail_sl_inner(pos, new_sl, pos_id, old_sl_id, qty_remaining)
 
 async def _execute_trail_sl_inner(pos: dict, new_sl: float,
-                                   pos_id: str, old_sl_id, qty_remaining: float) -> None:
+                                   pos_id: str, old_sl_id, qty_remaining: float) -> bool:
     symbol    = pos["symbol"]
     direction = pos["direction"].upper()
 
@@ -284,7 +284,8 @@ async def _execute_trail_sl_inner(pos: dict, new_sl: float,
         logger.info(f"[pm] {symbol} 新止损单 algoId={new_sl_id} stopPrice={sl_r:.6g}")
     except Exception as e:
         logger.error(f"[pm] {symbol} 新止损单提交失败: {e}")
-        return
+        update_position(pos_id, {"sl_target_price": new_sl, "sl_sync_status": "failed"})
+        return False
 
     # 2. 新单确认成功后,撤旧SL(确保新保护已就位再撤旧的,零裸仓窗口)
     try:
@@ -293,7 +294,14 @@ async def _execute_trail_sl_inner(pos: dict, new_sl: float,
         )
         for ao in (all_algo or []):
             aid = int(ao.get("algoId", 0))
-            if aid and aid != new_sl_id:   # 不撤刚挂的新单
+            owned = (str(aid) == str(old_sl_id) and aid != new_sl_id
+                     and ao.get("symbol") == symbol
+                     and ao.get("side") == close_side
+                     and ao.get("positionSide") in (pos_side, "BOTH")
+                     and ao.get("orderType", ao.get("type")) in ("STOP", "STOP_MARKET"))
+            if str(aid) == str(old_sl_id) and not owned:
+                logger.warning(f"[pm] {symbol} 旧止损归属或类型无法确认，保留 id={aid}")
+            if owned:
                 try:
                     await asyncio.get_running_loop().run_in_executor(
                         None, lambda _aid=aid: api.cancel_algo_order(symbol, _aid)
@@ -305,14 +313,19 @@ async def _execute_trail_sl_inner(pos: dict, new_sl: float,
 
     # 3. 更新状态(问题三修复:RR保护标志同步持久化)
     _update_fields = {
-        "sl_price":    new_sl,
+        "sl_price":    sl_r,
+        "sl_target_price": new_sl,
+        "sl_sync_status": "confirmed",
         "sl_order_id": new_sl_id,
     }
     # 如果 _calc_trail_sl 内将 rr_protection_triggered 设为 True,同步写入
     if pos.get("rr_protection_triggered"):
         _update_fields["rr_protection_triggered"] = True
-    update_position(pos_id, _update_fields)
+    if update_position(pos_id, _update_fields) is False:
+        logger.error(f"[pm] {symbol} 新止损已受理但持仓状态写入失败")
+        return False
     logger.info(f"[pm] {symbol} 移动止损完成 {pos.get('sl_price'):.6g} → {new_sl:.6g}")
+    return True
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -655,6 +668,12 @@ class PositionManager:
 
         # ── TP1 触发 ──────────────────────────────────────────────────────────
         if filled_oid == tp1_id and not tp1_filled:
+            single_tp = pos.get("tp_mode") == "single" or (pos.get("tp_mode") is None and pos.get("tp2_price") is None and not tp2_id)
+            if single_tp:
+                await _cancel(sl_id, is_algo=True)
+                update_position(pid, {"tp1_filled": True, "quantity_remaining": 0.0})
+                await self._close_position_post(pid, symbol, "tp1", event)
+                return
             logger.info(f"[pm] {symbol} TP1触发,更新剩余数量,补挂剩余40%仓位的SL单")
             update_position(pid, {
                 "tp1_filled":        True,
@@ -2449,7 +2468,8 @@ async def _maybe_pyramid(pos: dict) -> None:
                 "quantity":          new_total_qty,
                 "quantity_remaining": new_total_qty,
                 "entry_price":       round(new_avg_entry, 8),
-                "sl_price":          new_sl,
+                "sl_target_price":   new_sl,
+                "sl_sync_status":    "pending",
                 "pyramid_addup":     pos.get("pyramid_addup", 0) + 1,
             })
             logger.info(
@@ -2460,10 +2480,12 @@ async def _maybe_pyramid(pos: dict) -> None:
             # 立刻同步把交易所 Algo SL 移到保本线(不等 trail_sl 下轮巡检)
             try:
                 _pos_updated = dict(pos)
-                _pos_updated["sl_price"]    = new_sl
                 _pos_updated["quantity_remaining"] = new_total_qty
-                await _execute_trail_sl(_pos_updated, new_sl)
-                logger.info(f"[pm] {symbol} 加仓后 Algo SL 已同步移至保本线 {new_sl:.6g}")
+                synced = await _execute_trail_sl(_pos_updated, new_sl)
+                if synced:
+                    logger.info(f"[pm] {symbol} 加仓后 Algo SL 已同步移至保本线 {new_sl:.6g}")
+                else:
+                    logger.warning(f"[pm] {symbol} 加仓后 Algo SL 尚未同步，保留旧保护字段，目标价={new_sl:.6g}")
             except Exception as _sl_sync_e:
                 logger.warning(f"[pm] {symbol} 加仓后 Algo SL 同步失败(非致命,trail_sl 下轮会修复): {_sl_sync_e}")
             await _notify_async(

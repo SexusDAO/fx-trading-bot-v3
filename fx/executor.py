@@ -892,6 +892,10 @@ async def _place_guards_async(
     results: dict = {}
 
     async def _place(tag: str, kwargs: dict):
+        if kwargs.get("quantity", 0) <= 0:
+            results[tag] = None
+            await notify_async(f"⚠️ {symbol} {tag} 取整后数量为零，未提交；仓位处于部分保护状态")
+            return
         try:
             resp = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: api.place_order(**kwargs)
@@ -945,7 +949,8 @@ async def _place_guards_async(
             quantity=tp1_qty_f,
             price=tp1_p,
             timeInForce="GTC",
-            positionSide=pos_side,
+            position_side=pos_side,
+            reduce_only=True,
         )),
     ]
     if has_tp2:
@@ -955,7 +960,8 @@ async def _place_guards_async(
             quantity=tp2_qty_f,
             price=tp2_p,
             timeInForce="GTC",
-            positionSide=pos_side,
+            position_side=pos_side,
+            reduce_only=True,
         )))
 
     await asyncio.gather(*coros)
@@ -964,9 +970,16 @@ async def _place_guards_async(
     logger.info(f"[executor] {symbol} 保护单模式: {tp_mode}")
 
     return {
+        "protection_status": "complete" if results.get("sl") and results.get("tp1") and (not has_tp2 or results.get("tp2")) else "partial",
+        "unallocated_qty": max(0.0, fill_qty - sl_qty_f),
         "sl_id":   results.get("sl"),
         "tp1_id":  results.get("tp1"),
         "tp2_id":  results.get("tp2"),   # None if no tp2
+        "sl_price": sl_p,
+        "tp1_price": tp1_p,
+        "tp2_price": tp2_p,
+        "tp_prices_equal": has_tp2 and tp1_p == tp2_p,
+        "tp_mode": "dual" if has_tp2 else "single",
         "sl_qty":  sl_qty_f,
         "tp1_qty": tp1_qty_f,
         "tp2_qty": tp2_qty_f,
@@ -1173,15 +1186,17 @@ def _write_position(
         "quantity":              fill_qty,
         "quantity_remaining":    fill_qty,
         "leverage":              leverage,
-        "sl_price":              params["sl_price"],
+        "sl_price":              guard.get("sl_price", params["sl_price"]),
         "sl_order_id":           guard["sl_id"],
-        "tp1_price":             params["tp1_price"],
+        "tp1_price":             guard.get("tp1_price", params["tp1_price"]),
         "tp1_order_id":          guard["tp1_id"],
         "tp1_quantity":          tp1_qty,
         "tp1_filled":            False,
-        "tp2_price":             params["tp2_price"],
+        "tp2_price":             guard.get("tp2_price", params["tp2_price"]),
         "tp2_order_id":          guard["tp2_id"],
         "tp2_quantity":          tp2_qty,
+        "tp_prices_equal": guard.get("tp_prices_equal", False),
+        "tp_mode": guard.get("tp_mode", "dual" if params.get("tp2_price") is not None else "single"),
         "tp2_filled":            False,
         "open_time":             int(time.time() * 1000),
         "fill_time":             int(time.time() * 1000),   # v3.6: 实际成交时间，供 breakout_fail 检查用
