@@ -21,29 +21,50 @@ import shutil
 import subprocess
 from pathlib import Path
 
-# ── 启动前依赖检查：确保 SOCKS 代理依赖可用 ─────────────────────────────────
+# ── 启动前依赖检查：只检查，不在运行时安装 ───────────────────────────────────
+def _socks_proxy_configured() -> bool:
+    """
+    [v3.89 #24b] 是否配置了 SOCKS 代理：环境变量 SOCKS_PROXY 非空，或代理类环境变量 /
+    config 里的代理地址以 socks 开头（socks5://、socks5h:// 等）。读取失败按「未配置」处理。
+    """
+    import os
+    if (os.environ.get("SOCKS_PROXY") or "").strip():
+        return True
+    for k in ("BINANCE_PROXY", "PROXY_URL", "ALL_PROXY", "HTTPS_PROXY", "HTTP_PROXY"):
+        if (os.environ.get(k) or "").strip().lower().startswith("socks"):
+            return True
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        import config as _cfg
+        if str(getattr(_cfg, "SOCKS_PROXY", "") or "").strip():
+            return True
+        for k in ("PROXY_URL", "BINANCE_PROXY"):
+            if str(getattr(_cfg, k, "") or "").strip().lower().startswith("socks"):
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def _ensure_deps():
-    """检查关键依赖，缺失时自动安装，防止沙箱重建后包丢失。"""
+    """
+    [v3.89 #24/#24b] 只做依赖健康检查，不在运行时安装、不修改运行环境。
+    PySocks 缺失：配置了 SOCKS 代理 → logger.critical 并退出；未配置 SOCKS 代理 → 仅 logger.warning，继续启动。
+    依赖应在构建/部署阶段安装（requests[socks]、PySocks）。
+    """
     try:
         import socks  # noqa: F401
+        return
     except ImportError:
-        print("[startup] PySocks 缺失，自动安装...", flush=True)
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install",
-             "requests[socks]", "PySocks", "-q", "--break-system-packages"],
-            check=True,
-        )
-        print("[startup] PySocks 安装完成，重建代理 Session", flush=True)
-        # 重建 binance_api 的 Session，让 SOCKS 代理立即生效
-        try:
-            ROOT_PATH = Path(__file__).parent
-            sys.path.insert(0, str(ROOT_PATH))
-            sys.path.insert(0, str(ROOT_PATH / "shared"))
-            from shared.binance_api import reset_session
-            reset_session()
-            print("[startup] Session 重建完成", flush=True)
-        except Exception as e:
-            print(f"[startup] Session 重建失败（将在下次 import 时自动修复）: {e}", flush=True)
+        pass
+    lg = logging.getLogger("fx.startup")
+    if _socks_proxy_configured():
+        msg = ("[startup] 已配置 SOCKS 代理但缺少 PySocks（pip install 'requests[socks]' PySocks）。"
+               "请在部署阶段安装后重新启动，系统不会在启动时自动安装。")
+        lg.critical(msg)
+        print(msg, file=sys.stderr, flush=True)
+        sys.exit(1)
+    lg.warning("[startup] 缺少 PySocks，但未配置 SOCKS 代理，继续启动（如之后配置 SOCKS 代理需先安装 PySocks）")
 
 _ensure_deps()
 from datetime import datetime, timezone
@@ -512,6 +533,52 @@ async def _sync_positions_on_startup() -> None:
         logger.error(f"[startup_sync] 对齐失败: {e}", exc_info=True)
 
 
+def _handle_task_exception(loop, context):
+    """
+    事件循环未捕获异常处理器。
+    [v3.89 #106] 原写法 context.get("exception", context["message"]) 会提前求值 context["message"]，
+    自定义上下文缺少 message 时处理器自己抛 KeyError，掩盖原始故障。现安全读取两个可选字段并保留兜底。
+    """
+    try:
+        exc = context.get("exception")
+        msg = context.get("message")
+        detail = exc if exc is not None else (msg if msg is not None else f"<无 exception/message，上下文键: {sorted(context)}>")
+        logger.error(f"[main] 未捕获的协程异常: {detail}", exc_info=exc if isinstance(exc, BaseException) else None)
+    except Exception as _he:
+        logger.error(f"[main] 异常处理器自身出错: {_he!r}")
+
+
+async def _shutdown_components(steps, total_timeout: float = 30.0, per_timeout: float = 10.0) -> dict:
+    """
+    [v3.89 #105] 依次停止各组件：每项独立 try/except，单项最多 per_timeout 秒，整体最多 total_timeout 秒。
+    steps: [(name, callable)]，callable 可返回协程或普通值。
+    返回 {name: "ok" | "timeout" | "skipped(deadline)" | "error: ..."}。
+    """
+    import inspect
+    results: dict = {}
+    t0 = asyncio.get_event_loop().time()
+    for name, fn in steps:
+        remaining = total_timeout - (asyncio.get_event_loop().time() - t0)
+        if remaining <= 0:
+            results[name] = "skipped(deadline)"
+            logger.error(f"[main] 退出整体超时（{total_timeout:.0f}s），跳过 {name}")
+            continue
+        try:
+            r = fn()
+            if inspect.isawaitable(r):
+                await asyncio.wait_for(r, timeout=min(per_timeout, remaining))
+            results[name] = "ok"
+        except asyncio.TimeoutError:
+            results[name] = "timeout"
+            logger.error(f"[main] 停止 {name} 超时")
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            results[name] = f"error: {e!r}"
+            logger.error(f"[main] 停止 {name} 异常: {e!r}", exc_info=True)
+    return results
+
+
 async def main() -> None:
     logger.info("[main] fx 交易系统 V3.0 启动")
 
@@ -524,10 +591,23 @@ async def main() -> None:
     await _sync_positions_on_startup()
 
     # v3.33 注册 WS 重连回调：断线期间可能漏掉 TP/SL 成交事件，重连后主动对齐
+    # [v3.89 #3] 持仓对齐加锁：断线期间的 REST 补偿任务与重连回调不会同时对齐
+    _sync_lock = asyncio.Lock()
+
     async def _on_ws_reconnect():
         logger.info("[main] WS 重连，主动触发持仓对齐...")
-        await _sync_positions_on_startup()
+        async with _sync_lock:   # 重连对齐必须执行：若补偿任务正在对齐则等它结束
+            await _sync_positions_on_startup()
     ws.on_reconnect(_on_ws_reconnect)
+
+    async def _on_ws_disconnect():
+        # [v3.89 #3] userData 断线期间的有界 REST 补偿（最长 30s，每 10s 一轮）；已有对齐在跑则跳过本轮
+        if _sync_lock.locked():
+            return
+        logger.warning("[main] WS 断线，REST 补偿对齐持仓...")
+        async with _sync_lock:
+            await _sync_positions_on_startup()
+    ws.on_disconnect(_on_ws_disconnect)
 
     # ── 2. 初始化 PositionManager，注入 ws ────────────────────────────────
     from position_manager import PositionManager, _set_manager, _adjust_sl_tp_loop_static
@@ -607,10 +687,6 @@ async def main() -> None:
             pass
 
     # 捕获所有未处理的协程异常，防止 loop 意外退出
-    def _handle_task_exception(loop, context):
-        msg = context.get("exception", context["message"])
-        logger.error(f"[main] 未捕获的协程异常: {msg}")
-
     loop.set_exception_handler(_handle_task_exception)
 
     logger.info("[main] 所有任务已启动，等待退出信号...")
@@ -637,20 +713,37 @@ async def main() -> None:
         watchdog_task.cancel()
 
     # 停止
+    # [v3.89 #105] 各组件独立 try/except + 单项 10 秒超时 + 整体 30 秒截止；汇总结果后再报告。
+    #   原写法 gather/pm.stop/ws.stop 无保护，signal_watcher 四个 stop 共用一个 try，
+    #   任一步异常或卡住都会跳过后续清理，却仍无条件打印「已安全停止」。
     for t in tasks:
         t.cancel()
-    await asyncio.gather(*tasks, return_exceptions=True)
 
-    await pm.stop()
-    try:
-        await signal_watcher.stop_gc()
-        await signal_watcher.stop_polling()
-        await signal_watcher.stop_recheck()
-        await signal_watcher.stop_btc_guard()
-    except Exception:
-        pass
-    await ws.stop()
-    logger.info("[main] fx 系统已安全停止")
+    async def _stop_tasks():
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    def _report_orphans():
+        pend = getattr(signal_watcher, "_orphan_orders", None) or {}
+        for (_s, _oid), _rec in list(pend.items()):
+            logger.error(f"[main] 退出时仍有未对账的撤单结果未知订单: {_s} id={_oid} "
+                         f"尝试={_rec.get('attempts')} 原因={_rec.get('reason')}，请人工核查")
+        return len(pend)
+
+    _results = await _shutdown_components([
+        ("tasks",                    _stop_tasks),
+        ("pm",                       pm.stop),
+        ("signal_watcher.gc",        signal_watcher.stop_gc),
+        ("signal_watcher.polling",   signal_watcher.stop_polling),
+        ("signal_watcher.recheck",   signal_watcher.stop_recheck),
+        ("signal_watcher.btc_guard", signal_watcher.stop_btc_guard),
+        ("orphan_orders_report",     _report_orphans),
+        ("ws",                       ws.stop),
+    ], total_timeout=30.0, per_timeout=10.0)
+    _bad = {k: v for k, v in _results.items() if v != "ok"}
+    if _bad:
+        logger.error(f"[main] fx 系统已停止，但部分组件未正常清理: {_bad}")
+    else:
+        logger.info("[main] fx 系统已安全停止")
 
 
 if __name__ == "__main__":

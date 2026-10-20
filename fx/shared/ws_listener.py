@@ -57,6 +57,8 @@ logger = logging.getLogger("ws_listener")
 KEEPALIVE_INTERVAL   = getattr(config, "WS_KEEPALIVE_INTERVAL",   20 * 60)  # 秒
 RECONNECT_BASE       = getattr(config, "WS_RECONNECT_BASE",        3)        # 秒
 RECONNECT_MAX        = getattr(config, "WS_RECONNECT_MAX",         60)       # 秒
+COMPENSATION_TIMEOUT = getattr(config, "WS_COMPENSATION_TIMEOUT",  30)       # [v3.89 #3] 断线 REST 补偿任务最长运行秒数
+COMPENSATION_INTERVAL = getattr(config, "WS_COMPENSATION_INTERVAL", 10)      # [v3.89 #3] 补偿任务两次执行间隔秒数
 LIQ_WINDOW_SEC       = getattr(config, "WS_LIQ_WINDOW_SEC",        14400)    # 4 小时缓存窗口（基准计算需要）
 MARK_PRICE_URL_TPL   = config.BINANCE_WS_URL + "/stream?streams={streams}"
 USER_DATA_URL_TPL    = config.BINANCE_WS_URL + "/ws/{listen_key}"
@@ -104,6 +106,13 @@ class WsOrderListener:
         # 停止标志
         self._stop_flag = False
 
+        # [v3.89 #3] userData 断线即时 REST 补偿：状态与回调
+        self._disconnect_callbacks: list = []
+        self._user_connected: bool = False
+        self._compensation_task: Optional[asyncio.Task] = None
+        # [v3.89 #7] 当前 userData 连接对象，续期失败 / listenKey 过期时用来主动关闭
+        self._user_ws = None
+
     # ─────────────────────────────────────────────────────────────────────────
     # 公共 API
     # ─────────────────────────────────────────────────────────────────────────
@@ -150,6 +159,57 @@ class WsOrderListener:
         每次 userData 重连成功后，异步调用所有注册的回调，用于主动触发持仓对齐。"""
         self._reconnect_callbacks.append(callback)
 
+    def on_disconnect(self, callback) -> None:
+        """
+        [v3.89 #3] 注册 userData 断线补偿回调（async，无参数）。
+        userData 断线后立即启动唯一一个有界（COMPENSATION_TIMEOUT 秒）的 REST 补偿任务，
+        每 COMPENSATION_INTERVAL 秒调用一次这些回调；userData 重连成功后任务自行结束。
+        任务在独立协程里运行，不阻塞 WS 重连本身。
+        """
+        self._disconnect_callbacks.append(callback)
+
+    def _mark_user_stream_down(self) -> None:
+        """[v3.89 #3] userData 流不可用：置断线状态并启动（唯一的）补偿任务。"""
+        self._user_connected = False
+        self._user_ws = None
+        if self._stop_flag or not self._disconnect_callbacks:
+            return
+        if self._compensation_task and not self._compensation_task.done():
+            return   # 已有补偿任务在运行，不重复启动
+        self._compensation_task = asyncio.create_task(
+            self._compensation_loop(), name="ws_rest_compensation")
+
+    async def _compensation_loop(self) -> None:
+        """
+        [v3.89 #3] 有界 REST 补偿：断线期间主动对齐订单/持仓状态。
+        结束条件：userData 已重连 / 超过 COMPENSATION_TIMEOUT 秒 / 监听器停止。
+        重连后不取消正在执行的回调（避免对齐做到一半被打断），只是不再发起下一轮。
+        """
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + COMPENSATION_TIMEOUT
+        rounds = 0
+        try:
+            while not self._stop_flag and not self._user_connected:
+                remaining = deadline - loop.time()
+                if remaining <= 0:
+                    logger.warning(f"[ws] REST 补偿任务达到 {COMPENSATION_TIMEOUT}s 上限，停止（userData 仍未恢复）")
+                    return
+                rounds += 1
+                for cb in list(self._disconnect_callbacks):
+                    try:
+                        await asyncio.wait_for(cb(), timeout=max(remaining, 1.0))
+                    except asyncio.TimeoutError:
+                        logger.warning("[ws] REST 补偿回调超时")
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as e:
+                        logger.warning(f"[ws] REST 补偿回调异常: {e}")
+                await asyncio.sleep(min(COMPENSATION_INTERVAL, max(deadline - loop.time(), 0)))
+            if self._user_connected:
+                logger.info(f"[ws] userData 已恢复，REST 补偿任务结束（共 {rounds} 轮）")
+        except asyncio.CancelledError:
+            return
+
     async def start(self) -> None:
         """启动所有后台任务，不阻塞调用方。"""
         self._stop_flag = False
@@ -165,6 +225,7 @@ class WsOrderListener:
         for task in (
             self._user_data_task, self._mark_price_task,
             self._keepalive_task, self._force_order_task,
+            self._compensation_task,   # [v3.89 #3]
         ):
             if task and not task.done():
                 task.cancel()
@@ -213,6 +274,7 @@ class WsOrderListener:
                 self._listen_key = binance_api.get_listen_key()
                 if not self._listen_key:
                     logger.error("[ws] 无法获取 listenKey，10s 后重试")
+                    self._mark_user_stream_down()   # [v3.89 #3]
                     await asyncio.sleep(10)
                     continue
 
@@ -221,6 +283,8 @@ class WsOrderListener:
 
                 async with websockets.connect(url, ping_interval=20, ping_timeout=10, proxy=_WS_PROXY_URL) as ws:
                     delay = RECONNECT_BASE  # 连接成功后重置退避
+                    self._user_ws = ws                # [v3.89 #7]
+                    self._user_connected = True       # [v3.89 #3] 补偿任务见此状态后不再发起下一轮
                     # v3.33 重连回调：通知主进程触发持仓对齐
                     if self._reconnect_callbacks:
                         logger.info("[ws] userData 重连成功，触发重连回调")
@@ -242,6 +306,7 @@ class WsOrderListener:
             except Exception as e:
                 logger.error(f"[ws] userData 异常: {e}，{delay}s 后重连")
 
+            self._mark_user_stream_down()   # [v3.89 #3] 断线立即启动 REST 补偿，不等重连退避
             await asyncio.sleep(delay)
             delay = min(delay * 2, RECONNECT_MAX)
 
@@ -253,6 +318,12 @@ class WsOrderListener:
             return
 
         event_type = msg.get("e")
+        if event_type == "listenKeyExpired":
+            # [v3.89 #7] listenKey 过期事件：旧流已失效，显式关闭连接驱动重建（重连后由重连回调完成对齐）
+            logger.warning("[ws] 收到 listenKeyExpired，主动关闭 userData 连接以重建")
+            self._listen_key = None
+            await self._force_user_reconnect("listenKeyExpired")
+            return
         if event_type != "ORDER_TRADE_UPDATE":
             return
 
@@ -461,6 +532,21 @@ class WsOrderListener:
     # listenKey keepalive
     # ─────────────────────────────────────────────────────────────────────────
 
+    async def _force_user_reconnect(self, reason: str) -> None:
+        """
+        [v3.89 #7] 显式驱动 userData 连接重建：关闭当前连接，使接收循环退出并走重连路径
+        （重新申请 listenKey，重连成功后触发重连回调做订单对齐）。
+        原写法只把 _listen_key 置 None，接收循环不检查它，旧连接可能一直挂着直到服务端断开。
+        """
+        w = self._user_ws
+        if w is None:
+            return   # 连接已不存在，重连循环自己会重新申请 listenKey
+        try:
+            await w.close()
+            logger.info(f"[ws] 已主动关闭 userData 连接以重建: {reason}")
+        except Exception as e:
+            logger.warning(f"[ws] 主动关闭 userData 连接失败: {e}")
+
     async def _keepalive_loop(self) -> None:
         """每 KEEPALIVE_INTERVAL 秒续期 listenKey，防止 userData stream 超时断开。"""
         while not self._stop_flag:
@@ -474,12 +560,15 @@ class WsOrderListener:
                 if ok:
                     logger.debug("[ws] listenKey keepalive 成功")
                 else:
-                    logger.warning("[ws] listenKey keepalive 失败，userData loop 会自动重连")
-                    self._listen_key = None  # 触发 user_data_loop 重新申请
+                    logger.warning("[ws] listenKey keepalive 失败，主动关闭 userData 连接以重建")
+                    self._listen_key = None
+                    await self._force_user_reconnect("keepalive 失败")   # [v3.89 #7]
             except asyncio.CancelledError:
                 return
             except Exception as e:
-                logger.error(f"[ws] keepalive 异常: {e}")
+                logger.error(f"[ws] keepalive 异常，主动关闭 userData 连接以重建: {e}")
+                self._listen_key = None
+                await self._force_user_reconnect("keepalive 异常")   # [v3.89 #7]
 
     # ─────────────────────────────────────────────────────────────────────────
     # 等待订单事件（供 executor 同步阻塞式等待成交）

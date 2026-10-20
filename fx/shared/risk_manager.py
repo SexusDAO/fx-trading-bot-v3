@@ -13,6 +13,8 @@ shared/risk_manager.py — 风控守门人（V3.0 完整版）
 
 import json
 import logging
+import os
+import threading
 from pathlib import Path
 from shared.indicators import ema as _calc_ema
 import time
@@ -178,18 +180,30 @@ def is_circuit_open() -> bool:
 def record_pnl(pnl: float, symbol: str = "", reason: str = "") -> dict:
     """
     记录盈亏。pnl<0 累加 daily_loss。
-    返回 {"circuit_triggered": bool, "daily_loss": float}
+    返回 {"circuit_triggered": bool|None, "daily_loss": float|None, "persisted": bool[, "error": str]}
+    [v3.89 #63] persisted=False 表示本次盈亏没有记入 state（circuit_triggered 此时为 None=未知）。
     """
     from shared.state import record_pnl as _state_record, get_daily_loss
     from shared.state import mark_circuit_notified
 
     triggered = False
+    persisted = True
+    persist_error = None
     try:
         triggered = _state_record(pnl)
     except Exception as e:
-        logger.error(f"[risk] record_pnl state 写入失败: {e}")
+        # [v3.89 #63] 持久化失败不再伪装成「已记账、未触发熔断」：circuit_triggered 置 None（未知，且为假值，
+        #   兼容 if result["circuit_triggered"] 的既有用法），并带 persisted=False 与 error 供上游识别、对账。
+        persisted = False
+        persist_error = str(e)
+        triggered = None
+        logger.error(f"[risk] record_pnl state 写入失败，本次盈亏 {pnl} ({symbol}) 未记入: {e}")
 
-    daily_loss = get_daily_loss()
+    try:
+        daily_loss = get_daily_loss()
+    except Exception as e:
+        daily_loss = None
+        logger.error(f"[risk] 读取 daily_loss 失败: {e}")
 
     if triggered:
         try:
@@ -209,7 +223,10 @@ def record_pnl(pnl: float, symbol: str = "", reason: str = "") -> dict:
         logger.error(f"[risk] {msg}")
         mark_circuit_notified()  # 标记已处理，防止其他路径重复触发
 
-    return {"circuit_triggered": triggered, "daily_loss": daily_loss}
+    result = {"circuit_triggered": triggered, "daily_loss": daily_loss, "persisted": persisted}
+    if not persisted:
+        result["error"] = persist_error
+    return result
 
 
 # 向后兼容旧接口
@@ -377,31 +394,70 @@ def _clean_old_backups(archive: "Path", stem: str, keep_days: int) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 _DRAWDOWN_STATE_FILE = str(Path(__file__).parent.parent / "logs" / "drawdown_state.json")
 
-def _load_drawdown_state() -> dict:
-    try:
-        p = Path(_DRAWDOWN_STATE_FILE)
-        if p.exists():
-            return json.loads(p.read_text())
-    except Exception:
-        pass
+_DRAWDOWN_LOCK = threading.RLock()        # [v3.89 #67] 读-改-写串行化
+_DRAWDOWN_STATE_CORRUPTED = False         # [v3.89 #67] 状态文件曾损坏（进程内标志，重启清除；备份文件保留）
+
+
+def _default_drawdown_state() -> dict:
     return {"high_water": 0.0, "hw_updated_at": 0.0, "halt_until": 0.0}
 
+
+def _load_drawdown_state() -> dict:
+    """
+    [v3.89 #67] 文件不存在 → 默认值（首次初始化，正常）；
+    文件存在但读取/解析失败 → 保留损坏文件备份（.corrupted_<ms>），logger.error，置 _DRAWDOWN_STATE_CORRUPTED，
+    再返回默认值——不再静默返回零高水位。注意：默认值下高水位会从当前权益重新累计，
+    历史高水位只在备份文件里，需人工核对。
+    """
+    global _DRAWDOWN_STATE_CORRUPTED
+    p = Path(_DRAWDOWN_STATE_FILE)
+    if not p.exists():
+        return _default_drawdown_state()
+    try:
+        data = json.loads(p.read_text())
+        if not isinstance(data, dict):
+            raise ValueError(f"状态不是对象: {type(data).__name__}")
+        return data
+    except Exception as e:
+        _DRAWDOWN_STATE_CORRUPTED = True
+        backup = p.with_name(f"{p.name}.corrupted_{int(time.time() * 1000)}")
+        try:
+            p.replace(backup)
+            logger.error(f"[risk] 回撤状态文件损坏，已备份为 {backup.name}，高水位/暂停状态已丢失，请人工核对: {e}")
+        except Exception as be:
+            logger.error(f"[risk] 回撤状态文件损坏且备份失败（原文件保留）: {e} / 备份错误: {be}")
+        return _default_drawdown_state()
+
+
 def _save_drawdown_state(state: dict) -> None:
+    """[v3.89 #67] 原子写入：唯一临时文件 + replace，避免中断留下半截文件。"""
+    import uuid
     p = Path(_DRAWDOWN_STATE_FILE)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(state, ensure_ascii=False, indent=2))
+    tmp = p.with_name(f"{p.name}.tmp_{os.getpid()}_{uuid.uuid4().hex[:8]}")
+    try:
+        tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2))
+        tmp.replace(p)
+    except Exception:
+        try:
+            tmp.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
+
 
 def update_drawdown_high_water(current_equity: float) -> None:
     """
     每次账户状态更新后调用，维护高水位。
     current_equity: 账户总权益（totalMarginBalance）
     """
-    state = _load_drawdown_state()
-    if current_equity > state.get("high_water", 0):
-        state["high_water"]    = current_equity
-        state["hw_updated_at"] = time.time()
-        _save_drawdown_state(state)
-        logger.debug(f"[risk] 高水位更新: {current_equity:.2f}U")
+    with _DRAWDOWN_LOCK:
+        state = _load_drawdown_state()
+        if current_equity > state.get("high_water", 0):
+            state["high_water"]    = current_equity
+            state["hw_updated_at"] = time.time()
+            _save_drawdown_state(state)
+            logger.debug(f"[risk] 高水位更新: {current_equity:.2f}U")
 
 def check_max_drawdown(current_equity: float, notifier_fn=None) -> tuple[bool, str]:
     """
@@ -794,6 +850,42 @@ def _api_fail_rate_recent() -> float:
     return sum(1 for _, f in tail if f) / len(tail)
 
 
+LAST_USDT_PEG_STATUS: dict = {"status": "unknown", "rate": None, "ts": 0.0, "error": None}
+_PEG_WARN_INTERVAL = 600.0   # 数据不可用告警最小间隔（秒）
+_peg_last_warn = 0.0
+
+
+def get_usdt_peg_observation() -> dict:
+    """
+    [v3.89 #66] 取 USDCUSDT 标记价格，返回 {"status": "ok"|"unavailable", "rate": float|None, "error": str|None}。
+    markPrice 缺失、为零、非数字或请求异常 → unavailable（不用 1.0 代替）。同时写入 LAST_USDT_PEG_STATUS。
+    """
+    import math
+    obs = {"status": "unavailable", "rate": None, "error": None, "ts": time.time()}
+    try:
+        from shared import binance_api as _api
+        data = _api.get_mark_price("USDCUSDT")
+        raw = data.get("markPrice") if isinstance(data, dict) else None
+        rate = float(raw) if raw not in (None, "") else None
+        if rate is None or not math.isfinite(rate) or rate <= 0:
+            obs["error"] = f"markPrice 无效: {raw!r}"
+        else:
+            obs.update(status="ok", rate=rate)
+    except Exception as e:
+        obs["error"] = f"查询异常: {e}"
+    LAST_USDT_PEG_STATUS.update(obs)
+    return obs
+
+
+def _warn_peg_unavailable(obs: dict) -> None:
+    global _peg_last_warn
+    now = time.time()
+    if now - _peg_last_warn >= _PEG_WARN_INTERVAL:
+        _peg_last_warn = now
+        logger.warning(f"[risk] USDT 脱锚检查数据不可用（{obs.get('error')}），本次跳过该项检查")
+
+
+
 def check_systemic_risk() -> tuple[bool, str]:
     """
     检查系统性风险事件。返回 (ok, reason)。
@@ -812,14 +904,13 @@ def check_systemic_risk() -> tuple[bool, str]:
         SYSTEMIC_FUNDING_EXTREME_THRESH  = 0.010
 
     # ① USDT 脱锚（用 USDCUSDT 标记价格判断）
-    try:
-        from shared import binance_api as _api
-        usdc_data = _api.get_mark_price("USDCUSDT")
-        usdt_rate = float(usdc_data.get("markPrice", 1.0) or 1.0)
-        if abs(usdt_rate - 1.0) > SYSTEMIC_USDT_DEPEG_THRESH:
-            return False, f"USDT 脱锚警告: USDC/USDT={usdt_rate:.4f}"
-    except Exception:
-        pass
+    # [v3.89 #66] 价格缺失/为零/查询异常 → 记录「数据不可用」状态，不再用 1.0 伪造平价观测。
+    #   降级策略保持原行为（该项不单独阻断开仓，其他检查照常），但状态可见：LAST_USDT_PEG_STATUS + warning。
+    _peg = get_usdt_peg_observation()
+    if _peg["status"] == "unavailable":
+        _warn_peg_unavailable(_peg)
+    elif abs(_peg["rate"] - 1.0) > SYSTEMIC_USDT_DEPEG_THRESH:
+        return False, f"USDT 脱锚警告: USDC/USDT={_peg['rate']:.4f}"
 
     # ② API 响应异常
     fail_rate = _api_fail_rate_recent()

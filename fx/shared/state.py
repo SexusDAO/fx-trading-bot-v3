@@ -8,13 +8,15 @@ shared/state.py — 全局状态管理中心（V3.0 完整版）
     pending_confirm_state.json — breakout 待确认
     oi_cache.json           — OI 历史缓存
 
-所有读写：线程锁 + 文件锁 + 原子写入（先写 .tmp 再 os.replace）
+所有读写：线程锁 + 原子写入（先写唯一临时文件再替换）。
+[v3.89 #10] 线程锁只保证进程内线程安全，不保证跨进程；多进程同时读改写同一文件仍可能丢更新。
 """
 
 import json
 import os
 import threading
 import time
+import uuid
 import logging
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -48,7 +50,34 @@ _locks = {
 # ═══════════════════════════════════════════════════════════════════════════════
 # 原子读写工具
 # ═══════════════════════════════════════════════════════════════════════════════
+# [v3.89 #11] 持仓文件损坏标志：损坏时置 True，add_position / update_position 拒绝写入。
+#   仅模块级内存标志，进程重启后恢复 False。
+_POS_STATE_CORRUPTED = False
+
+
+def _backup_corrupted_pos(path: Path, err) -> None:
+    """[v3.89 #11] 把损坏的持仓文件重命名保留，记录错误并设置损坏标志。"""
+    global _POS_STATE_CORRUPTED
+    _POS_STATE_CORRUPTED = True
+    backup = path.with_name(f"{path.name}.corrupted_{int(time.time() * 1000)}")
+    try:
+        path.replace(backup)
+        logger.error(f"[state] {path.name} 已损坏，已备份为 {backup.name}，持仓写入已被阻止，请人工检查: {err}")
+    except Exception as e:
+        logger.error(f"[state] {path.name} 已损坏且备份失败（原文件保留）: {err} / 备份错误: {e}")
+
+
 def _read_json(path: Path, default):
+    # [v3.89 #11] 仅持仓文件区分「不存在」与「损坏」；其他状态文件保持原有行为。
+    if "pos_state" in path.name:
+        if not path.exists():
+            return default
+        try:
+            raw = path.read_text(encoding="utf-8").strip()
+            return json.loads(raw) if raw else default
+        except Exception as e:
+            _backup_corrupted_pos(path, e)
+            return default
     try:
         if not path.exists():
             return default
@@ -60,11 +89,20 @@ def _read_json(path: Path, default):
 
 
 def _write_json(path: Path, data) -> None:
-    """原子写入：先写 .tmp 再 os.replace"""
+    """原子写入：先写唯一临时文件再替换。进程内线程安全，不保证跨进程。"""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    os.replace(tmp, path)
+    # [v3.89 #10] 原临时文件名固定为 .tmp，两个写者会互相覆盖临时文件。改为 pid+毫秒+随机串唯一命名，
+    #   替换失败时删除临时文件，不留残留。
+    tmp = path.with_suffix(f".tmp_{os.getpid()}_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}")
+    try:
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+    except Exception:
+        try:
+            tmp.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -115,6 +153,9 @@ def get_pending_order(symbol: str) -> dict | None:
 
 
 def add_position(record: dict) -> bool:
+    if _POS_STATE_CORRUPTED:  # [v3.89 #11]
+        logger.error("[state] 持仓文件曾损坏，拒绝写入，请人工检查")
+        return False
     sym = record.get("symbol", "")
     with _locks["pos"]:
         data = _load_pos()
@@ -135,6 +176,9 @@ def add_pending_order(record: dict) -> bool:
 
 
 def update_position(pos_id: str, updates: dict) -> bool:
+    if _POS_STATE_CORRUPTED:  # [v3.89 #11]
+        logger.error("[state] 持仓文件曾损坏，拒绝写入，请人工检查")
+        return False
     with _locks["pos"]:
         data = _load_pos()
         for i, p in enumerate(data):
@@ -148,6 +192,9 @@ def update_position(pos_id: str, updates: dict) -> bool:
 
 def update_pending_order(symbol: str, updates: dict) -> bool:
     """按 symbol 更新挂单"""
+    if _POS_STATE_CORRUPTED:  # [v3.89 #11b]
+        logger.error("[state] 持仓文件曾损坏，拒绝写入: update_pending_order")
+        return False
     with _locks["pos"]:
         data = _load_pos()
         for i, p in enumerate(data):
@@ -160,6 +207,9 @@ def update_pending_order(symbol: str, updates: dict) -> bool:
 
 def remove_position(pos_id: str) -> bool:
     """按 pos_id 删除记录，无论 status 是什么（open/pending/patching 均可删除）。"""
+    if _POS_STATE_CORRUPTED:  # [v3.89 #11b]
+        logger.error("[state] 持仓文件曾损坏，拒绝写入: remove_position")
+        return False
     with _locks["pos"]:
         data = _load_pos()
         new  = [p for p in data if p.get("pos_id") != pos_id]
@@ -175,6 +225,9 @@ def remove_position_by_symbol(symbol: str, status: str | None = None) -> int:
     用于清理孤儿 patching 记录：remove_position_by_symbol(sym, status='patching')
     当 status=None 时删除该 symbol 下所有记录。
     """
+    if _POS_STATE_CORRUPTED:  # [v3.89 #11b]
+        logger.error("[state] 持仓文件曾损坏，拒绝写入: remove_position_by_symbol")
+        return 0
     with _locks["pos"]:
         data = _load_pos()
         if status is not None:
@@ -189,6 +242,9 @@ def remove_position_by_symbol(symbol: str, status: str | None = None) -> int:
 
 
 def remove_pending_order(symbol: str) -> bool:
+    if _POS_STATE_CORRUPTED:  # [v3.89 #11b]
+        logger.error("[state] 持仓文件曾损坏，拒绝写入: remove_pending_order")
+        return False
     with _locks["pos"]:
         data = _load_pos()
         new  = [p for p in data if not (p.get("symbol") == symbol
@@ -368,14 +424,24 @@ def add_cooldown(symbol: str, duration_seconds: int, reason: str) -> None:
     until = int(time.time() * 1000) + duration_seconds * 1000
     with _locks["cd"]:
         d = _load_cd()
-        existing = d.get(symbol, {}).get("cooldown_until", 0)
-        d[symbol] = {
-            "cooldown_until": max(until, existing),
-            "reason":         reason,
-            "set_at":         int(time.time() * 1000),
-        }
+        prev = d.get(symbol, {})
+        existing = prev.get("cooldown_until", 0)
+        if until > existing:
+            d[symbol] = {
+                "cooldown_until": until,
+                "reason":         reason,
+                "set_at":         int(time.time() * 1000),
+            }
+            effective, kept = until, False
+        else:
+            # [v3.89 #97] 已有冷却更长：保留决定该期限的原因和设置时间，不让较短的新事件覆盖
+            effective, kept = existing, True
         _save_cd(d)
-    logger.info(f"[state] {symbol} 冷却期 {duration_seconds}s reason={reason}")
+    if kept:
+        logger.info(f"[state] {symbol} 冷却 {duration_seconds}s(reason={reason}) 短于已有冷却，保留原因={prev.get('reason')}，"
+                    f"实际到期 {effective}")
+    else:
+        logger.info(f"[state] {symbol} 冷却期 {duration_seconds}s reason={reason}，实际到期 {effective}")
 
 
 # 向后兼容
@@ -452,13 +518,19 @@ def set_open_dir_cooldown(symbol: str, direction: str, hours: float) -> None:
     until  = int(time.time() * 1000) + int(hours * 3600 * 1000)
     with _locks["cd"]:
         d = _load_cd()
-        d[key] = {
-            "cooldown_until": until,
-            "reason":         "open_dir",
-            "set_at":         int(time.time() * 1000),
-        }
+        # [v3.89 #98] 重复写入取 max(已有期限, 新期限)，不缩短已有的更长方向冷却
+        existing = d.get(key, {}).get("cooldown_until", 0)
+        if until > existing:
+            d[key] = {
+                "cooldown_until": until,
+                "reason":         "open_dir",
+                "set_at":         int(time.time() * 1000),
+            }
+            effective = until
+        else:
+            effective = existing
         _save_cd(d)
-    logger.info(f"[state] {symbol} {direction.upper()} 开仓冷却 {hours}h 已写入")
+    logger.info(f"[state] {symbol} {direction.upper()} 开仓冷却 {hours}h 已写入，实际到期 {effective}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -607,8 +679,12 @@ def _ensure_files() -> None:
                 raw = path.read_text(encoding="utf-8").strip()
                 if raw:
                     json.loads(raw)   # 格式校验
-            except Exception:
-                logger.warning(f"[state] {path.name} 格式损坏，重置")
+            except Exception as e:
+                if path == _POS_FILE:
+                    # [v3.89 #11] 持仓文件损坏：备份保留 + 设标志，再写默认值维持启动
+                    _backup_corrupted_pos(path, e)
+                else:
+                    logger.error(f"[state] {path.name} 格式损坏，重置: {e}")
                 _write_json(path, default)
 
 
@@ -626,6 +702,8 @@ def cleanup_orphan_patching() -> list:
 
     返回被清除的 symbol 列表。
     """
+    if _POS_STATE_CORRUPTED:  # [v3.89 #11b] 清理孤儿记录不拦截，仅提示人工核查
+        logger.warning("[state] 持仓文件曾损坏，cleanup_orphan_patching 仍执行，请人工核查结果")
     with _locks["pos"]:
         data = _load_pos()
         orphans = [
