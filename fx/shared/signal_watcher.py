@@ -113,6 +113,8 @@ class WatchEntry:
     # 状态转换必须在 SignalWatcher._lock 内完成。
     entry_id:     str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     cancel_state: str = "none"
+    # [v3.89 #102] 触发结果状态：none=正常 / unknown=触发结果未知（on_trigger 在可能已下单之后失败），待人工核查
+    trigger_state: str = "none"
 
     @property
     def symbol(self) -> str:
@@ -410,6 +412,7 @@ class SignalWatcher:
         if not symbol:
             return
 
+        _evict_cancel = []   # [v3.89 撤单检查] 被驱逐条目的待撤订单（锁内登记，锁外执行）
         async with self._lock:
             existing = self._watched.get(symbol)
             if existing and not replace and not existing.triggered and not existing.is_expired():
@@ -505,24 +508,21 @@ class SignalWatcher:
                     except Exception as _sw_e:
                         logger.debug(f"[signal_watcher] 驱逐卡片追加失败: {_sw_e}")
                     if lowest.limit_order_id:
-                        try:
-                            import asyncio as _aio
-                            from shared import binance_api as _bapi
-                            loop_ref = _aio.get_running_loop()
-                            _aio.ensure_future(
-                                loop_ref.run_in_executor(
-                                    None, lambda: _bapi.cancel_order(old_sym, int(lowest.limit_order_id))
-                                )
-                            )
-                        except Exception as _ce:
-                            logger.warning(f"[signal_watcher] 撤低分挂单 {old_sym} 失败: {_ce}")
+                        # [v3.89 撤单检查] 原写法 ensure_future 发出去不看结果；改为锁外统一走
+                        #   _cancel_exchange_order 并确认终态（这里仍在锁内，只登记待撤计划）
+                        _evict_cancel.append((old_sym, int(lowest.limit_order_id), lowest))
                     # ── 清理 pos_state 残留（否则 get_pending_count 会虚高）──
                     try:
                         from shared.state import get_all_positions as _gap, remove_position as _rmp
                         _old_recs = [p for p in _gap()
                                      if p.get("symbol") == old_sym and p.get("status") == "pending"]
                         if _old_recs:
-                            _rmp(_old_recs[0]["pos_id"])
+                            # [v3.89 remove-pos 检查] 检查返回值，失败只记日志
+                            try:
+                                if _rmp(_old_recs[0]["pos_id"]) is False:
+                                    logger.warning("[signal_watcher] remove_position(%s) 返回 False，pos_state 未写入成功，请人工核查" % _old_sym)
+                            except Exception as _re:
+                                logger.error("[signal_watcher] remove_position(%s) 抛异常，持仓文件可能损坏，请人工核查: %s" % (_old_sym, _re))
                             logger.info(f"[signal_watcher] {old_sym} pos_state pending 记录已清理")
                     except Exception as _rpe:
                         logger.warning(f"[signal_watcher] {old_sym} pos_state 清理失败: {_rpe}")
@@ -558,6 +558,22 @@ class SignalWatcher:
             except Exception as _ne:
                 logger.debug(f"[signal_watcher] 信号卡片创建失败（非致命）: {_ne}")
 
+        # [v3.89 撤单检查] 锁外撤被驱逐条目的交易所挂单：确认终态，结果未知登记对账
+        for _esy, _eoid, _eentry in _evict_cancel:
+            try:
+                _oc = await self._cancel_exchange_order(_esy, _eoid)
+            except Exception as _ce:
+                _oc = "unknown"
+                logger.warning(f"[signal_watcher] 撤低分挂单 {_esy} 异常: {_ce}")
+            if _oc == "confirmed":
+                logger.info(f"[signal_watcher] 低分挂单 {_esy} id={_eoid} 已撤销")
+            elif _oc == "filled":
+                logger.error(f"[signal_watcher] 低分挂单 {_esy} id={_eoid} 已（部分）成交，请核对持仓")
+                self._append_reconcile_log({"ts": time.time(), "event": "filled_on_evict",
+                                            "symbol": _esy, "order_id": _eoid})
+            else:
+                self._register_orphan(_esy, _eoid, "竞争淘汰", _eentry, on_confirmed="remove")
+
     async def cancel_all(self, reason: str = "manual") -> int:
         """
         撤销所有未触发信号的入场挂单（仓位满时调用）。
@@ -574,14 +590,14 @@ class SignalWatcher:
             if entry.triggered:  # 二次确认：快照后如果已被 _trigger 激活，跳过，防止误撑进场挂单
                 continue
             try:
-                if entry.limit_order_id:
-                    await self._cancel_order(sym, entry.limit_order_id)
-                    logger.info(f"[signal_watcher] 撤销 {sym} 入场挂单 {entry.limit_order_id} ({reason})")
-                async with self._lock:
-                    self._watched.pop(sym, None)
-                if self._ws_listener:
-                    self._ws_listener.unsubscribe(sym)
-                cancelled += 1
+                # [v3.89 撤单检查] 统一走 _cancel_and_remove：撤单确认终态，结果未知登记 _orphan_orders。
+                #   单个条目失败只记录，不影响其他条目的撤单。
+                _st = await self._cancel_and_remove(sym, entry, reason)
+                if self._watched.get(sym) is entry:
+                    # filled / cancel_unknown：条目保留待对账，不计入已撤销
+                    logger.warning(f"[signal_watcher] {sym} 撤单未确认（{_st}），条目保留待对账")
+                else:
+                    cancelled += 1
             except Exception as e:
                 logger.warning(f"[signal_watcher] 撤销 {sym} 失败: {e}")
 
@@ -807,6 +823,14 @@ class SignalWatcher:
             self._dir_last_trigger[_dir_key] = _now_ts
 
         try:
+            from executor import PreOrderError as _PreOrderError   # [v3.89 #102]
+        except Exception:
+            class _PreOrderError(Exception):   # 兜底，避免因导入失败把可重试错误当未知处理
+                pass
+
+        _keep_entry = False   # [v3.89 #102] True 表示本次触发异常，条目保留（可重试或待对账）
+
+        try:
             # ── 卡片追加：价格触发挂单行 ─────────────────────────────────────
             try:
                 from shared.notifier import card_append, fmt_node_trigger
@@ -875,35 +899,56 @@ class SignalWatcher:
 
             if not _skip:
                 await entry.on_trigger(entry.signal)
+        except _PreOrderError as _pe:
+            # [v3.89 #102] 下单前失败：交易所确认没有订单，复位触发标记保留条目，等下一次价格触发重试
+            _keep_entry = True
+            async with self._lock:
+                if self._watched.get(symbol) is entry:
+                    entry.triggered = False
+                    entry.trigger_state = "none"
+            logger.warning(f"[signal_watcher] {symbol} 下单前失败，已保留信号等待下次触发重试: {_pe}")
         except Exception as e_:
-            logger.error(f"[signal_watcher] {symbol} on_trigger 异常: {e_}", exc_info=True)
+            # [v3.89 #102] 其他异常可能发生在已下单之后（结果未知）：标记待对账，不自动清理
+            _keep_entry = True
+            logger.error(f"[signal_watcher] {symbol} on_trigger 异常（触发结果未知）: {e_}", exc_info=True)
+            async with self._lock:
+                if self._watched.get(symbol) is entry:
+                    entry.trigger_state = "unknown"
+            _oid = entry.limit_order_id
+            try:
+                self._append_trigger_reconcile({
+                    "ts": time.time(), "symbol": symbol, "entry_id": entry.entry_id,
+                    "error": repr(e_), "order_id_if_known": _oid,
+                    "mode": entry.mode, "direction": entry.signal.get("direction", ""),
+                    "entry_price": entry.entry_price, "reason": "on_trigger 异常，触发结果未知",
+                })
+            except Exception:
+                pass
+            try:
+                from shared.notifier import notify as _notify
+                import threading as _thr
+                _thr.Thread(target=_notify, daemon=True, args=(
+                    f"🚨 {symbol} 触发后执行异常，无法确认是否已下单（order_id={_oid}），"
+                    f"已登记对账并保留条目，请人工核查！",)).start()
+            except Exception:
+                pass
         finally:
             async with self._lock:
                 # [v3.89 #102-partial] pop 前核对身份，避免删掉同品种被替换进来的新条目
-                if self._watched.get(symbol) is entry:
+                if (not _keep_entry) and self._watched.get(symbol) is entry:
                     self._watched.pop(symbol, None)
 
     async def _handle_expired(self, symbol: str, entry: WatchEntry) -> None:
         """处理过期信号：撤单 + 移除。"""
-        async with self._lock:
-            e = self._watched.get(symbol)
-            if e is None or e.triggered:
-                return
-            self._watched.pop(symbol, None)
-
         waited_min = (time.time() - entry.added_ts) / 60
         logger.info(
-            f"[signal_watcher] {symbol} 信号过期，已丢弃 "
+            f"[signal_watcher] {symbol} 信号过期，撤单并移除 "
             f"(mode={entry.mode} 等待了 {waited_min:.1f}min)"
         )
 
-        # 撤销已挂的入场限价单
-        if entry.limit_order_id:
-            try:
-                await self._cancel_order(symbol, entry.limit_order_id)
-                logger.info(f"[signal_watcher] 撤销过期挂单 {symbol} orderId={entry.limit_order_id}")
-            except Exception as ce:
-                logger.warning(f"[signal_watcher] 撤销过期挂单失败 {symbol}: {ce}")
+        # [v3.89 撤单检查] 不再重复实现撤单逻辑，统一复用 _cancel_and_remove
+        #   （撤单确认终态；结果未知时条目保留并登记 _orphan_orders，由 _reconcile_orphans 继续跟踪）
+        await self._cancel_and_remove(symbol, entry, "信号过期")
 
         try:
             from shared.notifier import card_append, fmt_node_timeout
@@ -912,10 +957,6 @@ class SignalWatcher:
                 card_append(_sig_id, fmt_node_timeout(int(waited_min)))
         except Exception as _sw_e:
             logger.debug(f"[signal_watcher] 超时卡片追加失败: {_sw_e}")
-
-        # 取消 WS 订阅
-        if self._ws_listener:
-            self._ws_listener.unsubscribe(symbol)
 
     async def _cancel_order(self, symbol: str, order_id: int) -> None:
         """异步撤单（在主 loop 里通过 run_in_executor 调同步 API）。"""
@@ -981,6 +1022,17 @@ class SignalWatcher:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         except Exception as e:
             logger.warning(f"[signal_watcher] 写对账记录失败: {e}")
+
+    @staticmethod
+    def _append_trigger_reconcile(rec: dict) -> None:
+        """[v3.89 #102] 追加写 logs/trigger_reconcile.jsonl（触发结果未知的对账记录）。"""
+        try:
+            p = Path(__file__).parent.parent / "logs" / "trigger_reconcile.jsonl"
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with open(p, "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
+        except Exception as e:
+            logger.warning(f"[signal_watcher] 写 trigger_reconcile 失败: {e}")
 
     def _register_orphan(self, symbol: str, order_id: int, reason: str,
                          entry: WatchEntry, on_confirmed: str) -> None:
@@ -1807,6 +1859,9 @@ class SignalWatcher:
         expired_entries = []
         async with self._lock:
             for sym, e in list(self._watched.items()):
+                # [v3.89 #102/#44] 触发结果未知的条目保留待人工核查；撤单进行中/结果未知的条目由撤单与对账流程负责
+                if e.trigger_state == "unknown" or e.cancel_state != "none":
+                    continue
                 if e.triggered:
                     self._watched.pop(sym, None)
                 elif e.is_expired():

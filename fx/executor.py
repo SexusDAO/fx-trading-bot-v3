@@ -64,6 +64,15 @@ from shared.notifier import (
 
 logger = logging.getLogger("fx.executor")
 
+
+class PreOrderError(Exception):
+    """
+    [v3.89 #102] 开仓前的暂时性失败：确认还没有向交易所提交过任何订单，可安全重试。
+    仅用于市场数据拉取失败 / set_leverage 失败 / 账户查询失败这类会自行恢复的故障。
+    业务性拒绝（_precheck 拒绝、calc_sl_tp 校验不通过、余额不足、持仓上限、冷却期等）
+    仍然 return False，不作为可重试错误——重试不会改变结果，只会持续空转。
+    """
+
 # 保证金状态全局缓存（由 _account_final_check 写入，开仓逻辑读取）
 _MARGIN_TIGHT_HINT: list = [""]   # [0]=提示文字
 _MARGIN_SCALE:      list = [1.0]   # [0]=仓位缩减系数（0.3–1.0）
@@ -622,7 +631,9 @@ def _setup_symbol(symbol: str) -> int:
         api.set_leverage(symbol, max_lev)
         logger.info(f"[executor] {symbol} 设置杠杆 {max_lev}x")
     except Exception as e:
-        logger.warning(f"[executor] {symbol} 设置杠杆失败: {e}，继续")
+        # [v3.89 #102] 杠杆没设上会让保证金校验和数量计算失真，且此时尚未提交任何订单 → 可重试
+        logger.error(f"[executor] {symbol} 设置杠杆 {max_lev}x 失败: {e}")
+        raise PreOrderError(f"{symbol} 设置杠杆失败: {e}") from e
     return max_lev
 
 
@@ -1390,7 +1401,7 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
         mkt = _fetch_market(symbol)
     except Exception as e:
         logger.error(f"[executor] {symbol} 市场数据拉取失败: {e}")
-        return False
+        raise PreOrderError(f"{symbol} 市场数据拉取失败: {e}") from e   # [v3.89 #102] 暂时性失败
 
     mark_price = mkt["mark_price"]
     atr        = mkt["atr"]
@@ -1631,6 +1642,9 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
     ok, reason = _account_final_check(notional)
     if not ok:
         logger.warning(f"[executor] {symbol} 账户终检失败: {reason}")
+        # [v3.89 #102] 账户查询失败是暂时性故障（可重试）；余额/名义/回撤等业务拒绝仍 return False
+        if str(reason).startswith("账户查询失败"):
+            raise PreOrderError(f"{symbol} {reason}")
         return False
 
     # ── 步骤6：设置全仓 + 最大杠杆 ───────────────────────────────────────────
