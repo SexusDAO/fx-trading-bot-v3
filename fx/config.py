@@ -942,3 +942,8 @@ OPT_DIVERGENCE_GATE_WEIGHT_CAP = 2.0
 # [v3.88 OPT-15] oi_divergence 近5根全阳（SHORT）/全阴（LONG）时直接拒绝信号；默认开启（与其他 OPT_* 不同）。
 #   关闭则恢复 mark*0.992 / mark*1.008 兜底。
 OPT_OID_REJECT_ALL_BULL = True
+
+
+# [v3.89 SHADOW] 影子信号穿透追踪：被拒信号写入 logs/rejected_log.jsonl，只记录、不改变交易行为。
+#   结果由 tools/shadow_verify.py 离线补标签。设 False 关闭记录。
+SHADOW_TRACE_ENABLED = True

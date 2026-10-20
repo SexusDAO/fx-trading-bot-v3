@@ -978,6 +978,16 @@ def analyze_symbol(symbol: str, ticker: dict,
                     ind=ind, reason=_reason if isinstance(_reason, dict) else {},
                     btc_trend=btc_trend, market_mode="",
                 )
+                # [v3.89 SHADOW] A 类：判定精筛被拒写入影子日志（judge 内部首个失败即返回，无法继续穿透同一 judge 的后续条件）
+                try:
+                    from shared import shadow_trace as _st1
+                    _rd = _reason if isinstance(_reason, dict) else {}
+                    _st1.record(symbol=symbol, signal_type=_route, direction=_dir,
+                                first_rejected_at=f"judge_{_route}", would_also_fail=[],
+                                entry_candidate=ind.get("price"), atr=ind.get("atr_1h") or ind.get("atr"),
+                                reason=str(_rd.get("reject_reason", _reason)), stage="A")
+                except Exception:
+                    pass
                 continue
 
             # judge 通过：计算质量分并加入候选列表
@@ -1435,6 +1445,12 @@ def _load_pool() -> list:
 def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     t0  = time.time()
     now = datetime.now(timezone.utc)
+    # [v3.89 SHADOW] 每轮扫描重置影子记录计数
+    try:
+        from shared import shadow_trace as _st0
+        _st0.new_round()
+    except Exception:
+        pass
     result = {
         "ts": now.isoformat(), "scanned": 0,
         "class_counts": {"reversal": 0, "breakout": 0, "pullback": 0},
@@ -2724,6 +2740,12 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
         pass
 
     _write_scan_log(result, avail_signals)
+    # [v3.89 SHADOW] 影子穿透追踪：扫描后处理被拒的信号写入 rejected_log.jsonl（只记录）
+    try:
+        from shared import shadow_trace as _st
+        _st.record_scanner_rejections(result, signals_raw)
+    except Exception as _st_e:
+        logger.debug(f"[shadow] 扫描后处理记录失败: {_st_e}")
     return result
 
 # ── OI 缓存写入 ──────────────────────────────────────────────────────────────
