@@ -302,6 +302,37 @@ def _cache_set(key: str, data):
 # CG 中转站 GET 请求（核心合约接口用）
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _parse_retry_after(value, default: float = 30.0, max_wait: float = 60.0) -> float:
+    """
+    [v3.89 #76] 解析 Retry-After 头，支持两种合法格式：
+      · 纯秒数，如 "30" / "1.5"
+      · HTTP 日期，如 "Wed, 21 Oct 2026 07:28:00 GMT"
+    无法解析时返回 default；结果统一夹在 [0, max_wait]。
+    """
+    if value is None:
+        return default
+    v = str(value).strip()
+    if not v:
+        return default
+    try:
+        return max(0.0, min(float(v), max_wait))
+    except (TypeError, ValueError):
+        pass
+    try:
+        from email.utils import parsedate_to_datetime
+        import datetime as _dt
+        dt = parsedate_to_datetime(v)
+        if dt is None:
+            return default
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_dt.timezone.utc)
+        delta = (dt - _dt.datetime.now(_dt.timezone.utc)).total_seconds()
+        return max(0.0, min(delta, max_wait))
+    except Exception:
+        logger.debug(f"[cg_get] 无法解析 Retry-After={v!r}，使用默认 {default}s")
+        return default
+
+
 def cg_get(path: str, params: dict = None, timeout: int = 12) -> "list | dict | None":
     """
     GET https://vip2.coinglass.site/<path>
@@ -319,8 +350,9 @@ def cg_get(path: str, params: dict = None, timeout: int = 12) -> "list | dict | 
             return None
 
         if r.status_code == 429:
-            retry_after = float(r.headers.get("Retry-After", 30))
-            wait = min(retry_after, 60)
+            # [v3.89 #76] Retry-After 可能是秒数，也可能是 HTTP 日期格式；
+            #   旧实现直接 float() 会把日期型头变成未分类异常，向上抛出。
+            wait = _parse_retry_after(r.headers.get("Retry-After"), default=30.0)
             logger.warning(f"[cg_get] 429 {path}, 等待 {wait:.0f}s")
             if attempt == 0:
                 time.sleep(wait)
@@ -335,6 +367,11 @@ def cg_get(path: str, params: dict = None, timeout: int = 12) -> "list | dict | 
         try:
             body = r.json()
         except Exception:
+            return None
+
+        # [v3.89 #76] 顶层必须是 dict；合法 JSON 也可能是 list/str，旧实现直接 .get 会抛异常
+        if not isinstance(body, dict):
+            logger.debug(f"[cg_get] {path} 顶层结构非 dict: {type(body).__name__}")
             return None
 
         code = str(body.get("code", ""))
