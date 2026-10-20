@@ -24,6 +24,10 @@ TRACK_WINDOW_H  = 8     # 追踪窗口
 CORRECT_MOVE    = 2.0   # 方向触达幅度门槛（%）
 KLINE_MS        = 15 * 60 * 1000   # [v3.89 #44] 15m K 线间隔
 
+# [v3.89 #46] 方向必须是明确枚举，其余值一律按 invalid 处理，
+#   不得落入 LONG 分支（旧实现任何非空且非 SHORT 的值都会走 LONG）。
+VALID_DIRECTIONS = ("LONG", "SHORT")
+
 
 def _get_klines(symbol, start_ms, limit=32):
     try:
@@ -71,6 +75,25 @@ def _validate_window(klines: list, start_ms: int, window_end: int, now_ms: int) 
     return None
 
 
+# [v3.89 #47] 行情请求合并缓存：key=(symbol, start_ms, limit)。
+#   同一次 run() 内相同标的、相同追踪窗口的记录复用同一份 K 线，
+#   节流（time.sleep）只在真正发出请求时执行，不再按记录条数计。
+_KLINE_CACHE: dict = {}
+
+
+def _get_klines_cached(symbol: str, start_ms: int, limit: int) -> list:
+    key = (symbol, start_ms, limit)
+    if key not in _KLINE_CACHE:
+        _KLINE_CACHE[key] = _get_klines(symbol, start_ms, limit=limit)
+        time.sleep(0.03)   # [v3.89 #47] 节流按实际发出的请求数计
+    return _KLINE_CACHE[key]
+
+
+def _clear_kline_cache() -> None:
+    """每次 run() 开始时清空，避免跨批次复用过期行情。"""
+    _KLINE_CACHE.clear()
+
+
 def _check_rejected_outcome(rec: dict) -> dict:
     """
     追踪一条拒绝记录。始终返回 dict，字段 status：
@@ -81,18 +104,37 @@ def _check_rejected_outcome(rec: dict) -> dict:
     [v3.89 #45] direction_touched 仅表示「参考价之后的最大有利波动达到门槛」，
     不检验候选入场是否触达、先后路径，也不代表成交或盈亏。
     """
-    direction = (rec.get("direction") or "").upper()
+    direction = (rec.get("direction") or "").strip().upper()
+    # [v3.89 #46] 校验方向枚举：非法/未知方向单独计为 invalid，不再默认走 LONG
+    if direction not in VALID_DIRECTIONS:
+        return {"status": "invalid", "reason": "bad_direction"}
+
     snap = rec.get("snapshot") or {}
     ref_price = snap.get("price")
-    if not ref_price or not direction:
-        return {"status": "invalid"}
+    # [v3.89 #46] 参考价需为正有限数，否则后续 (hi-ref)/ref 会除零或失真
+    try:
+        ref_price = float(ref_price)
+    except (TypeError, ValueError):
+        return {"status": "invalid", "reason": "bad_ref_price"}
+    if not (ref_price > 0) or ref_price != ref_price or ref_price in (float("inf"), float("-inf")):
+        return {"status": "invalid", "reason": "bad_ref_price"}
 
-    window_end = rec["ts"] + TRACK_WINDOW_H * 3600 * 1000
-    klines = _get_klines(rec["symbol"], rec["ts"], limit=TRACK_WINDOW_H * 4)
+    # [v3.89 #46] ts / symbol 由直接索引改为安全取值，缺字段的记录不再中断整份报告
+    try:
+        ts = int(rec.get("ts"))
+    except (TypeError, ValueError):
+        return {"status": "invalid", "reason": "bad_ts"}
+    symbol = rec.get("symbol")
+    if not symbol or not isinstance(symbol, str):
+        return {"status": "invalid", "reason": "bad_symbol"}
+
+    window_end = ts + TRACK_WINDOW_H * 3600 * 1000
+    # [v3.89 #47] 走合并缓存（同标的+同窗口只请求一次），节流按实际请求数
+    klines = _get_klines_cached(symbol, ts, TRACK_WINDOW_H * 4)
     if not klines:
         return {"status": "insufficient", "reason": "no_klines"}
     klines = [k for k in klines if int(k[0]) < window_end]
-    why = _validate_window(klines, rec["ts"], window_end, int(time.time() * 1000))
+    why = _validate_window(klines, ts, window_end, int(time.time() * 1000))
     if why:
         return {"status": why}
 
@@ -145,6 +187,9 @@ def run(analytics_file: Path | None = None, days: int = 7) -> dict:
                 continue
             rejected_recs.append(rec)
 
+    # [v3.89 #47] 每次重跑清空行情缓存，仅在同一次分析内复用相同窗口的 K 线
+    _clear_kline_cache()
+
     # 按拒绝原因分组统计
     groups: dict[str, list] = defaultdict(list)       # 仅 complete
     skipped: dict[str, Counter] = defaultdict(Counter)  # immature / insufficient / invalid
@@ -153,12 +198,17 @@ def run(analytics_file: Path | None = None, days: int = 7) -> dict:
         # 归类：取前半段（去掉动态数值部分）
         import re
         key = re.sub(r'[=:：].*', '', reason).strip()[:60]
-        result = _check_rejected_outcome(rec)
+        # [v3.89 #46] 逐条隔离：单条记录的字段类型异常不得中断整份报告，
+        #   记为 invalid 并继续处理后续记录。
+        try:
+            result = _check_rejected_outcome(rec)
+        except Exception as e:
+            logger.debug(f"[track_rejected] 记录处理失败(t={rec.get('ts')}): {e}")
+            result = {"status": "invalid", "reason": "exception"}
         if result.get("status") == "complete":
             groups[key].append(result)
         else:
             skipped[key][result.get("status", "invalid")] += 1
-        time.sleep(0.03)
 
     report = {}
     for reason in sorted(set(groups) | set(skipped), key=lambda k: -(len(groups.get(k, [])))):

@@ -61,7 +61,7 @@ def _load_analytics(
                 if direction and (rec.get("direction") or "").upper() != direction.upper():
                     continue
 
-                # 只取已追踪完成的记录
+                # 只取已追踪完成的记录（[v3.89 #89] filled 存在即代表追踪完成）
                 outcome = rec.get("outcome") or {}
                 if outcome.get("filled") is None:
                     continue
@@ -92,6 +92,8 @@ def get_kelly_size_cap(
         float  — Kelly 最优 cap（经 1/4 Kelly + [KELLY_MIN_CAP, KELLY_MAX_CAP] 约束）
         None   — 样本不足或 KELLY_ENABLED=False，调用方继续用固定 cap
     """
+    # 注意：此处兜底默认值掩盖了「配置模块损坏」与「可选项缺失」的区别（见审查 #31）。
+    #   本 commit 不改动该行为，仅登记；按 #31 处理时会输出实际配置来源。
     try:
         from config import (
             KELLY_ENABLED,
@@ -113,25 +115,54 @@ def get_kelly_size_cap(
     history = _load_analytics(mode, strength, market_mode, direction)
     filled  = [h for h in history if h.get("outcome", {}).get("filled")]
 
-    if len(filled) < SIGNAL_ANALYTICS_MIN_SAMPLE:
+    # [v3.89 #89] 收益有效性校验：pnl_pct 必须是有限实数。
+    #   旧写法 `(pnl_pct or 0) > 0` 把 None / 缺失 / 空串一律当成 0（亏损），
+    #   字符串型 pnl_pct 还会在比较时抛 TypeError；进统计后再用
+    #   h["outcome"]["pnl_pct"] 直接索引，缺失值继续污染均值。
+    #   这里把「未知收益」单独计数：既不计入胜率分母，也不当作亏损样本，
+    #   避免数据缺失变相压低 Kelly 系数（不改任何阈值与公式）。
+    known, unknown = [], 0
+    for h in filled:
+        _v = (h.get("outcome") or {}).get("pnl_pct")
+        if isinstance(_v, str):
+            try:
+                _v = float(_v)
+            except (TypeError, ValueError):
+                _v = None
+        if isinstance(_v, bool) or not isinstance(_v, (int, float)):
+            unknown += 1
+            continue
+        if _v != _v or _v in (float("inf"), float("-inf")):   # NaN / ±Inf
+            unknown += 1
+            continue
+        h["_pnl"] = float(_v)
+        known.append(h)
+
+    if unknown:
+        logger.info(
+            f"[kelly] ({mode}/{strength}/{market_mode}/{direction}) "
+            f"{unknown} 笔已成交记录缺少有效 pnl_pct，已排除出统计（不计为亏损）"
+        )
+
+    if len(known) < SIGNAL_ANALYTICS_MIN_SAMPLE:
         logger.debug(
             f"[kelly] ({mode}/{strength}/{market_mode}/{direction}) "
-            f"样本 {len(filled)} < {SIGNAL_ANALYTICS_MIN_SAMPLE}，跳过 Kelly"
+            f"有效样本 {len(known)}/{len(filled)} < {SIGNAL_ANALYTICS_MIN_SAMPLE}，跳过 Kelly"
         )
         return None
 
-    won  = [h for h in filled if (h.get("outcome", {}).get("pnl_pct") or 0) > 0]
-    lost = [h for h in filled if (h.get("outcome", {}).get("pnl_pct") or 0) <= 0]
+    won  = [h for h in known if h["_pnl"] > 0]
+    lost = [h for h in known if h["_pnl"] <= 0]
 
     if not won:
         # 胜率为零，直接降到最低仓位
         logger.info(f"[kelly] ({mode}) 胜率为0，返回 KELLY_MIN_CAP={KELLY_MIN_CAP}")
         return KELLY_MIN_CAP
 
-    p = len(won) / len(filled)  # 胜率
+    p = len(won) / len(known)  # 胜率（分母只含收益有效的样本，[v3.89 #89]）
 
-    avg_win  = mean(abs(h["outcome"]["pnl_pct"]) for h in won)
-    avg_loss = mean(abs(h["outcome"]["pnl_pct"]) for h in lost) if lost else avg_win
+    avg_win  = mean(abs(h["_pnl"]) for h in won)
+    avg_loss = mean(abs(h["_pnl"]) for h in lost) if lost else avg_win
 
     if avg_loss < 1e-9:
         avg_loss = avg_win  # 防零除
@@ -155,7 +186,7 @@ def get_kelly_size_cap(
 
     logger.info(
         f"[kelly] ({mode}/{strength}/{market_mode}/{direction}) "
-        f"n={len(filled)} p={p:.2f} b={b:.2f} "
+        f"n={len(known)}/{len(filled)} p={p:.2f} b={b:.2f} "
         f"kelly_f={kelly_f:.3f} × {KELLY_FRACTION} → {conservative_f:.3f} "
         f"→ clamp [{KELLY_MIN_CAP},{KELLY_MAX_CAP}] = {result:.3f}"
     )

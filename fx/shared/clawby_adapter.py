@@ -169,10 +169,93 @@ def _lsr_try_acquire() -> bool:
 
 import pathlib as _pathlib
 import json    as _json_mod
+import os      as _os
 
 _SHARED_CACHE_FILE = _pathlib.Path(__file__).parent.parent.parent / "ws_cache" / "clawby_shared_cache.json"
 _SHARED_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
 _cache_lock = threading.Lock()
+
+# [v3.89 #75] 该缓存声明为「三个工作流共用」，进程内 threading.Lock 只在单进程内有效，
+#   多进程同时读改写会互相覆盖；且直接 write_text 覆盖整个文件，崩溃即留下半截 JSON。
+#   这里补一层跨进程文件锁（fcntl.flock），并改为唯一临时文件 + os.replace 原子替换。
+_CACHE_LOCK_FILE = _SHARED_CACHE_FILE.with_suffix(".json.lock")
+
+
+class _CrossProcessCacheLock:
+    """
+    [v3.89 #75] 跨进程互斥锁：fcntl.flock 排他锁 + 进程内锁双保险。
+    仅用于保护「读—改—写整个缓存文件」这个临界区，不包裹任何网络调用。
+    在不支持 fcntl 的平台（非 POSIX）自动退化为仅进程内锁。
+    """
+
+    def __init__(self, path):
+        self._path = path
+        self._fd = None
+
+    def __enter__(self):
+        _cache_lock.acquire()
+        try:
+            self._fd = open(self._path, "a+")
+            try:
+                import fcntl
+                fcntl.flock(self._fd.fileno(), fcntl.LOCK_EX)
+            except Exception:
+                pass   # 单进程内仍有 _cache_lock 保护
+        except Exception:
+            self._fd = None
+        return self
+
+    def __exit__(self, *exc):
+        try:
+            if self._fd is not None:
+                try:
+                    import fcntl
+                    fcntl.flock(self._fd.fileno(), fcntl.LOCK_UN)
+                except Exception:
+                    pass
+                self._fd.close()
+        finally:
+            self._fd = None
+            _cache_lock.release()
+        return False
+
+
+def _read_shared_cache() -> dict:
+    """[v3.89 #75] 读取共享缓存；损坏时返回 {} 并记录告警，不再静默吞掉。"""
+    try:
+        if not _SHARED_CACHE_FILE.exists():
+            return {}
+        raw = _SHARED_CACHE_FILE.read_text(encoding="utf-8")
+        if not raw.strip():
+            return {}
+        data = _json_mod.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except Exception as e:
+        logger.warning(f"[clawby_cache] 共享缓存读取失败（按空缓存继续）: {e}")
+        return {}
+
+
+def _write_shared_cache(disk: dict) -> bool:
+    """
+    [v3.89 #75] 原子替换写入：唯一临时文件 → os.replace。
+    旧实现直接 write_text 覆盖，进程在多进程竞争或写中途崩溃时会留下半截 JSON，
+    下一次读取失败后又被空状态覆盖，缓存批量丢失。
+    """
+    try:
+        tmp = _SHARED_CACHE_FILE.with_name(
+            f"{_SHARED_CACHE_FILE.name}.{_os.getpid()}.tmp"   # 唯一临时名，避免多进程互踩
+        )
+        tmp.write_text(_json_mod.dumps(disk, ensure_ascii=False), encoding="utf-8")
+        _os.replace(tmp, _SHARED_CACHE_FILE)
+        return True
+    except Exception as e:
+        logger.warning(f"[clawby_cache] 共享缓存写入失败: {e}")
+        try:
+            if 'tmp' in locals() and tmp.exists():
+                tmp.unlink()
+        except Exception:
+            pass
+        return False
 
 # 进程内二级缓存：减少磁盘读写次数
 _mem_cache: dict = {}
@@ -184,20 +267,18 @@ def _cache_get(key: str):
         c = _mem_cache[key]
         if now - c["ts"] < CACHE_TTL:
             return c["data"]
-    # 2. 磁盘共享缓存
+    # 2. 磁盘共享缓存（[v3.89 #75] 跨进程锁 + 容错读取）
     try:
-        with _cache_lock:
-            if _SHARED_CACHE_FILE.exists():
-                raw = _SHARED_CACHE_FILE.read_text(encoding="utf-8")
-                disk = _json_mod.loads(raw) if raw.strip() else {}
-                if key in disk:
-                    entry = disk[key]
-                    if now - entry["ts"] < CACHE_TTL:
-                        # 回填内存缓存
-                        _mem_cache[key] = entry
-                        return entry["data"]
-    except Exception:
-        pass
+        with _CrossProcessCacheLock(_CACHE_LOCK_FILE):
+            disk = _read_shared_cache()
+            if key in disk:
+                entry = disk[key]
+                if now - entry["ts"] < CACHE_TTL:
+                    # 回填内存缓存
+                    _mem_cache[key] = entry
+                    return entry["data"]
+    except Exception as e:
+        logger.debug(f"[clawby_cache] 读取 {key} 失败: {e}")
     return None
 
 def _cache_set(key: str, data):
@@ -205,30 +286,52 @@ def _cache_set(key: str, data):
     entry = {"ts": now, "data": data}
     # 1. 写内存
     _mem_cache[key] = entry
-    # 2. 写磁盘（各进程共享）
+    # 2. 写磁盘（各进程共享）：[v3.89 #75] 跨进程锁内读改写 + 原子替换
     try:
-        with _cache_lock:
-            disk = {}
-            if _SHARED_CACHE_FILE.exists():
-                try:
-                    raw = _SHARED_CACHE_FILE.read_text(encoding="utf-8")
-                    disk = _json_mod.loads(raw) if raw.strip() else {}
-                except Exception:
-                    disk = {}
+        with _CrossProcessCacheLock(_CACHE_LOCK_FILE):
+            disk = _read_shared_cache()
             # 清理过期条目，防止文件无限增长
             disk = {k: v for k, v in disk.items()
                     if now - v.get("ts", 0) < CACHE_TTL}
             disk[key] = entry
-            _SHARED_CACHE_FILE.write_text(
-                _json_mod.dumps(disk, ensure_ascii=False),
-                encoding="utf-8"
-            )
-    except Exception:
-        pass  # 磁盘写入失败不影响运行
+            _write_shared_cache(disk)
+    except Exception as e:
+        logger.debug(f"[clawby_cache] 写入 {key} 失败: {e}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CG 中转站 GET 请求（核心合约接口用）
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _parse_retry_after(value, default: float = 30.0, max_wait: float = 60.0) -> float:
+    """
+    [v3.89 #76] 解析 Retry-After 头，支持两种合法格式：
+      · 纯秒数，如 "30" / "1.5"
+      · HTTP 日期，如 "Wed, 21 Oct 2026 07:28:00 GMT"
+    无法解析时返回 default；结果统一夹在 [0, max_wait]。
+    """
+    if value is None:
+        return default
+    v = str(value).strip()
+    if not v:
+        return default
+    try:
+        return max(0.0, min(float(v), max_wait))
+    except (TypeError, ValueError):
+        pass
+    try:
+        from email.utils import parsedate_to_datetime
+        import datetime as _dt
+        dt = parsedate_to_datetime(v)
+        if dt is None:
+            return default
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_dt.timezone.utc)
+        delta = (dt - _dt.datetime.now(_dt.timezone.utc)).total_seconds()
+        return max(0.0, min(delta, max_wait))
+    except Exception:
+        logger.debug(f"[cg_get] 无法解析 Retry-After={v!r}，使用默认 {default}s")
+        return default
+
 
 def cg_get(path: str, params: dict = None, timeout: int = 12) -> "list | dict | None":
     """
@@ -247,8 +350,9 @@ def cg_get(path: str, params: dict = None, timeout: int = 12) -> "list | dict | 
             return None
 
         if r.status_code == 429:
-            retry_after = float(r.headers.get("Retry-After", 30))
-            wait = min(retry_after, 60)
+            # [v3.89 #76] Retry-After 可能是秒数，也可能是 HTTP 日期格式；
+            #   旧实现直接 float() 会把日期型头变成未分类异常，向上抛出。
+            wait = _parse_retry_after(r.headers.get("Retry-After"), default=30.0)
             logger.warning(f"[cg_get] 429 {path}, 等待 {wait:.0f}s")
             if attempt == 0:
                 time.sleep(wait)
@@ -263,6 +367,11 @@ def cg_get(path: str, params: dict = None, timeout: int = 12) -> "list | dict | 
         try:
             body = r.json()
         except Exception:
+            return None
+
+        # [v3.89 #76] 顶层必须是 dict；合法 JSON 也可能是 list/str，旧实现直接 .get 会抛异常
+        if not isinstance(body, dict):
+            logger.debug(f"[cg_get] {path} 顶层结构非 dict: {type(body).__name__}")
             return None
 
         code = str(body.get("code", ""))
