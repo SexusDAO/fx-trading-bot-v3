@@ -97,12 +97,11 @@ def categorize_precheck_reason(reason: str) -> str:
 
 def would_pass_all(would_also_fail: list):
     """后续关卡全部放行 → True；有关卡拒绝 → False；有未探测项（跳过）→ None（未知）。"""
-    real = [x for x in would_also_fail if not str(x).startswith("shadow_skip")]
-    if real:
-        return False
-    if any(str(x).startswith("shadow_skip") for x in would_also_fail):
+    # [v3.89 PREMERGE] 未知优先，兼容两种 skip 标记。
+    if any(str(x).startswith(("shadow_skip", "skip_")) for x in would_also_fail):
         return None
-    return True
+    return False if would_also_fail else True
+
 
 
 def probe_liquidity(sig: dict) -> list:
@@ -133,7 +132,7 @@ def _num(x):
 def record(*, symbol: str, signal_type: str, direction: str, first_rejected_at: str,
            would_also_fail: list | None = None, entry_candidate=None, sl=None, tp1=None,
            atr=None, reason: str = "", stage: str = "", price_kind: str = "plan",
-           extra: dict | None = None) -> bool:
+           extra: dict | None = None, probe=None) -> bool:
     """写一条影子记录。超过该阶段每轮上限或关闭时不写。永不抛异常。
 
     price_kind：plan=计划入场价（有止损止盈）；mark=判定被拒时的现价，只能做 ±1ATR 兜底判定。
@@ -144,7 +143,13 @@ def record(*, symbol: str, signal_type: str, direction: str, first_rejected_at: 
     if cap is not None and not _take(stage, cap):
         return False
     _take("records", 10 ** 9)
+    # [v3.89 PREMERGE] 惰性探测：只有 record 已预占名额后才允许网络调用。
     waf = list(would_also_fail or [])
+    if probe is not None:
+        try:
+            waf.extend(probe())
+        except Exception:
+            waf.append(SKIP_ERR)
     rec = {
         "ts": int(time.time() * 1000),
         "stage": stage,
@@ -154,7 +159,6 @@ def record(*, symbol: str, signal_type: str, direction: str, first_rejected_at: 
         "first_rejected_at": first_rejected_at,
         "reason": (reason or "")[:160],
         "would_also_fail": waf,
-        "would_pass_all": would_pass_all(waf),
         "price_kind": price_kind,
         "entry_candidate": _num(entry_candidate),
         "sl": _num(sl),
@@ -163,10 +167,22 @@ def record(*, symbol: str, signal_type: str, direction: str, first_rejected_at: 
     }
     if extra:
         rec.update(extra)
+    rec["would_pass_all"] = would_pass_all(waf)
     try:
         LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with _lock, open(LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        # [v3.89 PREMERGE] 轮转和写入使用同一锁，保留三份备份，不丢当前记录。
+        payload = json.dumps(rec, ensure_ascii=False) + "\n"
+        with _lock:
+            if LOG_PATH.exists() and LOG_PATH.stat().st_size + len(payload.encode("utf-8")) > 5 * 1024 * 1024:
+                oldest = Path(str(LOG_PATH) + ".3")
+                oldest.unlink(missing_ok=True)
+                for n in (2, 1):
+                    src = Path(str(LOG_PATH) + f".{n}")
+                    if src.exists():
+                        src.replace(Path(str(LOG_PATH) + f".{n+1}"))
+                LOG_PATH.replace(Path(str(LOG_PATH) + ".1"))
+            with open(LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(payload)
         return True
     except Exception as e:
         logger.debug(f"[shadow] 写入失败: {e}")
@@ -199,12 +215,13 @@ def record_scanner_rejections(result: dict, signals: list) -> int:
         reason = str(rej.get("reason", ""))
         cat = categorize_scanner_reason(reason)
         waf = [SKIP_LLM] if cat == "llm_filter" else []
-        waf += probe_liquidity(sig)
+        # [v3.89 PREMERGE] 不在此执行网络请求，由 record 预占名额后执行。
         e, sl, tp = _sig_prices(sig)
         if record(symbol=sig["symbol"], signal_type=sig.get("mode", ""), direction=sig.get("direction", ""),
                   first_rejected_at=cat, would_also_fail=waf, entry_candidate=e, sl=sl, tp1=tp,
                   atr=(sig.get("ind") or {}).get("atr_1h") or sig.get("atr"), reason=reason, stage="B",
-                  extra={"match_ambiguous": True} if cnt.get(sig["symbol"], 0) > 1 else None):
+                  extra={"match_ambiguous": True} if cnt.get(sig["symbol"], 0) > 1 else None,
+                  probe=lambda: probe_liquidity(sig)):
             n += 1
     return n
 
@@ -220,12 +237,15 @@ def record_judge_rejection(*, symbol: str, route: str, direction: str, reason: s
 
 def record_precheck_rejection(signal: dict, reason: str) -> bool:
     """C 类：下单前检查被拒。非流动性原因时，继续探测流动性门槛（只读，受盘口上限约束）。"""
+    # [v3.89 PREMERGE] 关闭时不探测、不占名额。
+    if not enabled():
+        return False
     signal = signal or {}
     cat = categorize_precheck_reason(reason)
-    waf = [] if cat == "liquidity_gate" else probe_liquidity(signal)
+    probe = None if cat == "liquidity_gate" else lambda: probe_liquidity(signal)
     e, sl, tp = _sig_prices(signal)
     return record(symbol=signal.get("symbol", ""), signal_type=signal.get("mode", ""),
                   direction=signal.get("direction", ""), first_rejected_at=f"precheck:{cat}",
-                  would_also_fail=waf, entry_candidate=e, sl=sl, tp1=tp,
+                  would_also_fail=[], probe=probe, entry_candidate=e, sl=sl, tp1=tp,
                   atr=(signal.get("ind") or {}).get("atr_1h") or signal.get("atr"),
                   reason=str(reason), stage="C")

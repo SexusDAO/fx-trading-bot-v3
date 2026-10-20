@@ -173,5 +173,55 @@ class TestVerify(unittest.TestCase):
         self.assertEqual(r["label"], "先止盈")       # 第 80 分钟成交仍在 90 分钟成交窗口内
 
 
+class TestPremerge(unittest.TestCase):
+    """[v3.89 PREMERGE] 关闭零请求、名额前置、三态和轮转。"""
+    def setUp(self):
+        from unittest.mock import patch
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self.tmp.name) / "rejected_log.jsonl"
+        self.patches = [patch.object(st, "LOG_PATH", self.path),
+                        patch.object(st, "enabled", return_value=True),
+                        patch.object(st, "probe_liquidity", return_value=[])]
+        self.mocks = [p.start() for p in self.patches]
+        st.new_round()
+        self.sig = {"symbol":"ETHUSDT", "mode":"pullback", "direction":"LONG"}
+
+    def tearDown(self):
+        for p in reversed(self.patches): p.stop()
+        self.tmp.cleanup()
+
+    def test_switch_off_no_probe(self):
+        self.mocks[1].return_value = False
+        self.assertFalse(st.record_precheck_rejection(self.sig, "相关性过滤"))
+        self.assertEqual(st.record_scanner_rejections({"rejected":[{"symbol":"ETHUSDT","reason":"低分"}]}, [self.sig]), 0)
+        self.mocks[2].assert_not_called()
+
+    def test_cap_before_probe(self):
+        for stage in ("B", "C"): st._round[stage] = st.CAP_BY_STAGE[stage]
+        self.assertFalse(st.record_precheck_rejection(self.sig, "相关性过滤"))
+        self.assertEqual(st.record_scanner_rejections({"rejected":[{"symbol":"ETHUSDT","reason":"低分"}]}, [self.sig]), 0)
+        self.mocks[2].assert_not_called()
+
+    def test_would_pass_all_three_states(self):
+        for xs, expected in [([], True), ([st.SKIP_UNPROBED], None), (["gate"], False), (["gate",st.SKIP_CAP], None), (["skip_llm"], None)]:
+            self.assertIs(st.would_pass_all(xs), expected)
+            st.record(symbol="X",signal_type="pullback",direction="LONG",first_rejected_at="x",would_also_fail=xs,stage="A")
+            row=json.loads(self.path.read_text().splitlines()[-1])
+            self.assertIs(row["would_pass_all"],expected)
+
+    def test_rotation_keeps_current(self):
+        self.path.write_bytes(b"x"*(5*1024*1024))
+        for n in (1,2,3): Path(str(self.path)+f".{n}").write_text(str(n))
+        self.assertTrue(st.record_precheck_rejection(self.sig,"相关性过滤"))
+        self.assertEqual(json.loads(self.path.read_text())["symbol"],"ETHUSDT")
+        self.assertEqual(Path(str(self.path)+".3").read_text(),"2")
+        self.assertFalse(Path(str(self.path)+".4").exists())
+
+    def test_probe_once_no_double_reservation(self):
+        self.assertTrue(st.record_precheck_rejection(self.sig,"相关性过滤"))
+        self.mocks[2].assert_called_once()
+        self.assertEqual(st._round["C"],1)
+
+
 if __name__ == "__main__":
     unittest.main()
