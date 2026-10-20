@@ -35,6 +35,11 @@ WINDOWS = {
 LABELS = ("未成交", "先止盈", "先止损", "超时", "无法判定")
 
 
+def _norm_reason(reason: str) -> str:
+    import re
+    return re.sub(r"-?\d+(\.\d+)?(e-?\d+)?%?", "#", reason or "")[:30]
+
+
 def fetch_klines(symbol: str, interval: str, start_ms: int, end_ms: int) -> list:
     """币安公开 K 线，[open_time, open, high, low, close, ...]。"""
     out, cur = [], start_ms
@@ -103,6 +108,7 @@ def main(argv=None, fetch=fetch_klines) -> dict:
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=float, default=7)
     ap.add_argument("--only-pass-all", action="store_true", help="只统计 would_pass_all=True 的记录")
+    ap.add_argument("--include-ambiguous", action="store_true", help="包含 match_ambiguous 的 B 类记录（默认剔除）")
     a = ap.parse_args(argv)
     if not IN_PATH.exists():
         print("没有 rejected_log.jsonl")
@@ -118,6 +124,8 @@ def main(argv=None, fetch=fetch_klines) -> dict:
             continue
         if rec.get("ts", 0) < cutoff or (a.only_pass_all and rec.get("would_pass_all") is not True):
             continue
+        if rec.get("match_ambiguous") and not a.include_ambiguous:
+            continue
         w = WINDOWS.get(rec.get("signal_type"))
         if not w:
             continue
@@ -129,7 +137,11 @@ def main(argv=None, fetch=fetch_klines) -> dict:
             rec["_err"] = str(e)[:80]
         res = label_record(rec, kl)
         outs.append({**rec, "outcome": res})
-        key = rec.get("first_rejected_at", "?") + (" (兜底)" if res.get("fallback") else "")
+        key = rec.get("first_rejected_at", "?")
+        if key.endswith("other"):            # 未分类的原因按原文（数字归一化）细分，避免全挤在 other
+            key += ":" + _norm_reason(rec.get("reason", ""))
+        if res.get("fallback"):
+            key += " (兜底)"
         stats[key][res["label"]] += 1
     OUT_PATH.write_text("\n".join(json.dumps(o, ensure_ascii=False) for o in outs) + ("\n" if outs else ""), encoding="utf-8")
     print(f"共 {len(outs)} 条；结果写入 {OUT_PATH}")

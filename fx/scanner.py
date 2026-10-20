@@ -982,10 +982,8 @@ def analyze_symbol(symbol: str, ticker: dict,
                 try:
                     from shared import shadow_trace as _st1
                     _rd = _reason if isinstance(_reason, dict) else {}
-                    _st1.record(symbol=symbol, signal_type=_route, direction=_dir,
-                                first_rejected_at=f"judge_{_route}", would_also_fail=[],
-                                entry_candidate=ind.get("price"), atr=ind.get("atr_1h") or ind.get("atr"),
-                                reason=str(_rd.get("reject_reason", _reason)), stage="A")
+                    _st1.record_judge_rejection(symbol=symbol, route=_route, direction=_dir,
+                                                reason=str(_rd.get("reject_reason", _reason)), ind=ind)
                 except Exception:
                     pass
                 continue

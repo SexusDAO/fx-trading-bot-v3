@@ -41,12 +41,14 @@ class TestRecord(unittest.TestCase):
         self.assertTrue(r["would_pass_all"])
         self.assertIsNone(r["sl"])
 
-    def test_cap(self):
-        for _ in range(st.CAP_READONLY + 5):
-            st.record(symbol="X", signal_type="pullback", direction="LONG", first_rejected_at="a")
-        self.assertEqual(len(self._lines()), st.CAP_READONLY)
+    def test_cap_per_stage(self):
+        for _ in range(st.CAP_BY_STAGE["A"] + 5):
+            st.record(symbol="X", signal_type="pullback", direction="LONG", first_rejected_at="a", stage="A")
+        self.assertEqual(len(self._lines()), st.CAP_BY_STAGE["A"])
+        # A 类满了不影响 B 类
+        self.assertTrue(st.record(symbol="X", signal_type="pullback", direction="LONG", first_rejected_at="b", stage="B"))
         st.new_round()
-        self.assertTrue(st.record(symbol="X", signal_type="pullback", direction="LONG", first_rejected_at="a"))
+        self.assertTrue(st.record(symbol="X", signal_type="pullback", direction="LONG", first_rejected_at="a", stage="A"))
 
     def test_would_pass_all(self):
         self.assertTrue(st.would_pass_all([]))
@@ -79,6 +81,51 @@ class TestRecord(unittest.TestCase):
             self.assertFalse(st.record(symbol="X", signal_type="p", direction="LONG", first_rejected_at="a"))
         finally:
             config.SHADOW_TRACE_ENABLED = old
+
+
+class TestV2(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self._old = st.LOG_PATH
+        st.LOG_PATH = Path(self.tmp.name) / "r.jsonl"
+        self._probe = st.probe_liquidity
+        st.new_round()
+
+    def tearDown(self):
+        st.LOG_PATH = self._old
+        st.probe_liquidity = self._probe
+        self.tmp.cleanup()
+
+    def _last(self):
+        return json.loads(st.LOG_PATH.read_text(encoding="utf-8").splitlines()[-1])
+
+    def test_judge_unknown_and_mark(self):
+        st.record_judge_rejection(symbol="A", route="pullback", direction="LONG", reason="x",
+                                  ind={"price": 10, "atr_1h": 1})
+        r = self._last()
+        self.assertIsNone(r["would_pass_all"])
+        self.assertEqual(r["price_kind"], "mark")
+        self.assertEqual(r["would_also_fail"], [st.SKIP_UNPROBED])
+
+    def test_precheck_probes_liquidity(self):
+        st.probe_liquidity = lambda sig: ["precheck:liquidity_gate"]
+        st.record_precheck_rejection({"symbol": "A", "mode": "pullback", "direction": "LONG"}, "相关性过滤")
+        r = self._last()
+        self.assertEqual(r["first_rejected_at"], "precheck:correlation")
+        self.assertFalse(r["would_pass_all"])
+
+    def test_precheck_liquidity_not_reprobed(self):
+        called = []
+        st.probe_liquidity = lambda sig: called.append(1) or []
+        st.record_precheck_rejection({"symbol": "A", "mode": "pullback", "direction": "LONG"}, "流动性不足")
+        self.assertEqual(called, [])
+        self.assertTrue(self._last()["would_pass_all"])
+
+    def test_scanner_ambiguous(self):
+        st.probe_liquidity = lambda sig: []
+        st.record_scanner_rejections({"rejected": [{"symbol": "A", "reason": "多单槽位已满"}]},
+                                     [{"symbol": "A", "mode": "pullback"}, {"symbol": "A", "mode": "breakout"}])
+        self.assertTrue(self._last()["match_ambiguous"])
 
 
 class TestVerify(unittest.TestCase):

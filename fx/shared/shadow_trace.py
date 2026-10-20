@@ -22,14 +22,18 @@ logger = logging.getLogger("fx.shadow_trace")
 
 LOG_PATH = Path(__file__).resolve().parent.parent / "logs" / "rejected_log.jsonl"
 CAP_ORDERBOOK = 10      # 需要查盘口的探测（流动性门槛）每轮上限
-CAP_READONLY = 30       # 其余记录每轮上限
+# [v2] 按阶段分别设上限，防止 A 类（回踩兜底路线被拒最多）占满名额、挤掉更有价值的 B/C 类
+CAP_BY_STAGE = {"A": 15, "B": 20, "C": 20}
+CAP_READONLY = sum(CAP_BY_STAGE.values())   # 兼容旧引用：每轮总上限
 
 SKIP_LLM = "shadow_skip_llm"
 SKIP_CAP = "shadow_skip_cap"       # 超过每轮上限，未探测
 SKIP_ERR = "shadow_skip_error"     # 探测出错
+# [v2] 判定函数遇到第一个不满足的条件就返回，后续条件和下游关卡都没跑过 → 结果未知，不能当作“全部放行”
+SKIP_UNPROBED = "shadow_skip_unprobed"
 
 _lock = threading.Lock()
-_round = {"orderbook": 0, "records": 0}
+_round = {"orderbook": 0, "records": 0, "A": 0, "B": 0, "C": 0}
 
 
 def enabled() -> bool:
@@ -43,8 +47,8 @@ def enabled() -> bool:
 def new_round() -> None:
     """每轮扫描开始时调用，重置每轮计数。"""
     with _lock:
-        _round["orderbook"] = 0
-        _round["records"] = 0
+        for k in _round:
+            _round[k] = 0
 
 
 def _take(kind: str, cap: int) -> bool:
@@ -68,9 +72,9 @@ def categorize_scanner_reason(reason: str) -> str:
         return "slot_limit"
     if "BTC" in r:
         return "btc_bear_filter"
-    if "评分" in r or "分数" in r or "score" in r.lower():
+    if "评分" in r or "分数" in r or "score" in r.lower() or "低分" in r:
         return "low_score_filter"
-    return "scanner_other"
+    return "scanner_other"     # 未匹配：原因原文保存在 reason 字段，离线统计按原因细分
 
 
 def categorize_precheck_reason(reason: str) -> str:
@@ -86,7 +90,9 @@ def categorize_precheck_reason(reason: str) -> str:
         return "balance"
     if "上限" in r or "满" in r:
         return "position_limit"
-    return "other"
+    if "熔断" in r or "冲击" in r or "暂停" in r:
+        return "risk_pause"
+    return "other"             # 未匹配：原因原文保存在 reason 字段
 
 
 def would_pass_all(would_also_fail: list):
@@ -126,12 +132,18 @@ def _num(x):
 
 def record(*, symbol: str, signal_type: str, direction: str, first_rejected_at: str,
            would_also_fail: list | None = None, entry_candidate=None, sl=None, tp1=None,
-           atr=None, reason: str = "", stage: str = "") -> bool:
-    """写一条影子记录。超过每轮上限或关闭时不写。永不抛异常。"""
+           atr=None, reason: str = "", stage: str = "", price_kind: str = "plan",
+           extra: dict | None = None) -> bool:
+    """写一条影子记录。超过该阶段每轮上限或关闭时不写。永不抛异常。
+
+    price_kind：plan=计划入场价（有止损止盈）；mark=判定被拒时的现价，只能做 ±1ATR 兜底判定。
+    """
     if not enabled():
         return False
-    if not _take("records", CAP_READONLY):
+    cap = CAP_BY_STAGE.get(stage)
+    if cap is not None and not _take(stage, cap):
         return False
+    _take("records", 10 ** 9)
     waf = list(would_also_fail or [])
     rec = {
         "ts": int(time.time() * 1000),
@@ -143,11 +155,14 @@ def record(*, symbol: str, signal_type: str, direction: str, first_rejected_at: 
         "reason": (reason or "")[:160],
         "would_also_fail": waf,
         "would_pass_all": would_pass_all(waf),
+        "price_kind": price_kind,
         "entry_candidate": _num(entry_candidate),
         "sl": _num(sl),
         "tp1": _num(tp1),
         "atr": _num(atr),
     }
+    if extra:
+        rec.update(extra)
     try:
         LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with _lock, open(LOG_PATH, "a", encoding="utf-8") as f:
@@ -169,10 +184,13 @@ def record_scanner_rejections(result: dict, signals: list) -> int:
     """B 类：扫描结束时，把 result["rejected"] 里属于已通过判定的信号写入影子日志。"""
     if not enabled():
         return 0
-    by_sym = {}
+    # 扫描阶段每个币只保留质量最高的一条路线，所以按币种匹配通常唯一；
+    # 若出现同币多条（例如以后改了择优逻辑），取第一条并标记 match_ambiguous，统计时可剔除
+    by_sym, cnt = {}, {}
     for s in signals or []:
         if isinstance(s, dict) and s.get("symbol"):
             by_sym.setdefault(s["symbol"], s)
+            cnt[s["symbol"]] = cnt.get(s["symbol"], 0) + 1
     n = 0
     for rej in (result or {}).get("rejected", []):
         sig = by_sym.get(rej.get("symbol"))
@@ -185,6 +203,29 @@ def record_scanner_rejections(result: dict, signals: list) -> int:
         e, sl, tp = _sig_prices(sig)
         if record(symbol=sig["symbol"], signal_type=sig.get("mode", ""), direction=sig.get("direction", ""),
                   first_rejected_at=cat, would_also_fail=waf, entry_candidate=e, sl=sl, tp1=tp,
-                  atr=(sig.get("ind") or {}).get("atr_1h") or sig.get("atr"), reason=reason, stage="B"):
+                  atr=(sig.get("ind") or {}).get("atr_1h") or sig.get("atr"), reason=reason, stage="B",
+                  extra={"match_ambiguous": True} if cnt.get(sig["symbol"], 0) > 1 else None):
             n += 1
     return n
+
+
+def record_judge_rejection(*, symbol: str, route: str, direction: str, reason: str, ind: dict) -> bool:
+    """A 类：判定精筛被拒。后续条件未探测 → would_pass_all=None；价格只有现价。"""
+    ind = ind or {}
+    return record(symbol=symbol, signal_type=route, direction=direction,
+                  first_rejected_at=f"judge_{route}", would_also_fail=[SKIP_UNPROBED],
+                  entry_candidate=ind.get("price"), atr=ind.get("atr_1h") or ind.get("atr"),
+                  reason=reason, stage="A", price_kind="mark")
+
+
+def record_precheck_rejection(signal: dict, reason: str) -> bool:
+    """C 类：下单前检查被拒。非流动性原因时，继续探测流动性门槛（只读，受盘口上限约束）。"""
+    signal = signal or {}
+    cat = categorize_precheck_reason(reason)
+    waf = [] if cat == "liquidity_gate" else probe_liquidity(signal)
+    e, sl, tp = _sig_prices(signal)
+    return record(symbol=signal.get("symbol", ""), signal_type=signal.get("mode", ""),
+                  direction=signal.get("direction", ""), first_rejected_at=f"precheck:{cat}",
+                  would_also_fail=waf, entry_candidate=e, sl=sl, tp1=tp,
+                  atr=(signal.get("ind") or {}).get("atr_1h") or signal.get("atr"),
+                  reason=str(reason), stage="C")
