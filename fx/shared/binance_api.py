@@ -300,10 +300,10 @@ def get_order_book(symbol: str, limit: int = 20) -> dict:
     return _retry(_call) or {}
 
 def get_open_interest(symbol: str) -> dict:
-    """拉未平仓量，失败返回 {}"""
+    """拉未平仓量，失败返回 {}。400 错误（如 EPICUSDT 不支持）静默处理不重试。"""
     def _call():
         return _get("/fapi/v1/openInterest", {"symbol": symbol}) or {}
-    return _retry(_call) or {}
+    return _retry(_call, suppress_codes={400, -1121}) or {}
 
 def get_oi_history(symbol: str, period: str = "1h", limit: int = 24) -> list:
     """
@@ -311,7 +311,7 @@ def get_oi_history(symbol: str, period: str = "1h", limit: int = 24) -> list:
     period: 5m/15m/30m/1h/2h/4h/6h/12h/1d
     limit:  最多 500 条，默认 24 根（24H）
     返回 list of {"symbol", "sumOpenInterest", "sumOpenInterestValue", "timestamp"}
-    失败返回 []
+    失败返回 []。400 错误静默处理不重试。
     """
     def _call():
         return _get("/futures/data/openInterestHist", {
@@ -319,7 +319,7 @@ def get_oi_history(symbol: str, period: str = "1h", limit: int = 24) -> list:
             "period": period,
             "limit":  limit,
         }) or []
-    return _retry(_call) or []
+    return _retry(_call, suppress_codes={400, -1121}) or []
 
 # ── 账户持仓模式缓存（避免重复查询）─────────────────────────────────────────
 _HEDGE_MODE: bool = True  # 确认该账号为 Hedge Mode，直接确定，不再动态查询
@@ -646,13 +646,13 @@ def get_next_funding_time(symbol: str) -> float:
 def get_open_interest_hist(symbol: str, period: str = "1h", limit: int = 2) -> list:
     """
     拉 OI 历史（用于计算24H前OI）。
-    返回列表，最新在最后。失败返回 []。
+    返回列表，最新在最后。失败返回 []。400 错误静默处理不重试。
     """
     def _call():
         d = _get("/futures/data/openInterestHist",
                  {"symbol": symbol, "period": period, "limit": limit})
         return d if isinstance(d, list) else []
-    return _retry(_call) or []
+    return _retry(_call, suppress_codes={400, -1121}) or []
 
 
 def get_exchange_info() -> dict:
