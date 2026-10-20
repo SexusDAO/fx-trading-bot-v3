@@ -331,16 +331,27 @@ def stop_bg_refresh(timeout: float = 5.0) -> bool:
 
 
 
-def get_liq_src_level(symbol: str) -> int:
+def get_liq_src_level(symbol: str, range_: str = None) -> int:
     """[v3.88 OPT-14g] 返回该标的当前缓存中清算图的最差数据来源级别：
     1=Coinglass heatmap（主路径） / 2=ByKaranteli（二级降级） / 3=Coinglass liq_orders（三级降级）。
-    无缓存或未记录来源时返回 0（视为未知，不触发降级回退）。只读，不触发网络请求。"""
+    无缓存或未记录来源时返回 0（视为未知，不触发降级回退）。只读，不触发网络请求。
+    [v3.89 #37] 新增：
+      · 超过 2×TTL 的缓存记录视为过期，不参与来源判定（旧记录的降级标记不再污染本次判断）；
+      · range_ 可选：指定时只看 "{symbol}:{range_}" 这一份数据，不指定时行为同旧版（取各 range 最大值）。
+    读取异常时返回 0，并记录 warning（不再静默）。"""
     lvl = 0
     try:
+        now = time.time()
         with _CACHE_LOCK:
             for k, v in _CACHE.items():
-                if k.startswith(f"{symbol}:"):
-                    lvl = max(lvl, int((v or {}).get("src_level", 0) or 0))
-    except Exception:
+                if not k.startswith(f"{symbol}:"):
+                    continue
+                if range_ is not None and k != f"{symbol}:{range_}":
+                    continue
+                if now - (v or {}).get("ts", 0) > _CACHE_TTL * 2:
+                    continue
+                lvl = max(lvl, int((v or {}).get("src_level", 0) or 0))
+    except Exception as e:
+        logger.warning(f"[liq_cache] get_liq_src_level({symbol}) 读取失败，按未知(0)处理: {e}")
         return 0
     return lvl
