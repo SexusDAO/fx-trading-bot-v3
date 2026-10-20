@@ -555,10 +555,23 @@ async def main() -> None:
     await _sync_positions_on_startup()
 
     # v3.33 注册 WS 重连回调：断线期间可能漏掉 TP/SL 成交事件，重连后主动对齐
+    # [v3.89 #3] 持仓对齐加锁：断线期间的 REST 补偿任务与重连回调不会同时对齐
+    _sync_lock = asyncio.Lock()
+
     async def _on_ws_reconnect():
         logger.info("[main] WS 重连，主动触发持仓对齐...")
-        await _sync_positions_on_startup()
+        async with _sync_lock:   # 重连对齐必须执行：若补偿任务正在对齐则等它结束
+            await _sync_positions_on_startup()
     ws.on_reconnect(_on_ws_reconnect)
+
+    async def _on_ws_disconnect():
+        # [v3.89 #3] userData 断线期间的有界 REST 补偿（最长 30s，每 10s 一轮）；已有对齐在跑则跳过本轮
+        if _sync_lock.locked():
+            return
+        logger.warning("[main] WS 断线，REST 补偿对齐持仓...")
+        async with _sync_lock:
+            await _sync_positions_on_startup()
+    ws.on_disconnect(_on_ws_disconnect)
 
     # ── 2. 初始化 PositionManager，注入 ws ────────────────────────────────
     from position_manager import PositionManager, _set_manager, _adjust_sl_tp_loop_static
