@@ -2131,6 +2131,19 @@ def check_signal_consistency(symbol: str, ind: dict, chg24: float,
 # ══════════════════════════════════════════════════════════════════════════════
 def judge_funding_arb(symbol: str, funding: float, funding_hist: list,
                       ind: dict, next_settle_ts: float, k1h: list = None, k4h: list = None) -> tuple[bool, dict]:
+    """[v3.89] 外层异常包装（与 #26/#27 一致）：内部异常统一返回 internal_error 结构并记录带上下文的日志，
+    不再向调用方抛出；判定逻辑见 _judge_funding_arb_impl，拒绝条件未改。"""
+    try:
+        return _judge_funding_arb_impl(symbol, funding, funding_hist, ind, next_settle_ts, k1h, k4h)
+    except Exception as e:
+        _ctx = dict(ind) if isinstance(ind, dict) else {}
+        _ctx.setdefault("symbol", symbol)
+        _log_judge_failure("judge_funding_arb", e, k1h, k4h, None, _ctx)
+        return _judge_error_result("judge_funding_arb", "funding_arb", e)
+
+
+def _judge_funding_arb_impl(symbol: str, funding: float, funding_hist: list,
+                            ind: dict, next_settle_ts: float, k1h: list = None, k4h: list = None) -> tuple[bool, dict]:
     """
     判断是否满足资金费率套利开仓条件。
     参数:

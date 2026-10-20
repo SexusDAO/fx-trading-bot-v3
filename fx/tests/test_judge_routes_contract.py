@@ -67,6 +67,17 @@ class TestRouteContract(unittest.TestCase):
         ok, detail = _check_contract(self, res, "funding_arb")
         self.assertFalse(ok)
 
+    def test_funding_arb_exception_wrapped(self):
+        """[v3.89] funding_arb 外层异常包装：畸形输入不抛出，返回统一的 internal_error 结构。"""
+        for ind in (None, "bad", 123):
+            with self.subTest(ind=ind):
+                ok, d = _check_contract(self, J.judge_funding_arb("XUSDT", None, None, ind, None), "funding_arb(bad)")
+                self.assertFalse(ok)
+                self.assertTrue(d.get("internal_error"))
+                self.assertEqual(d.get("mode"), "funding_arb")
+                self.assertTrue(d.get("error_type"))
+                self.assertTrue(d["reject_reason"].startswith("内部异常"))
+
     def test_stop_hunt_stays_rejected(self):
         """stop_hunt 按现状关闭：这里只确认空输入不会通过，不启用开关。"""
         ok, _ = J.judge_stop_hunt([], [], [], {}, 0.0, 0.0)
