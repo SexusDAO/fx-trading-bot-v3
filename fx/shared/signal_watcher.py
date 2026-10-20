@@ -885,12 +885,13 @@ class SignalWatcher:
         try:
             # ── 卡片追加：价格触发挂单行 ─────────────────────────────────────
             try:
-                from shared.notifier import card_append, fmt_node_trigger, flush_signal
+                from shared.notifier import card_append, fmt_node_trigger
                 _sig_id_t = entry.signal.get("_sig_id", "")
                 if _sig_id_t:
                     card_append(_sig_id_t, fmt_node_trigger(price, entry.entry_price))
-                    # [v3.90 通知聚合] 价格触发 → 挂单：确认值得推送，合并发出监控行 + 触发行
-                    flush_signal(_sig_id_t)
+                    # [fix] 不在此处 flush：等 executor 确认下单成功后再推送
+                    # 若 executor 预检拒绝，会补发失败通知并 discard_signal 静默丢弃
+                    # flush_signal(_sig_id_t)  ← 移至 executor._execute_async 内
             except Exception as _tc_e:
                 logger.debug(f"[signal_watcher] 触发卡片追加失败: {_tc_e}")
 

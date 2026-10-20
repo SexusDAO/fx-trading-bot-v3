@@ -1427,6 +1427,15 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
             _st.record_precheck_rejection(signal, str(reason))
         except Exception:
             pass
+        # [fix] 预检拒绝：完善卡片追加失败通知，不再推送「限价挂出」
+        _sig_id_pre = signal.get("_sig_id", "")
+        if _sig_id_pre:
+            try:
+                from shared.notifier import card_append, discard_signal, notify_async
+                card_append(_sig_id_pre, f"\n❌ 挂单失败：{reason}")
+                discard_signal(_sig_id_pre)   # 延迟 flush 现在包含失败行一并推送
+            except Exception:
+                pass
         return False
 
     # ── 步骤1.5：-2019 保证金暂停检查 ─────────────────────────────────────────
@@ -1753,7 +1762,25 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
     )
     if order_id is None:
         logger.error(f"[executor] {symbol} 开仓单提交失败: {err}")
+        # [fix] 下单失败：追加失败行并 flush，确保用户收到失败通知
+        _sig_id_fail = signal.get("_sig_id", "")
+        if _sig_id_fail:
+            try:
+                from shared.notifier import card_append, flush_signal
+                card_append(_sig_id_fail, f"\n❌ 挂单失败：{err[:120]}")
+                flush_signal(_sig_id_fail)
+            except Exception:
+                pass
         return False
+
+    # 下单成功：现在 flush 「限价挂出」这一行（之前在 signal_watcher 延迟）
+    _sig_id_ok = signal.get("_sig_id", "")
+    if _sig_id_ok:
+        try:
+            from shared.notifier import flush_signal as _fsig
+            _fsig(_sig_id_ok)
+        except Exception:
+            pass
 
     # ── 步骤8：REST 轮询确认开仓成交（WS不可靠时降级）────────────────────────
     # 限价单挂出后立刻查一次，未成交则不撤单，记 pending 等后续重试
