@@ -236,12 +236,7 @@ def prefetch_liq_cache(symbols: list) -> None:
     updated = 0
     for sym in symbols:
         try:
-            from shared.binance_api import get_mark_price
-            price = float(get_mark_price(sym).get("markPrice", 0))
-            if price <= 0:
-                continue
-
-            # 判断是否需要刷新
+            # [v3.89 #36] 先判断是否需要刷新，缓存仍新鲜的标的不再白白请求一次 mark price
             needs_refresh = False
             for r in _PREFETCH_RANGES:
                 with _CACHE_LOCK:
@@ -251,6 +246,11 @@ def prefetch_liq_cache(symbols: list) -> None:
                     needs_refresh = True
                     break
             if not needs_refresh:
+                continue
+
+            from shared.binance_api import get_mark_price
+            price = float(get_mark_price(sym).get("markPrice", 0))
+            if price <= 0:
                 continue
 
             wrote = 0
