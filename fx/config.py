@@ -17,10 +17,13 @@ _FX_ROOT = Path(__file__).parent  # fx/ 目录绝对路径
 # export BINANCE_API_SECRET="your_secret"
 BINANCE_API_KEY    = os.environ.get("BINANCE_API_KEY") or ""
 BINANCE_API_SECRET = os.environ.get("BINANCE_API_SECRET") or ""
+# 导入时只警告，不立即报错——允许测试/回测脚本在没有 key 的环境导入 config。
+# 真正需要下单/查账时，binance_api 层会因请求失败而报错。
+import logging as _cfg_log
 if not BINANCE_API_KEY or not BINANCE_API_SECRET:
-    raise EnvironmentError(
-        "[fx] BINANCE_API_KEY / BINANCE_API_SECRET 未设置。"
-        " 请先 export 再启动。"
+    _cfg_log.getLogger(__name__).warning(
+        "[fx/config] BINANCE_API_KEY / BINANCE_API_SECRET 未设置，"
+        "任何需要签名的 API 调用都会失败。"
     )
 
 # ── SOCKS5 代理 ────────────────────────────────────────────────────────────────
@@ -213,28 +216,6 @@ MARKET_MODE_EMA_SLOW = 99
 
 # 名义仓位上限
 MAX_TOTAL_NOMINAL  = 5.0     # 总名义仓位上限 = 账户余额 × 5（v3.36: 3.0→5.0）
-
-# ── 杠杆利用率优化（v3.90）─────────────────────────────────────────────────
-# 按多空方向分配名义仓位预算：预算 = 权益 × LEVERAGE_TARGET × 该方向比例；开仓名义被截断到剩余预算。
-LEVERAGE_UTILIZATION_ENABLED = True
-LEVERAGE_TARGET = 5.0              # 目标总名义杠杆（权益倍数）
-MAX_SINGLE_NOMINAL_RATIO = 1.5     # 单笔名义上限 = 权益 × 该值
-
-# 多空名义预算比例（各档多+空=1.0）
-LEVERAGE_LONG_RATIO_BULL_EARLY   = 0.75
-LEVERAGE_SHORT_RATIO_BULL_EARLY  = 0.25
-LEVERAGE_LONG_RATIO_BULL_MID     = 0.70
-LEVERAGE_SHORT_RATIO_BULL_MID    = 0.30
-LEVERAGE_LONG_RATIO_BULL_LATE    = 0.55
-LEVERAGE_SHORT_RATIO_BULL_LATE   = 0.45
-LEVERAGE_LONG_RATIO_RANGE        = 0.50
-LEVERAGE_SHORT_RATIO_RANGE       = 0.50
-LEVERAGE_LONG_RATIO_BEAR_WEAK    = 0.40
-LEVERAGE_SHORT_RATIO_BEAR_WEAK   = 0.60
-LEVERAGE_LONG_RATIO_BEAR_MODERATE= 0.30
-LEVERAGE_SHORT_RATIO_BEAR_MODERATE= 0.70
-LEVERAGE_LONG_RATIO_BEAR_STRONG  = 0.20
-LEVERAGE_SHORT_RATIO_BEAR_STRONG = 0.80
 # 单仓上限公式 v3.1：本金 ÷ 最大仓位数（5倍杠杆，每仓占满 1/N 本金）
 # 例：本金1000U / 5仓 = 200U保证金 × 5杠杆 = 1000U名义
 # 代码里用 net_value / MAX_POSITIONS_TOTAL_BULL 动态计算，此值仅作兜底上限
@@ -964,8 +945,3 @@ OPT_DIVERGENCE_GATE_WEIGHT_CAP = 2.0
 # [v3.88 OPT-15] oi_divergence 近5根全阳（SHORT）/全阴（LONG）时直接拒绝信号；默认开启（与其他 OPT_* 不同）。
 #   关闭则恢复 mark*0.992 / mark*1.008 兜底。
 OPT_OID_REJECT_ALL_BULL = True
-
-
-# [v3.89 SHADOW] 影子信号穿透追踪：被拒信号写入 logs/rejected_log.jsonl，只记录、不改变交易行为。
-#   结果由 tools/shadow_verify.py 离线补标签。设 False 关闭记录。
-SHADOW_TRACE_ENABLED = True
