@@ -690,6 +690,16 @@ def _place_open_order(symbol: str, direction: str, mode: str,
     price_str = str(_round_price(entry_price, tick))
     qty_str   = str(_round_qty(quantity, step))
 
+    # [fix] -4024 预检：若计算价格低于历史已记录的最低限价，直接拒绝不提交
+    _min_price_key = f"_min_price_{symbol}"
+    _min_price_cached = _PRECISION_CACHE.get(_min_price_key, 0.0)
+    if _min_price_cached > 0 and float(price_str) < _min_price_cached:
+        logger.warning(
+            f"[executor] {symbol} 入场价 {price_str} < 历史已记录最低限价 {_min_price_cached}，"
+            f"跳过提交（-4024 预防）"
+        )
+        return None, f"-4024预防: 入场价 {price_str} < 最低限价 {_min_price_cached}"
+
     # v3.57: 下单参数自校验——最后一道防线
     _val_ok, _val_reason = _validate_order_params(
         symbol, side, direction.upper(), float(qty_str), float(price_str), notional
@@ -737,7 +747,25 @@ def _place_open_order(symbol: str, direction: str, mode: str,
         return int(oid), ""
     except Exception as e:
         err_str = str(e)
-        # ── 问题三修复：-2019 保证金不足专项处理 ──────────────────────────────
+        # ── -4024: Limit price can't be lower than X ─────────────────────────
+        # 交易所拒绝原因：当前最低限价高于计算的入场价。
+        # 不重试；提取最低限价并记录到 warning，供下次沃价参考。
+        if "-4024" in err_str:
+            import re as _re
+            _m = _re.search(r"lower than ([\d.]+)", err_str)
+            _min_price = _m.group(1) if _m else "unknown"
+            logger.warning(
+                f"[executor] {symbol} -4024 入场价 {price_str} 低于交易所最低限价 {_min_price}，"
+                f"拒绝下单（不重试）"
+            )
+            # 将最低限价写入精度缓存，下次下单前预检可直接拉起
+            if _m:
+                try:
+                    _PRECISION_CACHE[f"_min_price_{symbol}"] = float(_min_price)
+                except Exception:
+                    pass
+            return None, f"-4024 入场价影下了交易所最低限价 {_min_price}，需调整入场条件"
+        # ── -2019 保证金不足专项处理 ──────────────────────────────────
         if "-2019" in err_str or "insufficient" in err_str.lower():
             import asyncio as _aio
             logger.error(f"[executor] {symbol} -2019 保证金不足，暂停开仓15分钟")
