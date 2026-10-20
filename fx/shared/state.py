@@ -192,6 +192,9 @@ def update_position(pos_id: str, updates: dict) -> bool:
 
 def update_pending_order(symbol: str, updates: dict) -> bool:
     """按 symbol 更新挂单"""
+    if _POS_STATE_CORRUPTED:  # [v3.89 #11b]
+        logger.error("[state] 持仓文件曾损坏，拒绝写入: update_pending_order")
+        return False
     with _locks["pos"]:
         data = _load_pos()
         for i, p in enumerate(data):
@@ -204,6 +207,9 @@ def update_pending_order(symbol: str, updates: dict) -> bool:
 
 def remove_position(pos_id: str) -> bool:
     """按 pos_id 删除记录，无论 status 是什么（open/pending/patching 均可删除）。"""
+    if _POS_STATE_CORRUPTED:  # [v3.89 #11b]
+        logger.error("[state] 持仓文件曾损坏，拒绝写入: remove_position")
+        return False
     with _locks["pos"]:
         data = _load_pos()
         new  = [p for p in data if p.get("pos_id") != pos_id]
@@ -219,6 +225,9 @@ def remove_position_by_symbol(symbol: str, status: str | None = None) -> int:
     用于清理孤儿 patching 记录：remove_position_by_symbol(sym, status='patching')
     当 status=None 时删除该 symbol 下所有记录。
     """
+    if _POS_STATE_CORRUPTED:  # [v3.89 #11b]
+        logger.error("[state] 持仓文件曾损坏，拒绝写入: remove_position_by_symbol")
+        return 0
     with _locks["pos"]:
         data = _load_pos()
         if status is not None:
@@ -233,6 +242,9 @@ def remove_position_by_symbol(symbol: str, status: str | None = None) -> int:
 
 
 def remove_pending_order(symbol: str) -> bool:
+    if _POS_STATE_CORRUPTED:  # [v3.89 #11b]
+        logger.error("[state] 持仓文件曾损坏，拒绝写入: remove_pending_order")
+        return False
     with _locks["pos"]:
         data = _load_pos()
         new  = [p for p in data if not (p.get("symbol") == symbol
@@ -674,6 +686,8 @@ def cleanup_orphan_patching() -> list:
 
     返回被清除的 symbol 列表。
     """
+    if _POS_STATE_CORRUPTED:  # [v3.89 #11b] 清理孤儿记录不拦截，仅提示人工核查
+        logger.warning("[state] 持仓文件曾损坏，cleanup_orphan_patching 仍执行，请人工核查结果")
     with _locks["pos"]:
         data = _load_pos()
         orphans = [
