@@ -949,7 +949,8 @@ async def _place_guards_async(
             quantity=tp1_qty_f,
             price=tp1_p,
             timeInForce="GTC",
-            positionSide=pos_side,
+            position_side=pos_side,
+            reduce_only=True,
         )),
     ]
     if has_tp2:
@@ -959,7 +960,8 @@ async def _place_guards_async(
             quantity=tp2_qty_f,
             price=tp2_p,
             timeInForce="GTC",
-            positionSide=pos_side,
+            position_side=pos_side,
+            reduce_only=True,
         )))
 
     await asyncio.gather(*coros)
