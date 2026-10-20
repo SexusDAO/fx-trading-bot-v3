@@ -118,6 +118,20 @@ _NOT_SENT_MARKERS = ("ConnectTimeout", "NewConnectionError", "Connection refused
                      "Failed to establish a new connection")
 
 
+def _record_api_outcome(success: bool) -> None:
+    """
+    [v3.89 #64] 把一次 _retry 调用的最终结果记入 risk_manager 的失败率统计（唯一统计入口）：
+      成功返回 → True；重试耗尽 → False（每次调用只记一次，不按每次尝试记）。
+    suppress_codes 命中的静默返回、写请求「结果未知」抛 WriteTimeoutError 都不计入。
+    延迟导入并吞掉一切异常：统计失败绝不能影响请求本身。
+    """
+    try:
+        from shared.risk_manager import record_api_call
+        record_api_call(success)
+    except Exception:
+        pass
+
+
 def _retry(fn, *args, retries=3, suppress_codes=None, is_write: bool = False, **kwargs):
     """
     suppress_codes: 包含这些 Binance 错误码时不打 ERROR，直接返回 None
@@ -129,7 +143,9 @@ def _retry(fn, *args, retries=3, suppress_codes=None, is_write: bool = False, **
     last_err = None
     for attempt in range(retries):
         try:
-            return fn(*args, **kwargs)
+            _res = fn(*args, **kwargs)
+            _record_api_outcome(True)
+            return _res
         except Exception as e:
             last_err = e
             err_str = str(e)
@@ -160,6 +176,7 @@ def _retry(fn, *args, retries=3, suppress_codes=None, is_write: bool = False, **
             logger.warning(f"[api] _call 第{attempt+1}次失败: {e}")
             if attempt < retries - 1:
                 time.sleep(1)
+    _record_api_outcome(False)   # [v3.89 #64] 重试耗尽，记一次失败
     logger.error(f"[api] _call 全部重试失败: {last_err}")
     return None
 
