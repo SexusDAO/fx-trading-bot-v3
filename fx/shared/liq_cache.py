@@ -10,6 +10,7 @@ get_liq_zones_cached() 是 judges / calc_sl_tp 的唯一调用入口。
 """
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import threading
 import time
@@ -23,6 +24,10 @@ _CACHE_TTL = 15 * 60   # 15 分钟
 _CACHE_LOCK = threading.Lock()
 
 # ── 后台刷新线程状态 ───────────────────────────────────────────────────────
+# [v3.89 #35] 按 key 合并在途请求：同一 key 同时只有一个调用真正去拉数据，其余等待同一结果；
+#   写回只接受不比现有结果旧的数据，避免较早发出的慢响应覆盖较新的结果。网络请求期间不持有全局锁。
+_INFLIGHT: dict = {}
+_INFLIGHT_WAIT = 30.0   # 等待他人在途请求的上限（秒）
 _bg_started = False
 _bg_lock    = threading.Lock()
 
@@ -146,6 +151,42 @@ def _fetch_from_clawby(symbol: str, current_price: float,
 # 公共接口
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _store_if_newer(key: str, data: dict) -> bool:
+    """[v3.89 #35] 版本化写回：现有缓存更新（ts 更大）时放弃写入。"""
+    with _CACHE_LOCK:
+        old = _CACHE.get(key)
+        if old and old.get("ts", 0) > (data or {}).get("ts", 0):
+            return False
+        _CACHE[key] = data
+        return True
+
+
+def _fetch_dedup(symbol: str, price: float, range_: str, key: str) -> dict:
+    """[v3.89 #35] 同一 key 的在途请求合并；返回 {} 表示本次没拿到数据。"""
+    with _CACHE_LOCK:
+        fut = _INFLIGHT.get(key)
+        owner = fut is None
+        if owner:
+            fut = concurrent.futures.Future()
+            _INFLIGHT[key] = fut
+    if not owner:
+        try:
+            return fut.result(timeout=_INFLIGHT_WAIT) or {}
+        except Exception:
+            logger.debug(f"[liq_cache] {key} 等待在途请求失败或超时")
+            return {}
+    data: dict = {}
+    try:
+        data = _fetch_from_clawby(symbol, price, range_=range_)
+        if data:
+            _store_if_newer(key, data)
+        return data
+    finally:
+        fut.set_result(data)
+        with _CACHE_LOCK:
+            _INFLIGHT.pop(key, None)
+
+
 def get_liq_zones_cached(symbol: str, direction: str,
                           current_price: float = 0.0,
                           range_: str = "3d") -> list:
@@ -173,10 +214,8 @@ def get_liq_zones_cached(symbol: str, direction: str,
                 price = float(get_mark_price(symbol).get("markPrice", 0))
             except Exception:
                 pass
-        data = _fetch_from_clawby(symbol, price, range_=range_)
+        data = _fetch_dedup(symbol, price, range_, cache_key)   # [v3.89 #35] 在途合并 + 版本化写回
         if data:
-            with _CACHE_LOCK:
-                _CACHE[cache_key] = data
             entry = data
             logger.debug(f"[liq_cache] {symbol}:{range_} 实时拉取成功，写入缓存")
         else:
@@ -216,10 +255,8 @@ def prefetch_liq_cache(symbols: list) -> None:
 
             wrote = 0
             for r in _PREFETCH_RANGES:
-                data = _fetch_from_clawby(sym, price, range_=r)
+                data = _fetch_dedup(sym, price, r, f"{sym}:{r}")   # [v3.89 #35]
                 if data:
-                    with _CACHE_LOCK:
-                        _CACHE[f"{sym}:{r}"] = data
                     wrote += 1
                     # CG heatmap 拿到数据后，其他 range 共享同一份 BYK 结果
                     # （BYK 不区分 range，避免重复请求）
@@ -228,10 +265,9 @@ def prefetch_liq_cache(symbols: list) -> None:
                         for z in (data.get("LONG") or [])[:1]
                     ):
                         # BYK 数据，三个 range 共享
-                        with _CACHE_LOCK:
-                            for other_r in _PREFETCH_RANGES:
-                                if other_r != r:
-                                    _CACHE[f"{sym}:{other_r}"] = data
+                        for other_r in _PREFETCH_RANGES:
+                            if other_r != r:
+                                _store_if_newer(f"{sym}:{other_r}", data)
                         wrote = len(_PREFETCH_RANGES)
                         break
 
