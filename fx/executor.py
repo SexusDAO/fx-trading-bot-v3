@@ -615,6 +615,32 @@ def _account_final_check(notional: float, notifier_fn=None) -> tuple[bool, str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 杠杆利用率预算（v3.90）
+# ─────────────────────────────────────────────────────────────────────────────
+def _apply_leverage_budget(symbol: str, direction: str, nominal: float, equity: float) -> tuple[bool, float, str]:
+    """
+    返回 (放行?, 截断后的名义仓位, 原因)。
+    LEVERAGE_UTILIZATION_ENABLED 关闭时原样放行；剩余预算 <= 0 拒绝开仓；否则 nominal = min(nominal, 剩余预算)。
+    计算本身出现任何异常都降级放行（不阻断开仓）。不调用交易所接口。
+    """
+    try:
+        import config as _cfg
+        if not getattr(_cfg, "LEVERAGE_UTILIZATION_ENABLED", False):
+            return True, nominal, ""
+        from shared.risk_manager import calc_leverage_remaining
+        lev_remaining = calc_leverage_remaining(direction, equity)
+        if lev_remaining <= 0:
+            logger.warning(f"[leverage] {symbol} {direction} 杠杆预算已用满，拒绝开仓")
+            return False, nominal, "杠杆预算已用满"
+        nominal = min(nominal, lev_remaining)
+        logger.info(f"[leverage] {symbol} {direction} remaining={lev_remaining:.0f}U → nominal={nominal:.0f}U")
+        return True, nominal, ""
+    except Exception as e:
+        logger.warning(f"[leverage] {symbol} 杠杆预算检查异常，降级放行: {e}")
+        return True, nominal, ""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 步骤6：查询并设置最大杠杆
 # ─────────────────────────────────────────────────────────────────────────────
 def _setup_symbol(symbol: str) -> int:
@@ -1661,6 +1687,11 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
         # [v3.89 #102] 账户查询失败是暂时性故障（可重试）；余额/名义/回撤等业务拒绝仍 return False
         if str(reason).startswith("账户查询失败"):
             raise PreOrderError(f"{symbol} {reason}")
+        return False
+
+    # ── 杠杆利用率预算（v3.90）：在终检通过之后、设置杠杆/下单之前，把名义仓位截断到该方向剩余预算 ──
+    _lev_ok, notional, _lev_reason = _apply_leverage_budget(symbol, direction, notional, total_bal)
+    if not _lev_ok:
         return False
 
     # ── 步骤6：设置全仓 + 最大杠杆 ───────────────────────────────────────────

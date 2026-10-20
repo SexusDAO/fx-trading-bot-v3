@@ -257,9 +257,11 @@ def get_position_count() -> dict:
     """返回 {total, long, short}：只统计 open + patching（真实持仓，不含 pending 挂单）。
     v3.72: pending 挂单从此函数中移除，改由 get_pending_count() 独立统计，
     与 scanner.py v3.53 的槽位计算逻辑保持一致。
+    v3.90: TP1 已成交（tp1_filled=True）的仓位只剩 TP2 尾仓，不再占用槽位；
+           其名义仍由 risk_manager.calc_leverage_remaining 计入杠杆预算 used。
     """
     positions = [p for p in get_all_positions()
-                 if p.get("status") in ("open", "patching")]
+                 if p.get("status") in ("open", "patching") and not p.get("tp1_filled")]
     long_cnt  = sum(1 for p in positions if p.get("direction", "").upper() == "LONG")
     short_cnt = sum(1 for p in positions if p.get("direction", "").upper() == "SHORT")
     return {"total": len(positions), "long": long_cnt, "short": short_cnt}
