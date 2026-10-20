@@ -66,6 +66,11 @@ except Exception:
     _BUF_REVERSAL     = 0.03
     _BUF_BREAKOUT     = 0.01
     _BREAKOUT_LIQ_ENABLED = False
+    # [v3.89] config 整体导入失败时，下面两组名字在主 try 里是内层 try 才定义的，外层回退漏掉了它们，
+    #   导致 _calc_pending_score / 存活检查在回退路径上抛 NameError。补上与内层 ImportError 回退完全相同的默认值。
+    _SURVIVAL_RSI_SC, _SURVIVAL_RSI_LC = 60, 45
+    _SCORE_TYPE_MAP = {"reversal":20,"breakout":15,"stop_hunt":15,"pullback":12,
+                       "oi_divergence":12,"ema_trend":10,"range_bounce":8,"funding_arb":5}
 
 # ── 新闻信号模块（可选，失败自动降级）──────────────────────────────────────
 try:
