@@ -172,8 +172,10 @@ class TestGates(unittest.TestCase):
 
     def test_src_level(self):
         from shared import liq_cache as lc
-        lc._CACHE["XTEST:3d"] = {"src_level": 1}
-        lc._CACHE["XTEST:7d"] = {"src_level": 3}
+        import time as _t
+        # [v3.89 #37] 超过 2×TTL 的记录不参与来源判定，测试数据需带当前 ts
+        lc._CACHE["XTEST:3d"] = {"src_level": 1, "ts": _t.time()}
+        lc._CACHE["XTEST:7d"] = {"src_level": 3, "ts": _t.time()}
         self.assertEqual(lc.get_liq_src_level("XTEST"), 3)
         self.assertEqual(lc.get_liq_src_level("NOPE"), 0)
         lc._CACHE.pop("XTEST:3d"); lc._CACHE.pop("XTEST:7d")
