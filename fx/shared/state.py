@@ -424,14 +424,24 @@ def add_cooldown(symbol: str, duration_seconds: int, reason: str) -> None:
     until = int(time.time() * 1000) + duration_seconds * 1000
     with _locks["cd"]:
         d = _load_cd()
-        existing = d.get(symbol, {}).get("cooldown_until", 0)
-        d[symbol] = {
-            "cooldown_until": max(until, existing),
-            "reason":         reason,
-            "set_at":         int(time.time() * 1000),
-        }
+        prev = d.get(symbol, {})
+        existing = prev.get("cooldown_until", 0)
+        if until > existing:
+            d[symbol] = {
+                "cooldown_until": until,
+                "reason":         reason,
+                "set_at":         int(time.time() * 1000),
+            }
+            effective, kept = until, False
+        else:
+            # [v3.89 #97] 已有冷却更长：保留决定该期限的原因和设置时间，不让较短的新事件覆盖
+            effective, kept = existing, True
         _save_cd(d)
-    logger.info(f"[state] {symbol} 冷却期 {duration_seconds}s reason={reason}")
+    if kept:
+        logger.info(f"[state] {symbol} 冷却 {duration_seconds}s(reason={reason}) 短于已有冷却，保留原因={prev.get('reason')}，"
+                    f"实际到期 {effective}")
+    else:
+        logger.info(f"[state] {symbol} 冷却期 {duration_seconds}s reason={reason}，实际到期 {effective}")
 
 
 # 向后兼容
