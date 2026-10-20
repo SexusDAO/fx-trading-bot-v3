@@ -59,7 +59,7 @@ from shared.state import (
     get_all_positions, update_position, remove_position,
     set_cooldown, is_in_cooldown,
 )
-from shared.notifier import notify
+from shared.notifier import notify, card_append, card_append_async, card_remove, _hhmm, _CLOSE_REASON_CN, fmt_hold_time
 
 logger = logging.getLogger("fx.position_manager")
 
@@ -662,14 +662,17 @@ class PositionManager:
                         )
                     else:
                         logger.warning(f"[pm] {symbol} TP1后补挂SL单失败: {_resp}")
-                        await _notify_async(
-                            f"⚠️ {symbol} TP1触发后补挂SL失败,剩余40%仓位无止损保护!"
-                        )
+                        await _notify_async(f"🚨 {symbol} TP1触发后补挂SL失败,剩余40%仓位无止损保护!")
+                        # 同步卡片
+                        _pos_tp1f = get_all_positions()
+                        _tp1_sid = next((p.get("_sig_id","") for p in _pos_tp1f if p.get("symbol")==symbol), "")
+                        if _tp1_sid: await card_append_async(_tp1_sid, f"🚨 {_hhmm()} 止损丢失 保护单补挂失败，请手动检查持仓！")
                 except Exception as _tp1_sl_e:
                     logger.error(f"[pm] {symbol} TP1后补挂SL异常: {_tp1_sl_e}")
-                    await _notify_async(
-                        f"⚠️ {symbol} TP1触发后补挂SL异常,请检查仓位!\n错误:{_tp1_sl_e}"
-                    )
+                    await _notify_async(f"🚨 {symbol} TP1触发后补挂SL异常,请检查仓位!\n错误:{_tp1_sl_e}")
+                    _pos_tp1f2 = get_all_positions()
+                    _tp1_sid2 = next((p.get("_sig_id","") for p in _pos_tp1f2 if p.get("symbol")==symbol), "")
+                    if _tp1_sid2: await card_append_async(_tp1_sid2, f"🚨 {_hhmm()} 止损丢失 保护单补挂失败，请手动检查持仓！")
             return
 
         # ── TP2 触发 ──────────────────────────────────────────────────────────
@@ -947,10 +950,8 @@ class PositionManager:
         except Exception as _te:
             logger.error(f"[pm] {symbol} {_inferred_close_reason} trade_log 补写失败: {_te}")
 
-        _label = "止损触发" if _inferred_close_reason == "sl_triggered" else "手动平仓"
-        await _notify_async(
-            f"✅ {symbol} 检测到{_label}，已自动撤销所有挂单（SL + TP）"
-        )
+        # 手动平仓/SL触发 → 不单独推送（_close_position_post_static 的平仓行已覆盖）
+        logger.info(f"[pm] {symbol} {_inferred_close_reason} 挂单已清理")
 
     # ── B1. 时间止损 ─────────────────────────────────────────────────────────
     async def _check_time_stop(self, pos: dict, now_ms: int):
@@ -1039,10 +1040,17 @@ class PositionManager:
                             # 仅在真正失效后重挂成功时通知,不打扰正常状态
                         else:
                             logger.error(f"[pm] {symbol} 重挂 SL 失败: resp={new_resp}")
-                            await _notify_async(
-                                f"\u26a0\ufe0f {symbol} SL 重挂失败,请人工处理!\n"
-                                f"当前止损价: {sl_price:.6g}"
-                            )
+                            # 追加到卡片 + 独立告警
+                            try:
+                                _sl_pos = next((p for p in get_all_positions() if p.get("symbol")==symbol), {})
+                                _sl_sid = _sl_pos.get("_sig_id", "")
+                                _sl_warn = f"🚨 {_hhmm()} 止损丢失 保护单补挂失败，请手动检查持仓！"
+                                if _sl_sid:
+                                    await card_append_async(_sl_sid, _sl_warn)
+                                else:
+                                    await _notify_async(_sl_warn)
+                            except Exception:
+                                pass
                 except Exception as e:
                     logger.error(f"[pm] {symbol} SL 检查失败: {e}")
 
@@ -1308,10 +1316,18 @@ class PositionManager:
                                 logger.info(f"[pm] {symbol} REST路径TP1后补挂SL成功 id={_new_sl_id_r}")
                         except Exception as _rsl_e:
                             logger.warning(f"[pm] {symbol} REST路径TP1后补挂SL失败: {_rsl_e}")
-                    await _notify_async(
-                        f"🎯 {symbol} TP1成交(REST确认)\n"
-                        f"成交价: {fill_price:.6g}\n剩余40%仓位已补挂SL+移动止损保护中"
+                    # TP1 成交：追加到卡片
+                    _pos_tp1r = next((p for p in get_all_positions() if p.get("symbol")==symbol), {})
+                    _sl_new_p = float(_pos_tp1r.get("sl_price", 0))
+                    _tp1_sid_r = _pos_tp1r.get("_sig_id", "")
+                    _tp1_line = (
+                        f"🎯 {_hhmm()} TP1止盈 {fill_price:.6g}成交 | 锁利60%\n"
+                        f" 新止损移至 {_sl_new_p:.6g}（保本）| 剩余40%仓位"
                     )
+                    if _tp1_sid_r:
+                        await card_append_async(_tp1_sid_r, _tp1_line)
+                    else:
+                        await _notify_async(_tp1_line)
                     tp1_filled = True
             except Exception as e:
                 logger.debug(f"[pm] {symbol} TP1 REST查询失败: {e}")
@@ -2112,38 +2128,34 @@ async def _close_position_post_static(
             daemon=True
         ).start()
 
-    # 步骤6:发送 Jarvis 通知(最后执行,失败不影响核心逻辑)
+    # 步骤6:发送 Jarvis 通知 → 追加到信号卡片
     try:
-        direction_label = "多单" if direction == "LONG" else "空单"
-        mode_label = {"pullback": "回踩", "breakout": "突破", "reversal": "反转"}.get(mode, mode)
-        # 完整自然语言出场描述
-        _reason_desc = {
-            "sl":                           f"{mode_label}做{'多' if direction=='LONG' else '空'},触及止损价,系统止损离场",
-            "sl_triggered":                 f"{mode_label}做{'多' if direction=='LONG' else '空'},触及止损价,系统止损离场",
-            "tp2":                          f"{mode_label}做{'多' if direction=='LONG' else '空'},TP2止盈单成交,全仓获利离场",
-            "tp_full":                      f"{mode_label}做{'多' if direction=='LONG' else '空'},止盈目标达到,全仓获利平仓",
-            "tp1_partial":                  f"{mode_label}做{'多' if direction=='LONG' else '空'},TP1减仓成交,剩余仓位持续运行",
-            "tp2_rest":                     f"{mode_label}做{'多' if direction=='LONG' else '空'},TP1减仓后剩余仓位触及TP2,全仓获利离场",
-            "time_stop_loss":               f"时间止损:{mode_label}做{'多' if direction=='LONG' else '空'}持仓期间价格持续亏损未回本,超时强制离场",
-            "time_stop_hard":               f"时间止损:{mode_label}做{'多' if direction=='LONG' else '空'}持仓满12小时仍未达到止盈条件,强制市价离场",
-            "time_stop_profit_insufficient":f"时间止损:{mode_label}做{'多' if direction=='LONG' else '空'}浮盈不足ATR×1.5,结构动能衰减,时间止损离场",
-            "tp1_protect_exit":             f"{mode_label}做{'多' if direction=='LONG' else '空'},TP1 已兑现后价格跌穿入场价,市价平掉剩余仓位保护利润(v3.84 OPT-2)",
-            "early_stagnation":             f"时间止损:{mode_label}做{'多' if direction=='LONG' else '空'},持仓后价格横盘滞涨/滞跌,动能耗尽,系统判定早期滞涨,市价平仓离场",
-            "health_force_close":           f"健康检查:{mode_label}做{'多' if direction=='LONG' else '空'},仓位结构异常(挂单失效/回踩窗口关闭),强制平仓",
-            "breakout_fail":                f"突破失败:{mode_label}做{'多' if direction=='LONG' else '空'},价格未能有效突破确认位,假突破离场",
-            "exit_signal_reversal":         f"反向信号:{mode_label}做{'多' if direction=='LONG' else '空'},出现强烈反向信号,主动平仓规避对冲风险",
-            "partial_time_stop":            f"时间止损(部分):{mode_label}做{'多' if direction=='LONG' else '空'},达到时间上限,动态减仓离场",
-        }
-        reason_desc = _reason_desc.get(close_reason,
-            f"{mode_label}做{'多' if direction=='LONG' else '空'},{close_reason},系统平仓离场")
-        emoji = "🟢" if pnl_usdt >= 0 else "🔴"
-        await _notify_async(
-            f"{emoji} 标的:{symbol}\n"
-            f"方向:{direction_label}  模式:{mode_label}\n"
-            f"入场价:{entry:.6g}  出场价:{exit_price:.6g}\n"
-            f"盈亏:{pnl_usdt:+.2f}U({pnl_pct:+.2f}%)  持仓:{hold_minutes:.0f}分钟\n"
-            f"离场原因:{reason_desc}"
-        )
+        _pos_close   = next((p for p in get_all_positions() if p.get("symbol") == symbol), {})
+        _sig_id_cls  = _pos_close.get("_sig_id", "")
+        _reason_cn   = _CLOSE_REASON_CN.get(close_reason, close_reason)
+        _hold_str    = fmt_hold_time(hold_minutes)
+        _tp1_filled  = _pos_close.get("tp1_filled", False)
+        _tp2_filled  = _pos_close.get("tp2_filled", False)
+        _tp1_mark    = "✓" if _tp1_filled else "✗"
+        _tp2_mark    = "✓" if _tp2_filled else "✗"
+        _emoji       = "🟢" if pnl_usdt >= 0 else "🔴"
+        if pnl_usdt >= 0:
+            _close_line = (
+                f"{_emoji} {_hhmm()} 平仓完成 {_reason_cn}\n"
+                f" 持仓 {_hold_str} | PnL +{pnl_usdt:.2f}U (+{pnl_pct:.2f}%)\n"
+                f" TP1{_tp1_mark} TP2{_tp2_mark}"
+            )
+        else:
+            _close_line = (
+                f"{_emoji} {_hhmm()} 平仓完成 {_reason_cn}\n"
+                f" 持仓 {_hold_str} | PnL {pnl_usdt:.2f}U ({pnl_pct:.2f}%)\n"
+                f" TP1{_tp1_mark} 止损✓"
+            )
+        if _sig_id_cls:
+            await card_append_async(_sig_id_cls, _close_line)
+            card_remove(_sig_id_cls)
+        else:
+            await _notify_async(_close_line)
     except Exception as e:
         logger.error(f"[pm] 平仓通知发送失败: {e}")
 

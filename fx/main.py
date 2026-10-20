@@ -182,11 +182,10 @@ async def _loop_scan(interval: int = 300, signal_watcher=None) -> None:
                 _pending_n = signal_watcher.pending_count() if signal_watcher else 0
                 _hb_utc    = _hb_dt.datetime.now(_hb_dt.timezone.utc).strftime("%H:%M UTC")
                 await _nb_ntf(
-                    f"💓 系统心跳 {_hb_utc}\n"
-                    f"扫描正常 | 监控中 {_pending_n} 个信号\n"
-                    f"过去6小时：扫描 {_hb_scans} 轮，原始信号 {_hb_raw} 个，"
-                    f"进入监控 {_hb_watched} 个，成交 {_hb_placed} 笔\n"
-                    f"WS状态：{_ws_ok}"
+                    f"💓 系统心跳 · {_hb_utc}\n"
+                    f"扫描正常 | {_pending_n}个标的 | 每5分钟一轮\n"
+                    f"过去6小时：原始信号{_hb_raw}个 | 进入监控{_hb_watched}个 | 成交{_hb_placed}笔\n"
+                    f"WS：{_ws_ok}"
                 )
             except Exception as _hb_e:
                 logger.debug(f"[main] 心跳推送失败: {_hb_e}")

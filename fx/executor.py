@@ -56,7 +56,7 @@ from shared.state import (
     get_all_positions, add_position, update_position,
     is_in_cooldown, get_pending_orders,
 )
-from shared.notifier import notify, notify_async
+from shared.notifier import notify, notify_async, card_append, card_append_async, card_remove, _hhmm, _CLOSE_REASON_CN, fmt_hold_time
 
 logger = logging.getLogger("fx.executor")
 
@@ -1023,11 +1023,38 @@ async def _on_position_closed(pos_id: str, symbol: str,
     except Exception as _le:
         logger.warning(f"[executor] WS平仓 trade_log 写入失败: {_le}")
 
-    reason_label = {"sl": "止损", "tp2": "止盈TP2", "tp_full": "止盈全平"}.get(close_reason, close_reason)
-    await notify_async(
-        f"{'🟢' if pnl >= 0 else '🔴'} {symbol} {reason_label}\n"
-        f"入场: {entry}  已实现PnL: {pnl:+.2f}U"
-    )
+    # WS 路径平仓通知：向对应信号卡片追加平仓行
+    try:
+        _sig_id_ws = pos.get("_sig_id", "") if pos else ""
+        _hold_min  = (int(time.time() * 1000) - int(pos.get("open_time", int(time.time() * 1000)))) / 60000 if pos else 0
+        _tp1_ok    = pos.get("tp1_filled", False) if pos else False
+        _tp2_ok    = pos.get("tp2_filled", False) if pos else False
+        _reason_cn = _CLOSE_REASON_CN.get(close_reason, close_reason)
+        _hold_str  = fmt_hold_time(_hold_min)
+        _emoji     = "🟢" if pnl >= 0 else "🔴"
+        _tp1_mark  = "✓" if _tp1_ok else "✗"
+        _tp2_mark  = "✓" if _tp2_ok else "✗"
+        if pnl >= 0:
+            _close_line = (
+                f"{_emoji} {_hhmm()} 平仓完成 {_reason_cn}\n"
+                f" 持仓 {_hold_str} | PnL +{pnl:.2f}U\n"
+                f" TP1{_tp1_mark} TP2{_tp2_mark}"
+            )
+        else:
+            _close_line = (
+                f"{_emoji} {_hhmm()} 平仓完成 {_reason_cn}\n"
+                f" 持仓 {_hold_str} | PnL {pnl:.2f}U\n"
+                f" TP1{_tp1_mark} 止损✓"
+            )
+        if _sig_id_ws:
+            import asyncio as _aio_ws
+            _aio_ws.ensure_future(card_append_async(_sig_id_ws, _close_line))
+            card_remove(_sig_id_ws)
+        else:
+            import asyncio as _aio_ws
+            _aio_ws.ensure_future(notify_async(_close_line))
+    except Exception as _ne:
+        logger.debug(f"[executor] WS平仓卡片通知失败: {_ne}")
     # 冷却期/黑名单统计
     if close_reason == "sl" and pnl < 0:
         try:
@@ -1139,6 +1166,8 @@ def _write_position(
         "funding_cost_total":   0.0,     # 初始值，由 _maybe_record_funding_costs 累积
         "funding_cost_last":    None,
         "funding_last_settle_hour": -1,
+        # ── 推送卡片 ID（供 position_manager 追加进展行用）───────────────────
+        "_sig_id":              signal.get("_sig_id", ""),
     })
     _append_trade_log(pos_id, signal, fill_price, fill_qty, params)
     # v3.44: 写入同方向开仓冷協（防止同标的同方向短时间内连开）
@@ -1683,12 +1712,19 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
 
         pnl_est = (close_price - fill_price) * fill_qty if direction == "LONG"                   else (fill_price - close_price) * fill_qty
         logger.info(f"[executor] {symbol} 二次验证平仓 价格={close_price} PnL估={pnl_est:.2f}U")
-        await notify_async(
-            f"🟡 {symbol} 二次验证平仓\n"
-            f"开仓:{fill_price:.6g} 平仓:{close_price:.6g}\n"
-            f"PnL估算:{pnl_est:+.2f}U\n"
-            f"原因:{recheck_result.get('reason', '')}"
-        )
+        # 向开仓卡片追加节点
+        try:
+            _sig_id_r = signal.get("_sig_id", "")
+            _recheck_line = (
+                f"🟡 {_hhmm()} 开仓后立即平仓\n"
+                f" 原因：{recheck_result.get('reason', '')}"
+            )
+            if _sig_id_r:
+                await card_append_async(_sig_id_r, _recheck_line)
+            else:
+                await notify_async(_recheck_line)
+        except Exception:
+            pass
         return True   # 信号处理完成，不进入正常持仓流程
 
     # HOLD 路径：继续挂止损止盈
@@ -1712,18 +1748,36 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
         signal, fill_price, fill_qty, leverage, guard, params, order_id, atr=atr
     )
 
-    # 发送开仓通知
-    deg_mark = "⚠️降级" if params.get("sl_degraded") or params.get("tp_degraded") else ""
-    direction_label = "做多" if direction == "LONG" else "做空"
-    mode_label = {"pullback": "回踩", "breakout": "突破", "reversal": "反转", "stop_hunt": "止损猎杀", "oi_divergence": "OI背离", "ema_trend": "EMA趋势"}.get(mode, mode)
-    await notify_async(
-        f"✅ {symbol} 开仓 {direction_label}·{mode_label} {deg_mark}\n"
-        f"入场: {fill_price:.6g}  数量: {fill_qty}\n"
-        f"止损: {sl_price:.6g}  TP1: {tp1_price:.6g}"
-        + (f"  TP2: {tp2_price:.6g}" if tp2_price is not None else "（单TP）") + "\n"
-        + f"杠杆: {leverage}x  RR: {params['rr_tp1']:.1f}"
-        + (f"/{params['rr_tp2']:.1f}" if params.get('rr_tp2') else "")
-    )
+    # 开仓通知：向信号卡片追加开仓成交行
+    try:
+        _sig_id = signal.get("_sig_id", "")
+        _slippage_pct = 0.0
+        if params.get("entry_price") and params["entry_price"] > 0:
+            _slippage_pct = abs(fill_price - params["entry_price"]) / params["entry_price"] * 100
+        _slip_str = f"+{_slippage_pct:.2f}%" if _slippage_pct >= 0.05 else ""
+        _deg_mark = " ⚠️降级" if params.get("sl_degraded") or params.get("tp_degraded") else ""
+        _tp2_str  = f"{tp2_price:.6g}" if tp2_price else "单TP"
+        _rr_str   = f"{params['rr_tp1']:.1f}" + (f"/{params['rr_tp2']:.1f}" if params.get('rr_tp2') else "")
+        _open_line = (
+            f"✅ {_hhmm()} 开仓成交 成交价 {fill_price:.6g}"
+            + (f" | 滑点{_slip_str}" if _slip_str else "")
+            + f"\n 止损 {sl_price:.6g}{_deg_mark} | TP1 {tp1_price:.6g} | TP2 {_tp2_str}"
+            + f"\n 杠杆 {leverage}x | 仓位 {params.get('notional', fill_price * fill_qty):.0f}U | RR {_rr_str}"
+        )
+        if _sig_id:
+            await card_append_async(_sig_id, _open_line)
+        else:
+            # immediate 模式没有卡片，和 imm_ 前缀创建一张臨时卡片
+            from shared.notifier import make_card_header, card_create
+            _hdr = make_card_header(symbol, direction, mode, signal.get("signal_strength", "medium"))
+            _imm_sig_id = f"{symbol}_imm_{int(time.time())}"
+            signal["_sig_id"] = _imm_sig_id
+            await asyncio.get_event_loop().run_in_executor(
+                None, lambda: card_create(_imm_sig_id, _hdr)
+            )
+            await card_append_async(_imm_sig_id, _open_line)
+    except Exception as _ne:
+        logger.debug(f"[executor] 开仓卡片通知失败（非致命）: {_ne}")
 
     # ── 步骤10：止损止盈联动监听 ─────────────────────────────────────────────
     # ws_listener 在主线程 loop 里，不能在子线程 loop 里 fire ensure_future

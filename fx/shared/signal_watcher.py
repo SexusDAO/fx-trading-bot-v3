@@ -458,18 +458,7 @@ class SignalWatcher:
                             f"[signal_watcher] {symbol} 分数 {entry.pending_score:.0f} "
                             f"< {PENDING_MIN_SCORE_TO_COMPETE}，直接丢弃（不参与竞争）"
                         )
-                        try:
-                            from shared.notifier import notify as _sw_ntf
-                            import datetime as _sw_dt
-                            _sw_ts = _sw_dt.datetime.now(_sw_dt.timezone.utc).strftime('%H:%M UTC')
-                            _sw_ntf(
-                                f"🗑 信号未进入监控\n"
-                                f"标的：{symbol}\n"
-                                f"原因：评分 {entry.pending_score:.0f} < 竞争门槛 {PENDING_MIN_SCORE_TO_COMPETE}，槽位满\n"
-                                f"时间：{_sw_ts}"
-                            )
-                        except Exception as _sw_e:
-                            logger.debug(f"[signal_watcher] 丢弃通知失败: {_sw_e}")
+                        # 评分不足，静默丢弃（不推送用户）
                         return  # 不注册
 
                     # 找最低分的非保护（非 is_reorder）挂单
@@ -478,18 +467,7 @@ class SignalWatcher:
                         logger.info(
                             f"[signal_watcher] {symbol} 槽位满且全部为重挂单，无法替换，丢弃"
                         )
-                        try:
-                            from shared.notifier import notify as _sw_ntf
-                            import datetime as _sw_dt
-                            _sw_ts = _sw_dt.datetime.now(_sw_dt.timezone.utc).strftime('%H:%M UTC')
-                            _sw_ntf(
-                                f"🗑 信号未进入监控\n"
-                                f"标的：{symbol}\n"
-                                f"原因：槽位满且全部为受保护重挂单，无法驱逐\n"
-                                f"时间：{_sw_ts}"
-                            )
-                        except Exception as _sw_e:
-                            logger.debug(f"[signal_watcher] 丢弃通知失败: {_sw_e}")
+                        # 槽位满且全部受保护，静默丢弃
                         return
 
                     lowest = min(evictable, key=lambda e: e.pending_score)
@@ -499,18 +477,7 @@ class SignalWatcher:
                             f"≤ 最低分 {lowest.pending_score:.0f}+{PENDING_REPLACE_MARGIN}，"
                             f"竞争未胜出，丢弃"
                         )
-                        try:
-                            from shared.notifier import notify as _sw_ntf
-                            import datetime as _sw_dt
-                            _sw_ts = _sw_dt.datetime.now(_sw_dt.timezone.utc).strftime('%H:%M UTC')
-                            _sw_ntf(
-                                f"🗑 信号未进入监控\n"
-                                f"标的：{symbol}\n"
-                                f"原因：竞争未胜出，评分 {entry.pending_score:.0f} ≤ 当前最低分 {lowest.pending_score:.0f}+{PENDING_REPLACE_MARGIN}\n"
-                                f"时间：{_sw_ts}"
-                            )
-                        except Exception as _sw_e:
-                            logger.debug(f"[signal_watcher] 竞争通知失败: {_sw_e}")
+                        # 竞争未胜出，静默丢弃
                         return
 
                     # 替换最低分挂单
@@ -521,19 +488,16 @@ class SignalWatcher:
                         f"竞争胜出，替换"
                     )
                     self._watched.pop(old_sym, None)
+                    # 向被驱逐信号的卡片追加驱逐行
                     try:
-                        from shared.notifier import notify as _sw_ntf
-                        import datetime as _sw_dt
-                        _sw_ts = _sw_dt.datetime.now(_sw_dt.timezone.utc).strftime('%H:%M UTC')
-                        _sw_ntf(
-                            f"⬇️ 信号被驱逐\n"
-                            f"标的：{old_sym}\n"
-                            f"原因：被 {symbol}（评分 {entry.pending_score:.0f}）竞争替换\n"
-                            f"原评分：{lowest.pending_score:.0f}\n"
-                            f"时间：{_sw_ts}"
+                        from shared.notifier import card_append, _hhmm
+                        _old_sig_id = f"{old_sym}_{lowest.signal.get('_scan_ts', '')}"
+                        card_append(
+                            _old_sig_id,
+                            f"⬇️ {_hhmm()} 被驱逐 {symbol}(评分{entry.pending_score:.0f})替换，本信号结束"
                         )
                     except Exception as _sw_e:
-                        logger.debug(f"[signal_watcher] 驱逐通知失败: {_sw_e}")
+                        logger.debug(f"[signal_watcher] 驱逐卡片追加失败: {_sw_e}")
                     if lowest.limit_order_id:
                         try:
                             import asyncio as _aio
@@ -566,34 +530,33 @@ class SignalWatcher:
                 f"触发区间=[{entry_low:.6g},{entry_high:.6g}] "
                 f"挂单价={entry_price:.6g} 有效期={expire_in/60:.1f}min"
             )
-            # ── 信号进入监控推送通知 ──────────────────────────────────────────
+            # ── 创建信号卡片（进入监控节点）─────────────────────────────────
             try:
-                from shared.notifier import notify as _ntf
-                import datetime as _dt
-                _sig   = entry.signal
-                _dir   = _sig.get("direction", "?").upper()
-                _mode  = entry.mode
-                _score = _sig.get("score", _sig.get("pending_score", pending_score))
-                _sl    = _sig.get("pre_sl_price", _sig.get("sl_price", ""))
-                _tp1   = _sig.get("pre_tp1_price", _sig.get("tp1_price", ""))
-                _ts    = _dt.datetime.now(_dt.timezone.utc).strftime("%H:%M UTC")
-                _dir_emoji = "📈" if _dir == "LONG" else "📉"
-                _sl_str  = f"{_sl:.6g}" if isinstance(_sl, (int, float)) and _sl else "—"
-                _tp1_str = f"{_tp1:.6g}" if isinstance(_tp1, (int, float)) and _tp1 else "—"
-                _score_str = f"{int(_score)}分" if _score else "—"
-                _ntf(
-                    f"{_dir_emoji} 信号进入监控\n"
-                    f"标的：{symbol}\n"
-                    f"方向：{_dir}\n"
-                    f"策略：{_mode}\n"
-                    f"评分：{_score_str}\n"
-                    f"挂单价：{entry_price:.6g}\n"
-                    f"止损：{_sl_str}\n"
-                    f"TP1：{_tp1_str}\n"
-                    f"时间：{_ts}"
+                from shared.notifier import card_create, _hhmm, make_card_header, _DIR_CN, _STRENGTH_CN
+                _sig       = entry.signal
+                _dir       = _sig.get("direction", "LONG").upper()
+                _mode      = entry.mode
+                _strength  = _sig.get("signal_strength", "medium")
+                _score_val = _sig.get("ind", {}).get("final_score") or _sig.get("score") or pending_score
+                _header    = make_card_header(symbol, _dir, _mode, _strength)
+                # sig_id = symbol + 扫描时间戳（避免同标的多次信号冲突）
+                _scan_ts   = str(_sig.get("_scan_ts", int(time.time())))
+                _sig_id    = f"{symbol}_{_scan_ts}"
+                _sig["_sig_id"] = _sig_id   # 写回 signal，供后续节点使用
+                _expire_min = int(max(0, expire_ts - time.time()) / 60)
+                _score_str  = f"{int(_score_val)}" if _score_val else "—"
+                _line = (
+                    f"✅ {_hhmm()} 进入监控 评分{_score_str} | "
+                    f"预估入场 {entry_price:.6g} | {_expire_min}min后过期"
                 )
+                card_create(_sig_id, _header)
+                from shared.notifier import card_append
+                card_append(_sig_id, _line)
+                # sl_degraded 提示
+                if _sig.get("sl_degraded") or (_sig.get("params") or {}).get("sl_degraded"):
+                    card_append(_sig_id, "⚠️ 止损非结构位（降级），风险略高")
             except Exception as _ne:
-                logger.debug(f"[signal_watcher] 信号通知失败（非致命）: {_ne}")
+                logger.debug(f"[signal_watcher] 信号卡片创建失败（非致命）: {_ne}")
 
     async def cancel_all(self, reason: str = "manual") -> int:
         """
@@ -624,20 +587,17 @@ class SignalWatcher:
 
         if cancelled:
             logger.info(f"[signal_watcher] 共撤销 {cancelled} 个入场挂单 ({reason})")
+            # cancel_all 的通知由调用方（btc_guard / 仓位满）负责携带上下文推送
+            # 此处只向各被撤信号的卡片追加结束行
             try:
-                from shared.notifier import notify as _sw_ntf
-                import datetime as _sw_dt
-                _sw_ts = _sw_dt.datetime.now(_sw_dt.timezone.utc).strftime('%H:%M UTC')
-                _syms = ', '.join(to_cancel.keys())
-                _sw_ntf(
-                    f"🚨 批量撤单\n"
-                    f"原因：{reason}\n"
-                    f"撤销数：{cancelled} 个\n"
-                    f"标的：{_syms}\n"
-                    f"时间：{_sw_ts}"
-                )
+                from shared.notifier import card_append, _hhmm
+                for _sym, _e in to_cancel.items():
+                    _s = _e.signal
+                    _sid = _s.get("_sig_id", "")
+                    if _sid:
+                        card_append(_sid, f"⏰ {_hhmm()} 监控已撤销（{reason}）")
             except Exception as _sw_e:
-                logger.debug(f"[signal_watcher] 批量撤单通知失败: {_sw_e}")
+                logger.debug(f"[signal_watcher] 批量撤单卡片追加失败: {_sw_e}")
         return cancelled
 
     def pending_count(self) -> int:
@@ -687,6 +647,20 @@ class SignalWatcher:
                                     f"即时撤销 {_cnt} 个入场挂单"
                                 )
                                 await self.cancel_all(f"BTC_SHOCK_{_move*100:.1f}%")
+                                # 全局推送：BTC 保护撤单
+                                try:
+                                    from shared.notifier import notify as _btc_ntf, _hhmm as _bhm
+                                    _sym_list = ' · '.join(
+                                        s for s, e in self._watched.items()
+                                        if not e.triggered and not e.is_expired()
+                                    ) or '无'
+                                    _btc_ntf(
+                                        f"⚡ BTC 5分钟急{_direction} {_move*100:.1f}%\n"
+                                        f"已撤销全部 {_cnt} 个待触发监控\n"
+                                        f"{_sym_list}"
+                                    )
+                                except Exception:
+                                    pass
 
                             # ── 第二层：open 仓 SL/TP 重算（ATR已变，保护价可能失效）──
                             try:
@@ -747,15 +721,13 @@ class SignalWatcher:
                                             f"现价={_mp2:.4g} SL={_sl2:.4g} dir={_dir2}，"
                                             f"触发紧急平仓检查（通知用户）"
                                         )
-                                        # 只发通知，不自动平仓——等 patrol 确认
+                                        # 止损踩空告警：独立推送（不属于任何信号卡片）
                                         try:
-                                            # [v3.86 FIX-3] 原代码导入 shared.notify，但该模块不存在（实际是 shared.notifier）。
-                                            #   ImportError 被下方 except 吞掉，「止损踩空」告警从未发出过。
                                             from shared.notifier import notify as _ntf
                                             import asyncio as _asio3
                                             await _asio3.get_event_loop().run_in_executor(
                                                 None, lambda: _ntf(
-                                                    f"⚠️ {_sym2} 止损踩空告警\n"
+                                                    f"⚠️ {_sym2} 止损踩空\n"
                                                     f"现价 {_mp2:.4g} 已越过止损 {_sl2:.4g}\n"
                                                     f"BTC剧烈波动引发，请检查仓位"
                                                 )
@@ -828,6 +800,18 @@ class SignalWatcher:
             self._dir_last_trigger[_dir_key] = _now_ts
 
         try:
+            # ── 卡片追加：价格触发挂单行 ─────────────────────────────────────
+            try:
+                from shared.notifier import card_append, _hhmm
+                _sig_id_t = entry.signal.get("_sig_id", "")
+                if _sig_id_t:
+                    card_append(
+                        _sig_id_t,
+                        f"⏳ {_hhmm()} 价格触发 市价{price:.6g} → 限价单挂出 {entry.entry_price:.6g}"
+                    )
+            except Exception as _tc_e:
+                logger.debug(f"[signal_watcher] 触发卡片追加失败: {_tc_e}")
+
             # ── 触发前滑点合理性检查（v3.24）──────────────────────────────
             # 防止 WebSocket 延迟导致触发价与当前价偏离过大（高波动行情常见）
             _skip = False
@@ -916,20 +900,15 @@ class SignalWatcher:
                 logger.warning(f"[signal_watcher] 撤销过期挂单失败 {symbol}: {ce}")
 
         try:
-            from shared.notifier import notify as _sw_ntf
-            import datetime as _sw_dt
-            _sw_ts = _sw_dt.datetime.now(_sw_dt.timezone.utc).strftime('%H:%M UTC')
-            _has_order = "（已撤交易所挂单）" if entry.limit_order_id else "（未成交）"
-            _sw_ntf(
-                f"⏰ 信号过期撤销{_has_order}\n"
-                f"标的：{symbol}\n"
-                f"策略：{entry.mode}\n"
-                f"挂单价：{entry.entry_price:.6g}\n"
-                f"等待：{waited_min:.0f} 分钟未触发\n"
-                f"时间：{_sw_ts}"
-            )
+            from shared.notifier import card_append, _hhmm
+            _sig_id = entry.signal.get("_sig_id", "")
+            if _sig_id:
+                card_append(
+                    _sig_id,
+                    f"⏰ {_hhmm()} 超时撤销 等待{int(waited_min)}分钟未触发，监控结束"
+                )
         except Exception as _sw_e:
-            logger.debug(f"[signal_watcher] 过期通知失败: {_sw_e}")
+            logger.debug(f"[signal_watcher] 超时卡片追加失败: {_sw_e}")
 
         # 取消 WS 订阅
         if self._ws_listener:
@@ -1482,24 +1461,8 @@ class SignalWatcher:
                 old_entry_p = entry.entry_price
                 shift_atr   = abs(new_entry_p - old_entry_p) / (atr_v + 1e-9)
                 if shift_atr >= 0.5:
-                    logger.info(
-                        f'[recheck] {sym} 清算区位移 {shift_atr:.2f}ATR '
-                        f'({old_entry_p:.5f} → {new_entry_p:.5f})，撤旧单下新单'
-                    )
-                    try:
-                        from shared.notifier import notify as _sw_ntf
-                        import datetime as _sw_dt
-                        _sw_ts = _sw_dt.datetime.now(_sw_dt.timezone.utc).strftime('%H:%M UTC')
-                        _sw_ntf(
-                            f"🔄 挂单价调整（清算区位移）\n"
-                            f"标的：{sym}\n"
-                            f"原挂单价：{old_entry_p:.6g}\n"
-                            f"新挂单价：{new_entry_p:.6g}\n"
-                            f"位移：{shift_atr:.2f} ATR\n"
-                            f"时间：{_sw_ts}"
-                        )
-                    except Exception as _sw_e:
-                        logger.debug(f"[signal_watcher] 改价通知失败: {_sw_e}")
+                    # recheck 改价重挂：不单独推送，属于内部监控机制（静默）
+                    logger.info(f'[recheck] {sym} 清算区位移 {shift_atr:.2f}ATR，撤旧单下新单')
                     # 撤旧单
                     await self._cancel_and_remove(sym, entry, '清算区位移重新挂单')
 
