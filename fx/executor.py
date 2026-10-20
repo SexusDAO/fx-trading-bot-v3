@@ -1716,8 +1716,7 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
         jd.setdefault("vol_ratio", signal.get("ind", {}).get("vol_ratio", 0))
         signal["judge_detail"] = jd
         _pend_id = await _write_pending(signal, order_id, params, leverage, expire_ts, atr=atr)
-        if _pend_id is None:   # [v3.89 #52]
-            logger.critical("[executor] 持仓写入失败，订单已成交但本地无记录，请人工核查")
+        if _pend_id is None:   # [v3.89 #52] 日志已在 _persist_position_record 内记录
             return False
 
         # v3.6: 删除 ensure_future(_retry_confirm_30s)
@@ -1810,8 +1809,7 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
     pos_id = _write_position(
         signal, fill_price, fill_qty, leverage, guard, params, order_id, atr=atr
     )
-    if pos_id is None:   # [v3.89 #52] 不继续发通知，不打印「流程完成」
-        logger.critical("[executor] 持仓写入失败，订单已成交但本地无记录，请人工核查")
+    if pos_id is None:   # [v3.89 #52] 日志已在 _persist_position_record 内记录；不继续发通知，不打印「流程完成」
         return False
 
     # 开仓通知：向信号卡片追加开仓成交行
