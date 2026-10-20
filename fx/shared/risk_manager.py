@@ -178,18 +178,30 @@ def is_circuit_open() -> bool:
 def record_pnl(pnl: float, symbol: str = "", reason: str = "") -> dict:
     """
     记录盈亏。pnl<0 累加 daily_loss。
-    返回 {"circuit_triggered": bool, "daily_loss": float}
+    返回 {"circuit_triggered": bool|None, "daily_loss": float|None, "persisted": bool[, "error": str]}
+    [v3.89 #63] persisted=False 表示本次盈亏没有记入 state（circuit_triggered 此时为 None=未知）。
     """
     from shared.state import record_pnl as _state_record, get_daily_loss
     from shared.state import mark_circuit_notified
 
     triggered = False
+    persisted = True
+    persist_error = None
     try:
         triggered = _state_record(pnl)
     except Exception as e:
-        logger.error(f"[risk] record_pnl state 写入失败: {e}")
+        # [v3.89 #63] 持久化失败不再伪装成「已记账、未触发熔断」：circuit_triggered 置 None（未知，且为假值，
+        #   兼容 if result["circuit_triggered"] 的既有用法），并带 persisted=False 与 error 供上游识别、对账。
+        persisted = False
+        persist_error = str(e)
+        triggered = None
+        logger.error(f"[risk] record_pnl state 写入失败，本次盈亏 {pnl} ({symbol}) 未记入: {e}")
 
-    daily_loss = get_daily_loss()
+    try:
+        daily_loss = get_daily_loss()
+    except Exception as e:
+        daily_loss = None
+        logger.error(f"[risk] 读取 daily_loss 失败: {e}")
 
     if triggered:
         try:
@@ -209,7 +221,10 @@ def record_pnl(pnl: float, symbol: str = "", reason: str = "") -> dict:
         logger.error(f"[risk] {msg}")
         mark_circuit_notified()  # 标记已处理，防止其他路径重复触发
 
-    return {"circuit_triggered": triggered, "daily_loss": daily_loss}
+    result = {"circuit_triggered": triggered, "daily_loss": daily_loss, "persisted": persisted}
+    if not persisted:
+        result["error"] = persist_error
+    return result
 
 
 # 向后兼容旧接口
