@@ -151,5 +151,92 @@ class LogicTest(unittest.TestCase):
         # （逻辑正确性已由 StaticCodeTest 通过代码审查确认）
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. executor.py 静态代码检查：WS 路径两个 bug
+# ─────────────────────────────────────────────────────────────────────────────
+EXECUTOR_PATH = os.path.join(FX_ROOT, "executor.py")
+
+
+class ExecutorStaticTest(unittest.TestCase):
+    """静态扫描 executor.py，确认 WS 路径两个 bug 已修复。"""
+
+    @classmethod
+    def setUpClass(cls):
+        with open(EXECUTOR_PATH, encoding="utf-8") as f:
+            cls.src = f.read()
+
+    # ---- Bug 1: close_price 未定义 ----
+
+    def test_close_price_bug_removed(self):
+        """
+        旧 bug：WS 路径平仓通知中引用了未定义的 close_price。
+        修复后实际调用行不应再匹配 close_price（不计入注释行）。
+        """
+        idx = self.src.find("WS 路径平仓通知")
+        self.assertGreater(idx, 0, "找不到 'WS 路径平仓通知' 注释")
+        window = self.src[idx: idx + 900]
+        # 只检查非注释行中有没有 close_price
+        code_lines = [l for l in window.splitlines() if not l.lstrip().startswith("#")]
+        code_block = "\n".join(code_lines)
+        self.assertNotIn(
+            "close_price",
+            code_block,
+            "WS 通知块的代码行不应再引用 close_price（该作用域内未定义）",
+        )
+
+    def test_ws_uses_exit_price(self):
+        """WS 路径平仓通知应改用函数顶部已定义的 exit_price。"""
+        idx = self.src.find("WS 路径平仓通知")
+        window = self.src[idx: idx + 600]
+        self.assertIn(
+            "exit_price if exit_price > 0",
+            window,
+            "WS 通知块应使用 exit_price 而非 close_price",
+        )
+
+    # ---- Bug 2: card_remove 先于 card_append_async 执行 ----
+
+    def test_card_remove_after_append(self):
+        """
+        旧 bug：_aio_ws.ensure_future(card_append_async(...)) 之后立刻调用 card_remove，
+        导致异步追加还未完成时缓存已清空。
+        修复后应将 card_remove 包装进 async def 内，在 await 后调用。
+        """
+        idx = self.src.find("WS 路径平仓通知")
+        # _append_then_remove 在注释块后约 1129 字符，窗口扩展到 1300
+        window = self.src[idx: idx + 1300]
+        self.assertIn(
+            "_append_then_remove",
+            window,
+            "card_remove 应被包装到 async def _append_then_remove 里 await 后执行",
+        )
+        self.assertIn(
+            "await card_append_async",
+            window,
+            "_append_then_remove 内应用 await card_append_async",
+        )
+
+    # ---- Bug 3: 流动性门槛缺少 mark_price 据换算 ----
+
+    def test_liquidity_gate_uses_oi_usdt(self):
+        """
+        旧 bug：_check_liquidity_gate 直接用 oi_now * 0.001，
+        但 oi_now 是合约张数，必须先乘以 mark_price 换算成 USDT。
+        """
+        idx = self.src.find("阈值相对化：OI")
+        self.assertGreater(idx, 0, "找不到流动性阈値注释（含 '阈值相对化：OI' 关键词）")
+        window = self.src[idx: idx + 300]
+        self.assertIn(
+            "oi_now * mark_p",
+            window,
+            "流动性阈値应先用 oi_now * mark_p 换算成 USDT",
+        )
+        self.assertNotIn(
+            "oi_now * 0.001",
+            window,
+            "不应再直接用 oi_now * 0.001（张数，非 USDT）",
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
