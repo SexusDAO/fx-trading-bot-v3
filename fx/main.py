@@ -22,22 +22,49 @@ import subprocess
 from pathlib import Path
 
 # ── 启动前依赖检查：只检查，不在运行时安装 ───────────────────────────────────
+def _socks_proxy_configured() -> bool:
+    """
+    [v3.89 #24b] 是否配置了 SOCKS 代理：环境变量 SOCKS_PROXY 非空，或代理类环境变量 /
+    config 里的代理地址以 socks 开头（socks5://、socks5h:// 等）。读取失败按「未配置」处理。
+    """
+    import os
+    if (os.environ.get("SOCKS_PROXY") or "").strip():
+        return True
+    for k in ("BINANCE_PROXY", "PROXY_URL", "ALL_PROXY", "HTTPS_PROXY", "HTTP_PROXY"):
+        if (os.environ.get(k) or "").strip().lower().startswith("socks"):
+            return True
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        import config as _cfg
+        if str(getattr(_cfg, "SOCKS_PROXY", "") or "").strip():
+            return True
+        for k in ("PROXY_URL", "BINANCE_PROXY"):
+            if str(getattr(_cfg, k, "") or "").strip().lower().startswith("socks"):
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def _ensure_deps():
     """
-    [v3.89 #24] 只做依赖健康检查：缺少关键依赖时 logger.critical 并退出，不在启动阶段修改运行环境。
-    原写法在模块加载时运行未固定版本的 pip install（无超时），重启恢复时间取决于外网，
-    且同一提交可能得到不同依赖。依赖应在构建/部署阶段安装（requests[socks]、PySocks）。
+    [v3.89 #24/#24b] 只做依赖健康检查，不在运行时安装、不修改运行环境。
+    PySocks 缺失：配置了 SOCKS 代理 → logger.critical 并退出；未配置 SOCKS 代理 → 仅 logger.warning，继续启动。
+    依赖应在构建/部署阶段安装（requests[socks]、PySocks）。
     """
-    missing = []
     try:
         import socks  # noqa: F401
+        return
     except ImportError:
-        missing.append("PySocks（pip install 'requests[socks]' PySocks）")
-    if missing:
-        msg = "[startup] 缺少必需依赖: " + "; ".join(missing) + "。请在部署阶段安装后重新启动，系统不会在启动时自动安装。"
-        logging.getLogger("fx.startup").critical(msg)
+        pass
+    lg = logging.getLogger("fx.startup")
+    if _socks_proxy_configured():
+        msg = ("[startup] 已配置 SOCKS 代理但缺少 PySocks（pip install 'requests[socks]' PySocks）。"
+               "请在部署阶段安装后重新启动，系统不会在启动时自动安装。")
+        lg.critical(msg)
         print(msg, file=sys.stderr, flush=True)
         sys.exit(1)
+    lg.warning("[startup] 缺少 PySocks，但未配置 SOCKS 代理，继续启动（如之后配置 SOCKS 代理需先安装 PySocks）")
 
 _ensure_deps()
 from datetime import datetime, timezone
