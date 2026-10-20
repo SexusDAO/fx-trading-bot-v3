@@ -41,7 +41,26 @@ _CARD_STATE_PATH = Path(__file__).parent.parent / "logs" / "card_state.json"
 
 # ── 内存缓存：sig_id → {"message_id": str|None, "text": str, "ts": float} ───
 _card_cache: dict = {}
-_card_lock  = threading.Lock()
+
+# [v3.90 #18] 卡片缓存锁改为 16 个分片锁：按 sig_id 分片，不同信号互不阻塞。
+#   原实现是一把全局 _card_lock，多个标的同时追加卡片行时会串行等待，延迟叠加。
+#   注意：_card_cache 仍是单个共享 dict，_card_locks 只保证同一 sig_id 的互斥；
+#   快照落盘需要整表一致视图，因此另用 _card_state_lock 串行化 snapshot（很短的临界区）。
+_CARD_LOCK_SHARDS = 16
+_card_locks = {i: threading.Lock() for i in range(_CARD_LOCK_SHARDS)}
+_card_state_lock = threading.Lock()
+
+
+def _card_lock_for(sig_id: str) -> threading.Lock:
+    """[v3.90 #18] 取 sig_id 对应的分片锁（稳定哈希，避免受 PYTHONHASHSEED 影响）。"""
+    import zlib
+    return _card_locks[zlib.crc32(str(sig_id).encode()) % _CARD_LOCK_SHARDS]
+
+
+def _card_snapshot() -> dict:
+    """[v3.90 #18] 取 _card_cache 的一致性浅快照，避免落盘时遍历到正在变动的 dict。"""
+    with _card_state_lock:
+        return dict(_card_cache)
 
 
 # =============================================================================
@@ -229,22 +248,133 @@ def _load_card_state() -> dict:
 
 
 def _save_card_state(state: dict) -> None:
+    """
+    [v3.90 #19] 卡片状态落盘改为原子写入：先写同目录 .tmp，再 os.replace 覆盖。
+    os.replace 在 POSIX 上是原子操作，进程若在写中途崩溃，旧文件仍然完整可用，
+    不会留下半截 JSON（旧实现 write_text 直接覆盖，崩溃即损坏）。
+    写入失败从静默 pass 改为 warn 日志，便于发现磁盘/权限问题。
+    """
+    tmp_path = _CARD_STATE_PATH.with_suffix(".json.tmp")
     try:
         _CARD_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _CARD_STATE_PATH.write_text(
+        tmp_path.write_text(
             json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-    except Exception:
-        pass
+        os.replace(tmp_path, _CARD_STATE_PATH)
+    except Exception as e:
+        logger.warning(f"[notifier] card_state 写入失败: {e}")
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except Exception:
+            pass
 
 
 def _init_card_cache() -> None:
     global _card_cache
-    with _card_lock:
+    with _card_state_lock:
         _card_cache = _load_card_state()
 
 
 _init_card_cache()
+
+
+# =============================================================================
+# 信号卡片缓冲（#信号聚合）：延迟 card_create，短命信号不再留下空气卡片
+# =============================================================================
+
+class SignalBuffer:
+    """
+    [v3.90 通知聚合] 线程安全的信号卡片暂存区。
+
+    card_create 不再立刻发消息，而是把 header 暂存在这里；
+    同一个 sig_id 的后续 card_append 也进缓冲区，直到：
+      · flush_signal(sig_id)   —— 确认值得推送（开仓成交 / 价格触发）时一次性合并发出
+      · discard_signal(sig_id) —— 确认不该推送（竞争淘汰 / 过期 / 预检拒绝）时静默丢弃
+      · tick_signal_buffer()   —— 超过 TTL 仍未 flush/discard 的兜底 flush（默认 30 分钟）
+    缓冲只存文本，不放锁跨网络调用，所以 flush/discard 都是 O(缓冲区长度)。
+    """
+
+    def __init__(self, ttl: float = 1800.0):
+        self._buf: dict = {}       # sig_id -> [header(line0), line, ...]
+        self._ts:  dict = {}       # sig_id -> 首次入缓冲时间
+        self._lock = threading.Lock()
+        self._ttl  = ttl
+
+    def has(self, sig_id: str) -> bool:
+        with self._lock:
+            return sig_id in self._buf
+
+    def start(self, sig_id: str, header: str) -> None:
+        with self._lock:
+            self._buf[sig_id] = [header]
+            self._ts.setdefault(sig_id, time.time())
+
+    def append(self, sig_id: str, line: str) -> bool:
+        with self._lock:
+            if sig_id not in self._buf:
+                return False
+            self._buf[sig_id].append(line)
+            return True
+
+    def pop(self, sig_id: str) -> list:
+        with self._lock:
+            self._ts.pop(sig_id, None)
+            return self._buf.pop(sig_id, [])
+
+    def discard(self, sig_id: str) -> bool:
+        with self._lock:
+            self._ts.pop(sig_id, None)
+            return self._buf.pop(sig_id, None) is not None
+
+    def stale(self, now: float = None) -> list:
+        now = time.time() if now is None else now
+        with self._lock:
+            return [k for k, t in self._ts.items() if now - t >= self._ttl]
+
+    def size(self) -> int:
+        with self._lock:
+            return len(self._buf)
+
+
+_signal_buffer = SignalBuffer()
+
+
+def buffer_signal(sig_id: str, header: str) -> None:
+    """[v3.90 通知聚合] 把卡片标题放入缓冲区，暂不推送。"""
+    _signal_buffer.start(sig_id, header)
+
+
+def flush_signal(sig_id: str) -> bool:
+    """[v3.90 通知聚合] 把缓冲区内容合并一次性推送（标题 + 所有追加行）。"""
+    lines = _signal_buffer.pop(sig_id)
+    if not lines:
+        return False
+    _card_create_now(sig_id, lines[0])
+    for ln in lines[1:]:
+        _card_append_now(sig_id, ln)
+    logger.debug(f"[card] flush sig_id={sig_id} 合并推送 {len(lines)} 行")
+    return True
+
+
+def discard_signal(sig_id: str) -> bool:
+    """[v3.90 通知聚合] 静默丢弃缓冲区内容（信号被淘汰/过期/预检拒绝）。"""
+    dropped = _signal_buffer.discard(sig_id)
+    if dropped:
+        logger.debug(f"[card] discard sig_id={sig_id} 缓冲区已静默丢弃")
+    return dropped
+
+
+def tick_signal_buffer() -> int:
+    """[v3.90 通知聚合] 兜底：把超过 TTL 仍未 flush/discard 的条目 flush 出去。"""
+    stale = _signal_buffer.stale()
+    for sid in stale:
+        logger.warning(f"[card] sig_id={sid} 缓冲超过 TTL 未决，兜底 flush")
+        try:
+            flush_signal(sid)
+        except Exception as e:
+            logger.warning(f"[card] 兜底 flush 失败 sig_id={sid}: {e}")
+    return len(stale)
 
 
 # =============================================================================
@@ -272,21 +402,27 @@ async def notify_async(text: str) -> None:
 
 def card_create(sig_id: str, header: str) -> Optional[str]:
     """
-    创建新信号卡片，发出标题行消息。
-    若拿到 message_id，后续 card_append 走编辑路径（真正追加到同一条消息）。
-    否则 card_append 走独立消息路径。
-    返回 message_id 或 None。
+    [v3.90 通知聚合] 创建信号卡片：只把标题放入缓冲区，暂不推送。
+    真正发出消息在 flush_signal(sig_id) 时（开仓成交 / 价格触发）。
+    返回 None —— 因为此时还没有 message_id（延迟推送后由 _card_create_now 决定）。
     """
+    buffer_signal(sig_id, header)
+    logger.debug(f"[card] 缓冲卡片 sig_id={sig_id}（等待 flush）")
+    return None
+
+
+def _card_create_now(sig_id: str, header: str) -> Optional[str]:
+    """实际发出标题行并登记缓存（原 card_create 的即时行为）。"""
     mid = _send(header)
 
-    with _card_lock:
+    with _card_lock_for(sig_id):
         _card_cache[sig_id] = {
             "message_id": mid,
             "text": header,
             "ts": time.time(),
         }
-        if mid:
-            _save_card_state(dict(_card_cache))
+    if mid:
+        _save_card_state(_card_snapshot())
 
     if mid:
         logger.debug(f"[card] 创建卡片 sig_id={sig_id} mid={mid} ← 编辑模式")
@@ -305,7 +441,17 @@ def card_append(sig_id: str, line: str) -> bool:
 
     返回 True 表示消息已发出（不论编辑还是新消息）。
     """
-    with _card_lock:
+    # [v3.90 通知聚合] 在缓冲区里就直接追加，等 flush 时一次发出
+    if _signal_buffer.append(sig_id, line):
+        logger.debug(f"[card] 缓冲追加 sig_id={sig_id}")
+        return True
+
+    return _card_append_now(sig_id, line)
+
+
+def _card_append_now(sig_id: str, line: str) -> bool:
+    """实际执行追加（编辑原消息或独立消息）。"""
+    with _card_lock_for(sig_id):
         entry = dict(_card_cache.get(sig_id, {})) if sig_id in _card_cache else None
 
     if entry is None:
@@ -319,17 +465,17 @@ def card_append(sig_id: str, line: str) -> bool:
         new_text = entry["text"] + "\n" + line
         ok = _edit(message_id, new_text)
         if ok:
-            with _card_lock:
+            with _card_lock_for(sig_id):
                 if sig_id in _card_cache:
                     _card_cache[sig_id]["text"] = new_text
                     _card_cache[sig_id]["ts"]   = time.time()
-                    _save_card_state(dict(_card_cache))
+            _save_card_state(_card_snapshot())
             logger.debug(f"[card] 编辑追加 sig_id={sig_id}")
             return True
         else:
             # 编辑失败，清除 mid 防止后续重试，降级独立消息
             logger.warning(f"[card] 编辑失败 sig_id={sig_id} mid={message_id}，降级并清除 mid")
-            with _card_lock:
+            with _card_lock_for(sig_id):
                 if sig_id in _card_cache:
                     _card_cache[sig_id]["message_id"] = None
             notify(line)
@@ -356,9 +502,9 @@ async def card_append_async(sig_id: str, line: str) -> bool:
 
 def card_remove(sig_id: str) -> None:
     """信号结束后清理卡片缓存。"""
-    with _card_lock:
+    with _card_lock_for(sig_id):
         _card_cache.pop(sig_id, None)
-        _save_card_state(dict(_card_cache))
+    _save_card_state(_card_snapshot())
 
 
 # =============================================================================
