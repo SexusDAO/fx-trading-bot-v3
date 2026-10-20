@@ -244,27 +244,55 @@ def prefetch_liq_cache(symbols: list) -> None:
     logger.info(f"[liq_cache] 预热完成，更新 {updated}/{len(symbols)} 个")
 
 
+_bg_stop = threading.Event()
+_bg_thread = None
+
+
 def start_bg_refresh(symbols_fn) -> None:
-    """启动后台刷新线程（由 main.py 调用一次）。"""
-    global _bg_started
+    """#39 启动可停止的后台刷新线程；启动失败恢复状态。"""
+    global _bg_started, _bg_thread
     with _bg_lock:
         if _bg_started:
             return
-        _bg_started = True
-
-    def _loop():
-        while True:
+        _bg_stop.clear()
+        def _loop():
+            global _bg_started
             try:
-                syms = symbols_fn() or []
-                if syms:
-                    prefetch_liq_cache(syms)
-            except Exception as e:
-                logger.warning(f"[liq_cache] bg_refresh 异常: {e}")
-            time.sleep(_CACHE_TTL)
+                while not _bg_stop.is_set():
+                    try:
+                        syms = symbols_fn() or []
+                        if syms and not _bg_stop.is_set():
+                            prefetch_liq_cache(syms)
+                    except Exception as e:
+                        logger.warning(f"[liq_cache] bg_refresh 异常: {e}")
+                    if _bg_stop.wait(_CACHE_TTL):
+                        break
+            finally:
+                with _bg_lock:
+                    _bg_started = False
+        _bg_thread = threading.Thread(target=_loop, name="liq-cache-bg", daemon=True)
+        _bg_started = True
+        try:
+            _bg_thread.start()
+        except Exception:
+            _bg_started = False
+            _bg_thread = None
+            raise
+    logger.info("[liq_cache] 后台刷新线程已启动")
 
-    t = threading.Thread(target=_loop, name="liq-cache-bg", daemon=True)
-    t.start()
-    logger.info("[liq_cache] 后台刷新线程已启动（间隔15分钟）")
+
+def stop_bg_refresh(timeout: float = 5.0) -> bool:
+    """#39 取消等待并有界 join；在途同步请求不能强行取消，超时返回 False。"""
+    _bg_stop.set()
+    with _bg_lock:
+        thread = _bg_thread
+    if thread and thread is not threading.current_thread():
+        thread.join(timeout=max(0.0, timeout))
+    stopped = thread is None or not thread.is_alive()
+    if not stopped:
+        logger.warning("[liq_cache] 后台刷新仍有在途请求，停止等待超时")
+    return stopped
+
 
 
 def get_liq_src_level(symbol: str) -> int:
