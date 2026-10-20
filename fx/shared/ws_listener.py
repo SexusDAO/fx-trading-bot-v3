@@ -318,6 +318,12 @@ class WsOrderListener:
             return
 
         event_type = msg.get("e")
+        if event_type == "listenKeyExpired":
+            # [v3.89 #7] listenKey 过期事件：旧流已失效，显式关闭连接驱动重建（重连后由重连回调完成对齐）
+            logger.warning("[ws] 收到 listenKeyExpired，主动关闭 userData 连接以重建")
+            self._listen_key = None
+            await self._force_user_reconnect("listenKeyExpired")
+            return
         if event_type != "ORDER_TRADE_UPDATE":
             return
 
@@ -526,6 +532,21 @@ class WsOrderListener:
     # listenKey keepalive
     # ─────────────────────────────────────────────────────────────────────────
 
+    async def _force_user_reconnect(self, reason: str) -> None:
+        """
+        [v3.89 #7] 显式驱动 userData 连接重建：关闭当前连接，使接收循环退出并走重连路径
+        （重新申请 listenKey，重连成功后触发重连回调做订单对齐）。
+        原写法只把 _listen_key 置 None，接收循环不检查它，旧连接可能一直挂着直到服务端断开。
+        """
+        w = self._user_ws
+        if w is None:
+            return   # 连接已不存在，重连循环自己会重新申请 listenKey
+        try:
+            await w.close()
+            logger.info(f"[ws] 已主动关闭 userData 连接以重建: {reason}")
+        except Exception as e:
+            logger.warning(f"[ws] 主动关闭 userData 连接失败: {e}")
+
     async def _keepalive_loop(self) -> None:
         """每 KEEPALIVE_INTERVAL 秒续期 listenKey，防止 userData stream 超时断开。"""
         while not self._stop_flag:
@@ -539,12 +560,15 @@ class WsOrderListener:
                 if ok:
                     logger.debug("[ws] listenKey keepalive 成功")
                 else:
-                    logger.warning("[ws] listenKey keepalive 失败，userData loop 会自动重连")
-                    self._listen_key = None  # 触发 user_data_loop 重新申请
+                    logger.warning("[ws] listenKey keepalive 失败，主动关闭 userData 连接以重建")
+                    self._listen_key = None
+                    await self._force_user_reconnect("keepalive 失败")   # [v3.89 #7]
             except asyncio.CancelledError:
                 return
             except Exception as e:
-                logger.error(f"[ws] keepalive 异常: {e}")
+                logger.error(f"[ws] keepalive 异常，主动关闭 userData 连接以重建: {e}")
+                self._listen_key = None
+                await self._force_user_reconnect("keepalive 异常")   # [v3.89 #7]
 
     # ─────────────────────────────────────────────────────────────────────────
     # 等待订单事件（供 executor 同步阻塞式等待成交）

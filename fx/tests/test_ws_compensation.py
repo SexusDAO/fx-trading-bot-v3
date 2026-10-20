@@ -80,5 +80,64 @@ class TestCompensation(unittest.TestCase):
         asyncio.run(run())
 
 
+class TestKeepaliveRebuild(unittest.TestCase):
+    def setUp(self):
+        self._k = W.KEEPALIVE_INTERVAL
+        W.KEEPALIVE_INTERVAL = 0.01
+        self._orig = W.binance_api.keepalive_listen_key
+
+    def tearDown(self):
+        W.KEEPALIVE_INTERVAL = self._k
+        W.binance_api.keepalive_listen_key = self._orig
+
+    def _run_keepalive(self, fn):
+        W.binance_api.keepalive_listen_key = fn
+
+        async def run():
+            ws = W.WsOrderListener()
+            ws._listen_key = "k"
+            fake = FakeWs()
+            ws._user_ws = fake
+            task = asyncio.create_task(ws._keepalive_loop())
+            await asyncio.sleep(0.1)
+            ws._stop_flag = True
+            await asyncio.wait_for(task, timeout=1)
+            return ws, fake
+        return asyncio.run(run())
+
+    def test_keepalive_false_closes_connection(self):
+        ws, fake = self._run_keepalive(lambda k: False)
+        self.assertGreaterEqual(fake.closed, 1)
+        self.assertIsNone(ws._listen_key)
+
+    def test_keepalive_exception_closes_connection(self):
+        def boom(k): raise OSError("net")
+        ws, fake = self._run_keepalive(boom)
+        self.assertGreaterEqual(fake.closed, 1)
+
+    def test_keepalive_ok_keeps_connection(self):
+        ws, fake = self._run_keepalive(lambda k: True)
+        self.assertEqual(fake.closed, 0)
+        self.assertEqual(ws._listen_key, "k")
+
+    def test_listen_key_expired_event_closes_connection(self):
+        async def run():
+            ws = W.WsOrderListener()
+            ws._listen_key = "k"
+            fake = FakeWs()
+            ws._user_ws = fake
+            await ws._dispatch_user_data('{"e":"listenKeyExpired"}')
+            return ws, fake
+        ws, fake = asyncio.run(run())
+        self.assertEqual(fake.closed, 1)
+        self.assertIsNone(ws._listen_key)
+
+    def test_no_connection_is_safe(self):
+        async def run():
+            ws = W.WsOrderListener()
+            await ws._force_user_reconnect("x")
+        asyncio.run(run())
+
+
 if __name__ == "__main__":
     unittest.main()
