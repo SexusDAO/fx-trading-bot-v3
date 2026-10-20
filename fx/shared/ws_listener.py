@@ -48,6 +48,7 @@ except Exception:
 
 import config
 from shared import binance_api
+from shared.async_utils import _run_sync, RunSyncTimeout   # [v3.89 #6] 同步 HTTP 移出事件循环
 
 logger = logging.getLogger("ws_listener")
 
@@ -271,7 +272,13 @@ class WsOrderListener:
         delay = RECONNECT_BASE
         while not self._stop_flag:
             try:
-                self._listen_key = binance_api.get_listen_key()
+                # [v3.89 #6] get_listen_key 是同步 requests（内部重试还会同步 sleep），
+                #   直接在协程里调用会卡住整个事件循环；改走有界线程池，超时按「拿不到 key」处理。
+                try:
+                    self._listen_key = await _run_sync(binance_api.get_listen_key, timeout=20.0)
+                except RunSyncTimeout:
+                    logger.warning("[ws] 申请 listenKey 超过 20s 未返回，按失败处理（后台请求可能仍在执行）")
+                    self._listen_key = None
                 if not self._listen_key:
                     logger.error("[ws] 无法获取 listenKey，10s 后重试")
                     self._mark_user_stream_down()   # [v3.89 #3]
@@ -556,7 +563,13 @@ class WsOrderListener:
             if not self._listen_key:
                 continue
             try:
-                ok = binance_api.keepalive_listen_key(self._listen_key)
+                # [v3.89 #6] 续期同样是同步 HTTP，改走有界线程池；
+                #   超时只记日志、下一轮再试，不触发强制重连（真正返回失败仍走原有重建逻辑）。
+                try:
+                    ok = await _run_sync(binance_api.keepalive_listen_key, self._listen_key, timeout=15.0)
+                except RunSyncTimeout:
+                    logger.warning("[ws] listenKey 续期超过 15s 未返回，本轮跳过，下一轮再试")
+                    continue
                 if ok:
                     logger.debug("[ws] listenKey keepalive 成功")
                 else:
