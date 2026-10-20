@@ -2833,26 +2833,28 @@ def _write_scan_log(result: dict, signals: list) -> None:
     logger.info(log_text)
 
     # 同时写 scanner.log 文件（轮转写入，单文件上限 5MB，保留 3 份备份）
+    # [v3.89 #21] 备份统一命名 scanner.log.1/.2/.3；原写法当前文件被改名为 scanner.1.log，
+    #   而后续备份却按 scanner.log.N 查找，最近一份备份无法顺序滚动；轮转/写入失败也被静默吞掉。
     try:
         SCANNER_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
         _MAX_LOG_BYTES = 5 * 1024 * 1024   # 5 MB
         _BACKUP_COUNT  = 3
-        if SCANNER_LOG_FILE.exists() and SCANNER_LOG_FILE.stat().st_size > _MAX_LOG_BYTES:
-            import shutil as _shutil
-            # 将备份向后滚动：scanner.log.3 被删，scanner.log.2→3，以此类推
-            for _i in range(_BACKUP_COUNT, 0, -1):
-                _src = SCANNER_LOG_FILE.with_suffix(f".log.{_i - 1}") if _i > 1 else SCANNER_LOG_FILE
-                _dst = SCANNER_LOG_FILE.with_suffix(f".log.{_i}")
-                if _src == SCANNER_LOG_FILE:
-                    # 重命名当前日志文件为 .1
-                    _dst = SCANNER_LOG_FILE.parent / (SCANNER_LOG_FILE.stem + ".1" + SCANNER_LOG_FILE.suffix)
-                    _shutil.move(str(SCANNER_LOG_FILE), str(_dst))
-                elif _src.exists():
-                    _shutil.move(str(_src), str(_dst))
+        try:
+            if SCANNER_LOG_FILE.exists() and SCANNER_LOG_FILE.stat().st_size > _MAX_LOG_BYTES:
+                import os as _os
+                _base = str(SCANNER_LOG_FILE)
+                # 从最老的开始滚动：.2→.3（覆盖旧 .3），.1→.2，当前→.1
+                for _i in range(_BACKUP_COUNT, 0, -1):
+                    _src = Path(_base) if _i == 1 else Path(f"{_base}.{_i - 1}")
+                    _dst = Path(f"{_base}.{_i}")
+                    if _src.exists():
+                        _os.replace(str(_src), str(_dst))
+        except Exception as _re:
+            logger.warning(f"[scanner] scanner.log 轮转失败: {_re}")
         with open(SCANNER_LOG_FILE, "a", encoding="utf-8") as f:
             f.write(log_text + "\n")
-    except Exception:
-        pass
+    except Exception as _we:
+        logger.warning(f"[scanner] scanner.log 写入失败: {_we}")
 
 
 # ── CLI 入口 ──────────────────────────────────────────────────────────────────
