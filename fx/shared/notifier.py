@@ -41,7 +41,26 @@ _CARD_STATE_PATH = Path(__file__).parent.parent / "logs" / "card_state.json"
 
 # ── 内存缓存：sig_id → {"message_id": str|None, "text": str, "ts": float} ───
 _card_cache: dict = {}
-_card_lock  = threading.Lock()
+
+# [v3.90 #18] 卡片缓存锁改为 16 个分片锁：按 sig_id 分片，不同信号互不阻塞。
+#   原实现是一把全局 _card_lock，多个标的同时追加卡片行时会串行等待，延迟叠加。
+#   注意：_card_cache 仍是单个共享 dict，_card_locks 只保证同一 sig_id 的互斥；
+#   快照落盘需要整表一致视图，因此另用 _card_state_lock 串行化 snapshot（很短的临界区）。
+_CARD_LOCK_SHARDS = 16
+_card_locks = {i: threading.Lock() for i in range(_CARD_LOCK_SHARDS)}
+_card_state_lock = threading.Lock()
+
+
+def _card_lock_for(sig_id: str) -> threading.Lock:
+    """[v3.90 #18] 取 sig_id 对应的分片锁（稳定哈希，避免受 PYTHONHASHSEED 影响）。"""
+    import zlib
+    return _card_locks[zlib.crc32(str(sig_id).encode()) % _CARD_LOCK_SHARDS]
+
+
+def _card_snapshot() -> dict:
+    """[v3.90 #18] 取 _card_cache 的一致性浅快照，避免落盘时遍历到正在变动的 dict。"""
+    with _card_state_lock:
+        return dict(_card_cache)
 
 
 # =============================================================================
@@ -240,7 +259,7 @@ def _save_card_state(state: dict) -> None:
 
 def _init_card_cache() -> None:
     global _card_cache
-    with _card_lock:
+    with _card_state_lock:
         _card_cache = _load_card_state()
 
 
@@ -279,14 +298,14 @@ def card_create(sig_id: str, header: str) -> Optional[str]:
     """
     mid = _send(header)
 
-    with _card_lock:
+    with _card_lock_for(sig_id):
         _card_cache[sig_id] = {
             "message_id": mid,
             "text": header,
             "ts": time.time(),
         }
-        if mid:
-            _save_card_state(dict(_card_cache))
+    if mid:
+        _save_card_state(_card_snapshot())
 
     if mid:
         logger.debug(f"[card] 创建卡片 sig_id={sig_id} mid={mid} ← 编辑模式")
@@ -305,7 +324,7 @@ def card_append(sig_id: str, line: str) -> bool:
 
     返回 True 表示消息已发出（不论编辑还是新消息）。
     """
-    with _card_lock:
+    with _card_lock_for(sig_id):
         entry = dict(_card_cache.get(sig_id, {})) if sig_id in _card_cache else None
 
     if entry is None:
@@ -319,17 +338,17 @@ def card_append(sig_id: str, line: str) -> bool:
         new_text = entry["text"] + "\n" + line
         ok = _edit(message_id, new_text)
         if ok:
-            with _card_lock:
+            with _card_lock_for(sig_id):
                 if sig_id in _card_cache:
                     _card_cache[sig_id]["text"] = new_text
                     _card_cache[sig_id]["ts"]   = time.time()
-                    _save_card_state(dict(_card_cache))
+            _save_card_state(_card_snapshot())
             logger.debug(f"[card] 编辑追加 sig_id={sig_id}")
             return True
         else:
             # 编辑失败，清除 mid 防止后续重试，降级独立消息
             logger.warning(f"[card] 编辑失败 sig_id={sig_id} mid={message_id}，降级并清除 mid")
-            with _card_lock:
+            with _card_lock_for(sig_id):
                 if sig_id in _card_cache:
                     _card_cache[sig_id]["message_id"] = None
             notify(line)
@@ -356,9 +375,9 @@ async def card_append_async(sig_id: str, line: str) -> bool:
 
 def card_remove(sig_id: str) -> None:
     """信号结束后清理卡片缓存。"""
-    with _card_lock:
+    with _card_lock_for(sig_id):
         _card_cache.pop(sig_id, None)
-        _save_card_state(dict(_card_cache))
+    _save_card_state(_card_snapshot())
 
 
 # =============================================================================
