@@ -1,11 +1,20 @@
 """
 shared/notifier.py — 推送通知（Jarvis）
 
-设计：动态卡片（一个信号 = 一条消息，后续事件追加行，不新发）
-  - card_create(sig_id, header)   → 创建卡片，返回 message_id
-  - card_append(sig_id, line)     → 向已有卡片追加一行
-  - notify(text)                  → 发一条全局独立消息
-  - notify_async(text)            → 异步版 notify
+动态卡片设计：一个信号 = 一条消息，后续事件编辑同一条消息追加内容。
+
+底层推送优先级：
+  1. tools/invoke HTTP API  — 能发 + 能编辑，可拿到 message_id  ← 主路径
+  2. IPC Socket             — 备用（socket 存在时）
+  3. Popen fire-and-forget  — 兜底，不阻塞，但拿不到 message_id
+
+公共接口：
+  notify(text)                    → 发一条全局独立消息
+  notify_async(text)              → 异步版 notify
+  card_create(sig_id, header)     → 创建卡片（发第一条），返回 message_id
+  card_append(sig_id, line)       → 编辑原消息追加行；无法编辑则发独立消息
+  card_append_async(sig_id, line) → 异步版 card_append
+  card_remove(sig_id)             → 信号结束后清理缓存
 """
 import json
 import logging
@@ -19,36 +28,92 @@ from typing import Optional
 logger = logging.getLogger("fx.notifier")
 
 # ── Jarvis 推送目标（userId:thread:threadId）──────────────────────────────────
-_JARVIS_TARGET = "432401404:thread:01a14004-35fe-7932-ae7e-fd9ae23f767b"
+_JARVIS_TARGET = "432401404:thread:01a157e7-5c36-76fa-9e3f-70de22a64c3a"
+
+# ── Gateway HTTP API ────────────────────────────────────────────────────────
+_GW_PORT  = os.environ.get("OPENCLAW_GATEWAY_PORT", "18789")
+_GW_TOKEN = "560e77c0982afef774c11776cb5ac38052b027afbda9778f"
+_GW_URL   = f"http://127.0.0.1:{_GW_PORT}/tools/invoke"
+_GW_HDR   = {"Authorization": f"Bearer {_GW_TOKEN}"}
 
 # ── 卡片状态持久化路径（进程重启后能续接同一张卡片）────────────────────────────
 _CARD_STATE_PATH = Path(__file__).parent.parent / "logs" / "card_state.json"
 
-# ── 内存缓存：sig_id → {"message_id": str, "text": str} ─────────────────────
+# ── 内存缓存：sig_id → {"message_id": str|None, "text": str, "ts": float} ───
 _card_cache: dict = {}
-_card_lock = threading.Lock()
+_card_lock  = threading.Lock()
 
 
 # =============================================================================
-# 底层：发送 / 编辑 消息
+# 底层：HTTP invoke（主路径）
 # =============================================================================
 
-def _send_via_socket(payload: dict) -> Optional[str]:
+def _http_send(text: str) -> Optional[str]:
     """
-    通过 IPC Socket 发送请求到 OpenClaw gateway。
-    成功返回 message_id（字符串），失败返回 None。
+    通过 tools/invoke 发消息，返回 message_id（字符串），失败返回 None。
     """
+    try:
+        import requests as _req
+        resp = _req.post(_GW_URL, json={
+            "tool": "message",
+            "args": {
+                "action":  "send",
+                "channel": "jarvis",
+                "target":  _JARVIS_TARGET,
+                "message": text,
+            },
+        }, headers=_GW_HDR, timeout=6)
+
+        if resp.status_code == 200:
+            body = resp.json()
+            inner = json.loads(body["result"]["content"][0]["text"])
+            mid = inner.get("result", {}).get("messageId") or inner.get("messageId")
+            return mid if mid else None
+    except Exception as e:
+        logger.debug(f"[notifier] _http_send 失败: {e}")
+    return None
+
+
+def _http_edit(message_id: str, new_text: str) -> bool:
+    """
+    通过 tools/invoke 编辑已有消息，返回是否成功。
+    """
+    try:
+        import requests as _req
+        resp = _req.post(_GW_URL, json={
+            "tool": "message",
+            "args": {
+                "action":    "send",
+                "channel":   "jarvis",
+                "target":    _JARVIS_TARGET,
+                "messageId": message_id,
+                "message":   new_text,
+            },
+        }, headers=_GW_HDR, timeout=6)
+        return resp.status_code == 200
+    except Exception as e:
+        logger.debug(f"[notifier] _http_edit 失败: {e}")
+    return False
+
+
+# =============================================================================
+# 底层：IPC Socket（备用）
+# =============================================================================
+
+def _socket_send(text: str) -> Optional[str]:
     try:
         import socket as _sock
         sock_path = os.path.expanduser("~/.openclaw/gateway.sock")
         if not os.path.exists(sock_path):
             return None
-        raw = json.dumps(payload).encode() + b"\n"
+        payload = json.dumps({
+            "action": "send", "channel": "jarvis",
+            "target": _JARVIS_TARGET, "message": text,
+        }).encode() + b"\n"
         with _sock.socket(_sock.AF_UNIX, _sock.SOCK_STREAM) as s:
             s.settimeout(5)
             s.connect(sock_path)
-            s.sendall(raw)
-            # 读取响应（最多 4KB）
+            s.sendall(payload)
             resp_raw = b""
             try:
                 s.settimeout(3)
@@ -62,81 +127,85 @@ def _send_via_socket(payload: dict) -> Optional[str]:
         if resp_raw:
             try:
                 resp = json.loads(resp_raw.decode())
-                return resp.get("message_id") or resp.get("id") or resp.get("messageId")
+                mid = resp.get("message_id") or resp.get("id") or resp.get("messageId")
+                if mid and mid != "ok":
+                    return mid
             except Exception:
                 pass
-        return "ok"   # socket 成功但无 message_id 时也标记为成功
+        return None
     except Exception:
         return None
 
 
-def _send_via_cli(text: str) -> Optional[str]:
-    """用 subprocess 调 openclaw CLI，返回 stdout 中的 message_id（如有）。"""
+# =============================================================================
+# 底层：Popen 兜底（最后手段，无 message_id）
+# =============================================================================
+
+def _popen_send(text: str) -> None:
+    """Fire-and-forget，不等待，不阻塞，拿不到 message_id。"""
     try:
-        r = subprocess.run(
+        env = dict(os.environ)
+        env.pop("OPENCLAW_SHELL", None)
+        subprocess.Popen(
             ["openclaw", "message", "send",
              "--channel", "jarvis",
-             "--target", _JARVIS_TARGET,
+             "--target",  _JARVIS_TARGET,
              "--message", text],
-            timeout=30, capture_output=True, text=True
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=env,
         )
-        # 尝试从 stdout 解析 message_id
-        out = r.stdout.strip()
-        if out:
-            try:
-                d = json.loads(out)
-                return d.get("message_id") or d.get("id") or d.get("messageId")
-            except Exception:
-                pass
-        return "ok"  # CLI 成功但无结构化输出
-    except Exception:
-        return None
+    except Exception as e:
+        logger.warning(f"[notifier] Popen 失败: {e}")
 
 
-def _edit_via_socket(message_id: str, new_text: str) -> bool:
-    """通过 IPC Socket 编辑已有消息。"""
+# =============================================================================
+# 统一发送入口
+# =============================================================================
+
+def _send(text: str) -> Optional[str]:
+    """
+    尝试发消息，按优先级降级：HTTP → Socket → Popen。
+    返回 message_id（字符串）或 None（Popen 兜底时）。
+    """
+    mid = _http_send(text)
+    if mid:
+        return mid
+
+    mid = _socket_send(text)
+    if mid:
+        return mid
+
+    _popen_send(text)
+    return None
+
+
+def _edit(message_id: str, new_text: str) -> bool:
+    """尝试编辑消息：HTTP → Socket。"""
+    if _http_edit(message_id, new_text):
+        return True
+    # Socket edit（如果有）
     try:
         import socket as _sock
         sock_path = os.path.expanduser("~/.openclaw/gateway.sock")
-        if not os.path.exists(sock_path):
-            return False
-        payload = {
-            "action":     "edit",
-            "channel":    "jarvis",
-            "target":     _JARVIS_TARGET,
-            "message_id": message_id,
-            "message":    new_text,
-        }
-        raw = json.dumps(payload).encode() + b"\n"
-        with _sock.socket(_sock.AF_UNIX, _sock.SOCK_STREAM) as s:
-            s.settimeout(5)
-            s.connect(sock_path)
-            s.sendall(raw)
-            # 消费响应（不解析）
-            try:
-                s.settimeout(2)
-                s.recv(4096)
-            except Exception:
-                pass
-        return True
+        if os.path.exists(sock_path):
+            payload = json.dumps({
+                "action": "edit", "channel": "jarvis",
+                "target": _JARVIS_TARGET,
+                "message_id": message_id, "message": new_text,
+            }).encode() + b"\n"
+            with _sock.socket(_sock.AF_UNIX, _sock.SOCK_STREAM) as s:
+                s.settimeout(5)
+                s.connect(sock_path)
+                s.sendall(payload)
+                try:
+                    s.settimeout(2); s.recv(4096)
+                except Exception:
+                    pass
+            return True
     except Exception:
-        return False
-
-
-def _edit_via_cli(message_id: str, new_text: str) -> bool:
-    """用 subprocess 调 CLI 编辑消息。"""
-    try:
-        r = subprocess.run(
-            ["openclaw", "message", "edit",
-             "--channel", "jarvis",
-             "--target", _JARVIS_TARGET,
-             "--message-id", message_id,
-             "--message", new_text],
-            timeout=30, capture_output=True
-        )
-        return r.returncode == 0
-    except Exception:
-        return False
+        pass
+    return False
 
 
 # =============================================================================
@@ -147,9 +216,13 @@ def _load_card_state() -> dict:
     try:
         if _CARD_STATE_PATH.exists():
             data = json.loads(_CARD_STATE_PATH.read_text(encoding="utf-8"))
-            # 清理超过 24h 的旧卡片
             cutoff = time.time() - 86400
-            return {k: v for k, v in data.items() if v.get("ts", 0) > cutoff}
+            # 只保留有真实 message_id（非 None/"ok"）且未过期的卡片
+            return {
+                k: v for k, v in data.items()
+                if v.get("ts", 0) > cutoff
+                and v.get("message_id") not in (None, "ok", "")
+            }
     except Exception:
         pass
     return {}
@@ -166,13 +239,11 @@ def _save_card_state(state: dict) -> None:
 
 
 def _init_card_cache() -> None:
-    """进程启动时从磁盘加载卡片状态到内存。"""
     global _card_cache
     with _card_lock:
         _card_cache = _load_card_state()
 
 
-# 启动时初始化
 _init_card_cache()
 
 
@@ -181,19 +252,15 @@ _init_card_cache()
 # =============================================================================
 
 def notify(text: str) -> None:
-    """发一条全局独立消息（不属于任何卡片）。失败则只记日志。"""
+    """发一条全局独立消息。失败只记日志，不抛异常。"""
     try:
-        mid = _send_via_socket({"action": "send", "channel": "jarvis",
-                                 "target": _JARVIS_TARGET, "message": text})
-        if mid:
-            return
-        _send_via_cli(text)
+        _send(text)
     except Exception as e:
         logger.info(f"[notify] 推送失败: {e} | 内容: {text[:80]}")
 
 
 async def notify_async(text: str) -> None:
-    """异步版 notify，在协程中 await 使用，不阻塞事件循环。"""
+    """异步版 notify，不阻塞事件循环。"""
     import asyncio
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, lambda: notify(text))
@@ -205,63 +272,72 @@ async def notify_async(text: str) -> None:
 
 def card_create(sig_id: str, header: str) -> Optional[str]:
     """
-    创建一张新信号卡片，发出第一条消息。
-    header = 标题行，如 "📋 BTCUSDT · 做多 · 回踩 · 强信号"
-    返回 message_id（后续 card_append 用），失败返回 None。
+    创建新信号卡片，发出标题行消息。
+    若拿到 message_id，后续 card_append 走编辑路径（真正追加到同一条消息）。
+    否则 card_append 走独立消息路径。
+    返回 message_id 或 None。
     """
-    text = header
-    mid = _send_via_socket({"action": "send", "channel": "jarvis",
-                             "target": _JARVIS_TARGET, "message": text})
-    if not mid:
-        mid = _send_via_cli(text)
-    if not mid:
-        logger.warning(f"[card] 创建卡片失败: sig_id={sig_id}")
-        return None
+    mid = _send(header)
 
     with _card_lock:
-        _card_cache[sig_id] = {"message_id": mid, "text": text, "ts": time.time()}
-        _save_card_state(dict(_card_cache))
+        _card_cache[sig_id] = {
+            "message_id": mid,
+            "text": header,
+            "ts": time.time(),
+        }
+        if mid:
+            _save_card_state(dict(_card_cache))
 
-    logger.debug(f"[card] 创建卡片 sig_id={sig_id} mid={mid}")
+    if mid:
+        logger.debug(f"[card] 创建卡片 sig_id={sig_id} mid={mid} ← 编辑模式")
+    else:
+        logger.debug(f"[card] 创建卡片 sig_id={sig_id} ← 独立消息模式（无 mid）")
     return mid
 
 
 def card_append(sig_id: str, line: str) -> bool:
     """
-    向已有卡片追加一行。通过编辑原消息实现（text += \\n + line）。
-    如果卡片不存在（进程重启丢失），降级为发一条新消息。
-    返回是否成功。
+    向信号卡片追加一行进展。
+
+    · 有 message_id → 编辑原消息追加（动态卡片）
+    · 无 message_id → 直接发一条独立消息
+    · 卡片不存在（进程重启丢失）→ 降级独立消息
+
+    返回 True 表示消息已发出（不论编辑还是新消息）。
     """
     with _card_lock:
-        entry = _card_cache.get(sig_id)
+        entry = dict(_card_cache.get(sig_id, {})) if sig_id in _card_cache else None
 
     if entry is None:
-        # 卡片不存在，降级为独立消息（追加内容前缀标注）
-        logger.debug(f"[card] sig_id={sig_id} 无卡片，降级独立推送")
+        logger.debug(f"[card] sig_id={sig_id} 无卡片缓存，降级独立推送")
         notify(line)
         return False
 
-    message_id = entry["message_id"]
-    new_text = entry["text"] + "\n" + line
+    message_id = entry.get("message_id")
 
-    # 尝试编辑
-    ok = _edit_via_socket(message_id, new_text)
-    if not ok:
-        ok = _edit_via_cli(message_id, new_text)
-
-    if ok:
-        with _card_lock:
-            if sig_id in _card_cache:
-                _card_cache[sig_id]["text"] = new_text
-                _card_cache[sig_id]["ts"] = time.time()
-                _save_card_state(dict(_card_cache))
-        logger.debug(f"[card] 追加成功 sig_id={sig_id} mid={message_id}")
-        return True
+    if message_id:
+        new_text = entry["text"] + "\n" + line
+        ok = _edit(message_id, new_text)
+        if ok:
+            with _card_lock:
+                if sig_id in _card_cache:
+                    _card_cache[sig_id]["text"] = new_text
+                    _card_cache[sig_id]["ts"]   = time.time()
+                    _save_card_state(dict(_card_cache))
+            logger.debug(f"[card] 编辑追加 sig_id={sig_id}")
+            return True
+        else:
+            # 编辑失败，清除 mid 防止后续重试，降级独立消息
+            logger.warning(f"[card] 编辑失败 sig_id={sig_id} mid={message_id}，降级并清除 mid")
+            with _card_lock:
+                if sig_id in _card_cache:
+                    _card_cache[sig_id]["message_id"] = None
+            notify(line)
+            return False
     else:
-        # 编辑失败（可能消息太旧或 API 不支持），降级为新消息
-        logger.warning(f"[card] 编辑失败 sig_id={sig_id} mid={message_id}，降级独立推送")
+        # Popen 兜底模式：直接发独立消息
         notify(line)
-        return False
+        return True
 
 
 async def card_create_async(sig_id: str, header: str) -> Optional[str]:
@@ -279,7 +355,7 @@ async def card_append_async(sig_id: str, line: str) -> bool:
 
 
 def card_remove(sig_id: str) -> None:
-    """从缓存中移除卡片（信号结束后可选清理，减少内存占用）。"""
+    """信号结束后清理卡片缓存。"""
     with _card_lock:
         _card_cache.pop(sig_id, None)
         _save_card_state(dict(_card_cache))
@@ -297,33 +373,33 @@ def _hhmm() -> str:
 
 _DIR_CN = {"LONG": "做多", "SHORT": "做空"}
 _MODE_CN = {
-    "pullback":    "回踩",
-    "breakout":    "突破",
-    "reversal":    "反转",
+    "pullback":      "回踩",
+    "breakout":      "突破",
+    "reversal":      "反转",
     "oi_divergence": "OI背离",
-    "ema_trend":   "EMA趋势",
-    "stop_hunt":   "猎杀止损",
-    "funding_arb": "资金费套利",
+    "ema_trend":     "EMA趋势",
+    "stop_hunt":     "猎杀止损",
+    "funding_arb":   "资金费套利",
 }
 _STRENGTH_CN = {"strong": "强信号", "medium": "中等信号", "weak": "弱信号"}
 _CLOSE_REASON_CN = {
-    "tp2":           "TP2止盈",
-    "sl":            "止损",
-    "sl_triggered":  "止损",
-    "manual_close":  "手动平仓",
-    "time_stop":     "时间止损",
-    "time_stop_no_progress": "时间止损",
-    "time_stop_loss": "时间止损",
-    "time_stop_hard": "时间止损",
-    "time_stop_hard_72h": "时间止损",
-    "trailing_stop": "移动止损锁利",
-    "pnl_lock":      "浮盈保护平仓",
-    "early_stagnation": "时间止损",
-    "pnl_protection": "浮盈保护平仓",
-    "tp1_protect_exit": "浮盈保护平仓",
-    "partial_time_stop": "时间止损",
-    "breakout_fail": "突破失败",
-    "exit_signal_reversal": "反向信号平仓",
+    "tp2":                       "TP2止盈",
+    "sl":                        "止损",
+    "sl_triggered":              "止损",
+    "manual_close":              "手动平仓",
+    "time_stop":                 "时间止损",
+    "time_stop_no_progress":     "时间止损",
+    "time_stop_loss":            "时间止损",
+    "time_stop_hard":            "时间止损",
+    "time_stop_hard_72h":        "时间止损",
+    "trailing_stop":             "移动止损锁利",
+    "pnl_lock":                  "浮盈保护平仓",
+    "early_stagnation":          "时间止损",
+    "pnl_protection":            "浮盈保护平仓",
+    "tp1_protect_exit":          "浮盈保护平仓",
+    "partial_time_stop":         "时间止损",
+    "breakout_fail":             "突破失败",
+    "exit_signal_reversal":      "反向信号平仓",
 }
 
 
