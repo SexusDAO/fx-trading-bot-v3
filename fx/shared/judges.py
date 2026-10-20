@@ -802,11 +802,19 @@ def _fill_liq_zone(out: dict, price: float, direction: str, atr: float,
                 if best_dist is None or atr_d < best_dist:
                     best_dist = round(atr_d, 2)
 
-        out["liq_zone_valid"]        = total_liq > 0
+        # [v3.89 #29] 先局部算完再写回：只有全部字段计算成功才写入，
+        #   避免异常时留下「部分字段已写、其余仍是默认值」的混合状态，
+        #   使调用方无法区分真实零清算量、数据缺失与解析错误。
+        _liq_valid  = total_liq > 0
+        _liq_amount = round(total_liq, 0)
+        out["liq_zone_valid"]        = _liq_valid
         out["liq_zone_distance_atr"] = best_dist
-        out["liq_zone_amount"]       = round(total_liq, 0)
-    except Exception:
-        pass
+        out["liq_zone_amount"]       = _liq_amount
+    except Exception as _liq_e:
+        # [v3.89 #29] 不再静默：区分「取到数据但无有效清算区」与「计算/解析失败」
+        out["liq_zone_valid"]  = False
+        out["liq_zone_error"]  = type(_liq_e).__name__
+        logger.debug(f"[judges] _fill_liq_zone 计算失败（清算字段按无效处理）: {_liq_e}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1128,8 +1136,11 @@ def _fill_breakout_liq(out: dict, price: float, direction: str, atr: float, symb
             total = sum(z.get("liq_usd", 0) for z in zones
                         if 0 < price - z["price_high"] < atr * 2)
             out["liq_pressure_below"] = round(total, 0)
-    except Exception:
-        pass
+    except Exception as _bq_e:
+        # [v3.89 #29] 不再静默：区分「取到数据但无有效清算区」与「计算/解析失败」，
+        #   失败时不写入部分字段，只标记该次清算填充失败
+        out["liq_pressure_error"] = type(_bq_e).__name__
+        logger.debug(f"[judges] _fill_breakout_liq 计算失败（压力字段按无效处理）: {_bq_e}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2007,8 +2018,12 @@ def _fill_reversal_liq(out: dict, price: float, direction: str,
                 out["position_size_cap"] = 0.5 if out.get("extreme_candle_flag") else 0.75
             elif total >= 1_000_000:
                 out["position_size_cap"] = 0.5
-    except Exception:
-        pass
+    except Exception as _rv_e:
+        # [v3.89 #29] 不再静默：清算字段按无效处理并记录失败原因。
+        #   注意 position_size_cap / entry_mode 的既有分支逐行未动，
+        #   本处只影响清算金额字段，不改变仓位上限与入场模式语义。
+        out["liq_zone_error"] = type(_rv_e).__name__
+        logger.debug(f"[judges] _fill_reversal_liq 计算失败（清算字段按无效处理）: {_rv_e}")
 
 
 def _set_cooldown_safe(symbol: str, hours: float, reason: str) -> None:
