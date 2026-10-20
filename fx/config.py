@@ -12,8 +12,8 @@ _FX_ROOT = Path(__file__).parent  # fx/ 目录绝对路径
 # 第一组：系统基础配置
 # ═══════════════════════════════════════════════════════════════════════════════
 # ── API Key ─────────────────────────────────────────────────────────────────────────────────────────────
-BINANCE_API_KEY    = "REDACTED_API_KEY"
-BINANCE_API_SECRET = "REDACTED_API_SECRET"
+BINANCE_API_KEY    = "E621Obw9P1hFy90HhgrXVDwOwqcbKIPCw22tGDQ73r7j3tezSXu6OhrGpQhdDZhG"
+BINANCE_API_SECRET = "ACLFzjjYD67Q2RTjmZn1PcG6wBeVqWQvXc0VFAmofKaYy5t4Whdvek7zJwSdTloX"
 
 # ── SOCKS5 代理 ────────────────────────────────────────────────────────────────
 PROXY_URL = os.environ.get("PROXY_URL", "")  # socks5://user:pass@host:port
