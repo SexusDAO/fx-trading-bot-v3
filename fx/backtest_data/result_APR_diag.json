@@ -1,0 +1,172 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-08-08 17:15",
+      "close_ts": "2026-08-08 18:50",
+      "symbol": "APRUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2074,
+      "exit_price": 0.202215,
+      "close_reason": "sl",
+      "pnl": -2.7,
+      "hold_min": 95.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-08-08 22:45",
+      "close_ts": "2026-08-09 06:45",
+      "symbol": "APRUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2077,
+      "exit_price": 0.2055,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -1.2592,
+      "hold_min": 480.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-08-14 18:15",
+      "close_ts": "2026-08-15 03:20",
+      "symbol": "APRUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.5238,
+      "exit_price": 0.5185,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -1.2118,
+      "hold_min": 545.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-08-17 05:15",
+      "close_ts": "2026-08-17 13:15",
+      "symbol": "APRUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.1849,
+      "exit_price": 0.1806,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -2.5256,
+      "hold_min": 480.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-08-24 09:30",
+      "close_ts": "2026-08-25 03:20",
+      "symbol": "APRUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2018,
+      "exit_price": 0.2022,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -0.0018,
+      "hold_min": 1070.0,
+      "signal_score": 75
+    },
+    {
+      "open_ts": "2026-09-07 14:15",
+      "close_ts": "2026-09-07 23:35",
+      "symbol": "APRUSDT",
+      "direction": "LONG",
+      "mode": "breakout",
+      "entry_price": 0.1873,
+      "exit_price": 0.1858,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -1.0009,
+      "hold_min": 560.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-09-17 14:15",
+      "close_ts": "2026-09-19 04:50",
+      "symbol": "APRUSDT",
+      "direction": "short",
+      "mode": "reversal",
+      "entry_price": 0.1649,
+      "exit_price": 0.1534794,
+      "close_reason": "tp1_partial",
+      "pnl": 3.3629,
+      "hold_min": 2315.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-09-17 14:15",
+      "close_ts": "2026-09-20 14:15",
+      "symbol": "APRUSDT",
+      "direction": "short",
+      "mode": "reversal",
+      "entry_price": 0.1649,
+      "exit_price": 0.1585,
+      "close_reason": "time_stop_hard",
+      "pnl": 1.8406,
+      "hold_min": 4320.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-10-01 00:45",
+      "close_ts": "2026-10-01 08:45",
+      "symbol": "APRUSDT",
+      "direction": "LONG",
+      "mode": "range_bounce",
+      "entry_price": 0.1426,
+      "exit_price": 0.1398,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -2.1635,
+      "hold_min": 480.0,
+      "signal_score": 60
+    }
+  ],
+  "stats": {
+    "symbol": "APRUSDT",
+    "days": 80,
+    "total_trades": 9,
+    "win_trades": 2,
+    "loss_trades": 7,
+    "win_rate_pct": 22.2,
+    "total_pnl_u": -5.66,
+    "total_win_u": 5.2,
+    "total_loss_u": -10.86,
+    "profit_factor": 0.48,
+    "max_drawdown_u": 8.7,
+    "max_single_loss": -2.7,
+    "avg_hold_min": 1003.8,
+    "by_mode": {
+      "pullback": {
+        "n": 5,
+        "win": 0,
+        "pnl": -7.7,
+        "win_rate": 0.0
+      },
+      "breakout": {
+        "n": 1,
+        "win": 0,
+        "pnl": -1.0,
+        "win_rate": 0.0
+      },
+      "reversal": {
+        "n": 2,
+        "win": 2,
+        "pnl": 5.2,
+        "win_rate": 100.0
+      },
+      "range_bounce": {
+        "n": 1,
+        "win": 0,
+        "pnl": -2.16,
+        "win_rate": 0.0
+      }
+    },
+    "funnel": {
+      "judge_pass": 96,
+      "filter_bear_reversal": 0,
+      "filter_settle_win": 2,
+      "filter_cooldown": 38,
+      "filter_same_dir": 0,
+      "filter_calc_sl": 21,
+      "filter_score": 27,
+      "opened": 8
+    }
+  }
+}

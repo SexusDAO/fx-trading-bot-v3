@@ -1,0 +1,53 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-10-08 18:45",
+      "close_ts": "2026-10-08 19:00",
+      "symbol": "SNDKUSDT",
+      "direction": "long",
+      "mode": "reversal",
+      "entry_price": 1608.24,
+      "exit_price": 1568.034,
+      "close_reason": "sl",
+      "pnl": 2.3,
+      "hold_min": 15.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-14 19:45",
+      "close_ts": "2026-10-14 20:00",
+      "symbol": "SNDKUSDT",
+      "direction": "long",
+      "mode": "reversal",
+      "entry_price": 1405.75,
+      "exit_price": 1370.60625,
+      "close_reason": "sl",
+      "pnl": 2.3,
+      "hold_min": 15.0,
+      "signal_score": 50
+    }
+  ],
+  "stats": {
+    "symbol": "SNDKUSDT",
+    "days": 30,
+    "total_trades": 2,
+    "win_trades": 2,
+    "loss_trades": 0,
+    "win_rate_pct": 100.0,
+    "total_pnl_u": 4.6,
+    "total_win_u": 4.6,
+    "total_loss_u": 0,
+    "profit_factor": 999,
+    "max_drawdown_u": 0.0,
+    "max_single_loss": 2.3,
+    "avg_hold_min": 15.0,
+    "by_mode": {
+      "reversal": {
+        "n": 2,
+        "win": 2,
+        "pnl": 4.6,
+        "win_rate": 100.0
+      }
+    }
+  }
+}

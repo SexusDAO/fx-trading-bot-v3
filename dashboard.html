@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binance AI Pro — Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#f5f6f8;--card:#fff;--card2:#f8f9fb;--border:#e8eaed;
+  --text:#111827;--sub:#6b7280;--sub2:#9ca3af;
+  --green:#059669;--green-bg:#ecfdf5;--green-bd:#a7f3d0;
+  --red:#dc2626;--red-bg:#fef2f2;--red-bd:#fecaca;
+  --yellow:#d97706;--yellow-bg:#fffbeb;--yellow-bd:#fde68a;
+  --blue:#2563eb;--blue-bg:#eff6ff;--blue-bd:#bfdbfe;
+  --purple:#7c3aed;--purple-bg:#f5f3ff;--purple-bd:#ddd6fe;
+  --orange:#ea580c;--orange-bg:#fff7ed;
+  --r:10px;--font:'Inter','PingFang SC','Helvetica Neue',system-ui,sans-serif;
+  --sh:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);
+  --sh2:0 4px 12px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;-webkit-font-smoothing:antialiased}
+.layout{display:flex;min-height:100vh}
+
+/* Sidebar */
+.sidebar{width:216px;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;box-shadow:var(--sh)}
+.logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.logo-icon{font-size:26px}
+.logo-text h1{font-size:15px;font-weight:700;color:var(--text)}
+.logo-text span{font-size:11px;color:var(--sub2)}
+nav{flex:1;padding:8px 8px}
+.nav-sec{font-size:10px;font-weight:600;color:var(--sub2);letter-spacing:.7px;text-transform:uppercase;padding:10px 10px 4px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;cursor:pointer;color:var(--sub);transition:all .12s;font-size:13px;font-weight:500;border-radius:8px;margin-bottom:1px;user-select:none}
+.nav-item:hover{background:var(--card2);color:var(--text)}
+.nav-item.active{background:var(--blue-bg);color:var(--blue);font-weight:600}
+.nav-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+.sys-dot{width:7px;height:7px;border-radius:50%;background:var(--green);margin-left:auto;animation:pulse 2s infinite}
+.sys-dot.off{background:var(--red);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.sidebar-bottom{padding:12px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--sub2);display:flex;align-items:center;gap:6px}
+
+/* Main */
+.main{flex:1;padding:26px 28px;overflow-x:hidden}
+.page{display:none}.page.active{display:block}
+.ph{display:flex;align-items:baseline;gap:12px;margin-bottom:4px}
+.ph h2{font-size:21px;font-weight:700;color:var(--text)}
+.ph-sub{font-size:13px;color:var(--sub);margin-bottom:20px}
+
+/* Stat grid */
+.sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:14px;margin-bottom:22px}
+.sc{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);display:flex;flex-direction:column;gap:5px;transition:box-shadow .12s}
+.sc:hover{box-shadow:var(--sh2)}
+.sc-lbl{font-size:11px;color:var(--sub);font-weight:500;display:flex;align-items:center;gap:5px}
+.sc-val{font-size:23px;font-weight:700;line-height:1.2}
+.sc-sub{font-size:12px;color:var(--sub2)}
+.sc-badge{font-size:11px;font-weight:600;padding:1px 7px;border-radius:20px;display:inline-block}
+.badge-up{background:var(--green-bg);color:var(--green)}
+.badge-dn{background:var(--red-bg);color:var(--red)}
+.badge-neu{background:var(--card2);color:var(--sub)}
+
+/* Card */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);margin-bottom:18px;overflow:hidden;box-shadow:var(--sh)}
+.ch{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fafbfc;flex-wrap:wrap}
+.ct{font-weight:600;font-size:14px}
+.ca{font-size:12px;color:var(--blue);cursor:pointer;font-weight:500}.ca:hover{text-decoration:underline}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead th{padding:9px 14px;text-align:left;font-size:11px;color:var(--sub);font-weight:600;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border);background:#fafbfc;white-space:nowrap}
+tbody td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#fafbfc}
+
+/* Tags */
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.tl{background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd)}
+.ts{background:var(--red-bg);color:var(--red);border:1px solid var(--red-bd)}
+.ton{background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd)}
+.toff{background:var(--red-bg);color:var(--red);border:1px solid var(--red-bd)}
+.twait{background:var(--orange-bg);color:var(--orange);border:1px solid #fed7aa}
+.tlow{background:var(--card2);color:var(--sub);border:1px solid var(--border)}
+.tmid{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-bd)}
+.ttop{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-bd)}
+.tfuse{background:var(--red-bg);color:var(--red);border:1px solid var(--red-bd)}
+
+.green{color:var(--green)}.red{color:var(--red)}.yellow{color:var(--yellow)}.blue{color:var(--blue)}.purple{color:var(--purple)}.orange{color:var(--orange)}
+
+/* Charts */
+.crow{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+.cc{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px;box-shadow:var(--sh)}
+.cc-title{font-size:12px;font-weight:600;color:var(--sub);margin-bottom:12px;text-transform:uppercase;letter-spacing:.4px}
+.cw{position:relative;height:200px}
+
+/* Scanner */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.scard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:15px;box-shadow:var(--sh);display:flex;flex-direction:column;gap:9px;transition:box-shadow .12s}
+.scard:hover{box-shadow:var(--sh2)}
+.st{display:flex;justify-content:space-between;align-items:center}
+.ssym{font-weight:700;font-size:15px}
+.sscore{font-size:22px;font-weight:800}
+.sr{display:flex;justify-content:space-between;font-size:12px;color:var(--sub)}
+.sv{color:var(--text);font-weight:600}
+.sbar{height:4px;border-radius:2px;background:var(--border);overflow:hidden}
+.sfill{height:100%;border-radius:2px;transition:width .4s}
+
+/* Process */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:18px}
+.pcard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:15px;box-shadow:var(--sh)}
+.phead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.pname{font-weight:600;font-size:14px}
+.plog{font-size:11px;color:var(--sub);background:var(--card2);border-radius:6px;padding:8px 10px;font-family:'SF Mono',monospace;margin-top:8px;line-height:1.6;word-break:break-all;max-height:68px;overflow:hidden;border:1px solid var(--border)}
+
+/* Task cards */
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.tcard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:18px;box-shadow:var(--sh);display:flex;flex-direction:column;gap:13px;transition:box-shadow .12s}
+.tcard:hover{box-shadow:var(--sh2)}
+.thead2{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.tname{font-weight:700;font-size:15px}
+.tsub{font-size:12px;color:var(--sub);margin-top:3px}
+.tlist{display:flex;flex-direction:column;gap:8px}
+.trow{display:flex;align-items:flex-start;gap:8px;font-size:13px}
+.tcheck{width:18px;height:18px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.tcheck.done{background:var(--green-bg);color:var(--green);border:1.5px solid var(--green-bd)}
+.tcheck.pend{background:var(--card2);color:var(--sub2);border:1.5px solid var(--border)}
+.tdetail{font-size:11px;color:var(--sub2);margin-top:2px;word-break:break-all}
+.tnote{font-size:12px;color:var(--sub);background:var(--card2);border-radius:7px;padding:9px 12px;line-height:1.5;border:1px solid var(--border)}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:500;transition:all .12s;border:1px solid transparent;white-space:nowrap}
+.btn-pri{background:var(--blue);color:#fff;border-color:var(--blue)}.btn-pri:hover{background:#1d4ed8}
+.btn-out{background:var(--card);color:var(--text);border-color:var(--border)}.btn-out:hover{background:var(--card2)}
+.btn-out.sel{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-bd);font-weight:600}
+
+/* Snap bar */
+.snapbar{background:var(--yellow-bg);border:1px solid var(--yellow-bd);border-radius:var(--r);padding:10px 16px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.snapbar-txt{font-size:13px;color:var(--yellow);font-weight:500}
+.snapbar-ts{font-size:11px;color:var(--sub);margin-top:2px}
+
+/* Fused banner */
+.fbanner{background:var(--red-bg);border:1px solid var(--red-bd);border-radius:var(--r);padding:11px 16px;margin-bottom:18px;color:var(--red);font-weight:600;font-size:13px;display:none;align-items:center;gap:8px}
+
+/* Misc */
+.empty{text-align:center;padding:36px;color:var(--sub2);font-size:13px}
+.loading{text-align:center;padding:32px;color:var(--sub2);font-size:13px}
+.spin{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.alink{color:var(--blue);text-decoration:none;font-size:11px;font-weight:500}.alink:hover{text-decoration:underline}
+.btags{display:flex;flex-wrap:wrap;gap:4px}
+.btag{background:var(--purple-bg);color:var(--purple);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;border:1px solid var(--purple-bd)}
+.mono{font-family:'SF Mono','Fira Code',monospace;font-size:11px}
+code{background:var(--card2);padding:1px 5px;border-radius:3px;font-size:11px;font-family:monospace;border:1px solid var(--border)}
+
+@media(max-width:960px){.crow{grid-template-columns:1fr}}
+@media(max-width:768px){.sidebar{width:58px}.logo-text,.nav-item span,.sidebar-bottom span,.nav-sec{display:none}.nav-item{justify-content:center;padding:10px}.logo{justify-content:center;padding:14px 0}.main{padding:14px}}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<aside class="sidebar">
+  <div class="logo"><div class="logo-icon">🦞</div><div class="logo-text"><h1>AI Pro</h1><span>Trading Dashboard</span></div></div>
+  <nav>
+    <div class="nav-sec">总览</div>
+    <div class="nav-item active" onclick="G('overview')"  id="n-overview"><span class="nav-icon">📊</span><span>总览</span></div>
+    <div class="nav-sec">交易</div>
+    <div class="nav-item"        onclick="G('futures')"   id="n-futures"><span class="nav-icon">⚡</span><span>合约仓位</span></div>
+    <div class="nav-item"        onclick="G('scanner')"   id="n-scanner"><span class="nav-icon">🔍</span><span>信号扫描</span></div>
+    <div class="nav-item"        onclick="G('ct')"        id="n-ct"><span class="nav-icon">🧠</span><span>BSC 跟单</span></div>
+    <div class="nav-sec">数据</div>
+    <div class="nav-item"        onclick="G('watchlist')" id="n-watchlist"><span class="nav-icon">👁</span><span>监控地址</span></div>
+    <div class="nav-item"        onclick="G('history')"   id="n-history"><span class="nav-icon">📜</span><span>历史记录</span></div>
+    <div class="nav-sec">管理</div>
+    <div class="nav-item"        onclick="G('missions')"  id="n-missions"><span class="nav-icon">🎯</span><span>任务中心</span></div>
+    <div class="nav-item"        onclick="G('tasks')"     id="n-tasks"><span class="nav-icon">⚙️</span><span>系统任务</span><div class="sys-dot" id="sys-dot"></div></div>
+    <div class="nav-item"        onclick="G('chat')"      id="n-chat"><span class="nav-icon">💬</span><span>聊天</span><div id="chat-unread" style="display:none;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 5px;margin-left:auto"></div></div>
+  </nav>
+  <div class="sidebar-bottom">⏱ <span id="last-ts">未刷新</span></div>
+</aside>
+
+<main class="main">
+
+<!-- ===== 总览 ===== -->
+<div class="page active" id="page-overview">
+  <div class="ph"><h2>📊 总览</h2></div>
+  <div class="ph-sub">账户整体状态，点击获取实时数据</div>
+  <div class="snapbar" id="ov-bar" style="display:none">
+    <div><div class="snapbar-txt">📷 快照数据</div><div class="snapbar-ts" id="ov-ts"></div></div>
+    <button class="btn btn-pri" onclick="loadOV()">↻ 刷新</button>
+  </div>
+  <div style="text-align:center;padding:28px 0 20px" id="ov-loadbtn">
+    <button class="btn btn-pri" style="font-size:14px;padding:10px 26px" onclick="loadOV()">↻ 加载最新数据</button>
+  </div>
+  <div id="ov-body" style="display:none">
+    <div class="sg" id="ov-stats"></div>
+    <div class="crow">
+      <div class="cc"><div class="cc-title">合约持仓浮盈亏</div><div class="cw" id="cw-pnl"><canvas id="ch-pnl"></canvas></div></div>
+      <div class="cc"><div class="cc-title">BSC 跟单资金曲线</div><div class="cw" id="cw-eq"><canvas id="ch-eq"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="ct">合约持仓</span><span class="ca" onclick="G('futures')">查看全部 →</span></div>
+      <div class="tw" id="ov-pos"></div>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="ct">BSC 钱包资产</span><span class="ca" onclick="G('ct')">跟单详情 →</span></div>
+      <div class="tw" id="ov-wallet"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 合约 ===== -->
+<div class="page" id="page-futures">
+  <div class="ph"><h2>⚡ 合约仓位</h2></div>
+  <div class="ph-sub">实时持仓与挂单，点击获取最新数据</div>
+  <div class="snapbar" id="ft-bar" style="display:none">
+    <div><div class="snapbar-txt">📷 快照数据</div><div class="snapbar-ts" id="ft-ts"></div></div>
+    <button class="btn btn-pri" onclick="loadFT()">↻ 刷新</button>
+  </div>
+  <div style="text-align:center;padding:28px 0 20px" id="ft-loadbtn">
+    <button class="btn btn-pri" style="font-size:14px;padding:10px 26px" onclick="loadFT()">↻ 加载最新数据</button>
+  </div>
+  <div id="ft-body" style="display:none">
+    <div class="sg" id="ft-stats"></div>
+    <div class="card">
+      <div class="ch"><span class="ct">当前持仓</span></div>
+      <div class="tw" id="ft-pos"></div>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="ct">当前挂单</span><span id="ft-ord-note" style="font-size:12px;color:var(--sub)"></span></div>
+      <div class="tw" id="ft-ord"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 扫描 ===== -->
+<div class="page" id="page-scanner">
+  <div class="ph"><h2>🔍 信号扫描</h2></div>
+  <div class="ph-sub">全市场合约信号筛选，每次手动触发</div>
+  <div style="margin-bottom:18px"><button class="btn btn-pri" style="font-size:14px;padding:10px 26px" onclick="loadSC()">▶ 开始扫描</button></div>
+  <div id="sc-content"></div>
+</div>
+
+<!-- ===== BSC 跟单 ===== -->
+<div class="page" id="page-ct">
+  <div class="ph"><h2>🧠 BSC 跟单</h2></div>
+  <div class="ph-sub">聪明钱跟单持仓，点击获取最新数据</div>
+  <div class="fbanner" id="fbanner">⛔ 熔断已触发 — 今日暂停新买入，次日 UTC 00:00 自动重置</div>
+  <div class="snapbar" id="ct-bar" style="display:none">
+    <div><div class="snapbar-txt">📷 快照数据</div><div class="snapbar-ts" id="ct-ts"></div></div>
+    <button class="btn btn-pri" onclick="loadCT()">↻ 刷新</button>
+  </div>
+  <div style="text-align:center;padding:28px 0 20px" id="ct-loadbtn">
+    <button class="btn btn-pri" style="font-size:14px;padding:10px 26px" onclick="loadCT()">↻ 加载最新数据</button>
+  </div>
+  <div id="ct-body" style="display:none">
+    <div class="sg" id="ct-stats"></div>
+    <div class="card">
+      <div class="ch"><span class="ct">当前持仓</span></div>
+      <div class="tw" id="ct-pos"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 聊天 ===== -->
+<div class="page" id="page-chat">
+  <div class="ph"><h2>💬 聊天</h2></div>
+  <div class="ph-sub">通过网页与 Binance AI Pro 对话</div>
+  <div id="chat-wrap" style="display:flex;flex-direction:column;height:calc(100vh - 180px);min-height:400px">
+    <div id="chat-msgs" style="flex:1;overflow-y:auto;padding:4px 0 12px;display:flex;flex-direction:column;gap:10px"></div>
+    <div style="border-top:1px solid var(--border);padding-top:12px;display:flex;gap:10px;align-items:flex-end">
+      <textarea id="chat-input"
+        placeholder="输入消息，Enter 发送，Shift+Enter 换行"
+        style="flex:1;resize:none;height:48px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px;background:var(--card);color:var(--text);outline:none;line-height:1.5;transition:border .15s"
+        onkeydown="chatKey(event)"
+        oninput="this.style.height='48px';this.style.height=Math.min(this.scrollHeight,120)+'px'"
+        onfocus="this.style.borderColor='var(--blue)'"
+        onblur="this.style.borderColor='var(--border)'"></textarea>
+      <button class="btn btn-pri" onclick="chatSend()" id="chat-send-btn" style="height:48px;padding:0 20px">
+        发送
+      </button>
+    </div>
+    <div style="font-size:11px;color:var(--sub2);margin-top:6px">消息通过 Jarvis 转发给 AI，AI 回复每匱2秒自动同步</div>
+  </div>
+</div>
+
+
+<div class="page" id="page-watchlist">
+  <div class="ph"><h2>👁 监控地址库</h2></div>
+  <div class="ph-sub">聪明钱地址列表，静态加载</div>
+  <div class="card">
+    <div class="ch"><span class="ct" id="wl-cnt">加载中…</span></div>
+    <div class="tw" id="wl-table"><div class="loading"><span class="spin">⟳</span></div></div>
+  </div>
+</div>
+
+<!-- ===== 历史 ===== -->
+<div class="page" id="page-history">
+  <div class="ph"><h2>📜 历史记录</h2></div>
+  <div class="ph-sub">操作记录，静态加载</div>
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <button class="btn btn-out sel" onclick="SH('futures')" id="ht-ft">⚡ 合约</button>
+    <button class="btn btn-out"     onclick="SH('ct')"      id="ht-ct">🧠 BSC 跟单</button>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct" id="hist-title">合约历史</span></div>
+    <div class="tw" id="hist-body"><div class="loading"><span class="spin">⟳</span></div></div>
+  </div>
+</div>
+
+<!-- ===== 任务中心 ===== -->
+<div class="page" id="page-missions">
+  <div class="ph"><h2>🎯 任务中心</h2></div>
+  <div class="ph-sub">活动与任务执行状态</div>
+  <div id="ms-cards"><div class="loading"><span class="spin">⟳</span></div></div>
+</div>
+
+<!-- ===== 系统任务 ===== -->
+<div class="page" id="page-tasks">
+  <div class="ph"><h2>⚙️ 系统任务</h2></div>
+  <div class="ph-sub">进程状态与定时任务</div>
+  <div style="margin-bottom:16px"><button class="btn btn-out" onclick="loadTK()">↻ 刷新状态</button></div>
+  <div class="pgrid" id="tk-procs"><div class="loading"><span class="spin">⟳</span></div></div>
+  <div class="card">
+    <div class="ch"><span class="ct">Cron 定时任务</span></div>
+    <div class="tw" id="tk-cron"><div class="loading"><span class="spin">⟳</span></div></div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+let _pnlChart=null,_eqChart=null,_histMode='futures';
+const _loaded={}; // 记录哪些页面已首次加载过
+
+const $ = id => document.getElementById(id);
+// ─── Chat ───
+let _chatSince=0, _chatTimer=null, _chatSending=false, _chatUnread=0;
+
+function chatInit(){
+  chatLoadHistory();
+  // 每2秒轮询新消息
+  if(_chatTimer) clearInterval(_chatTimer);
+  _chatTimer=setInterval(chatPoll,2000);
+}
+
+async function chatLoadHistory(){
+  try{
+    const msgs=await AF('/api/chat/history');
+    const el=$('chat-msgs');
+    el.innerHTML='';
+    msgs.forEach(m=>chatAppend(m,false));
+    if(msgs.length){ _chatSince=msgs[msgs.length-1].ts; chatScrollBottom(); }
+  }catch(e){}
+}
+
+async function chatPoll(){
+  try{
+    const msgs=await AF('/api/chat/history?since='+_chatSince);
+    if(!msgs.length) return;
+    const isChat=$('page-chat').classList.contains('active');
+    msgs.forEach(m=>{
+      // 只显示 AI 回复（用户自己发的已经显示过）
+      if(m.role==='assistant') chatAppend(m,true);
+      if(m.ts>_chatSince) _chatSince=m.ts;
+    });
+    // 未读提示
+    const newAI=msgs.filter(m=>m.role==='assistant');
+    if(newAI.length && !isChat){
+      _chatUnread+=newAI.length;
+      const ud=$('chat-unread');
+      ud.textContent=_chatUnread;
+      ud.style.display='inline-block';
+    }
+  }catch(e){}
+}
+
+function chatAppend(m, scroll){
+  const el=$('chat-msgs');
+  const isUser=m.role==='user';
+  const t=new Date(m.ts).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+  const div=document.createElement('div');
+  div.style.cssText=`display:flex;flex-direction:column;align-items:${isUser?'flex-end':'flex-start'};gap:3px`;
+  // 渲染 markdown 样式：代码块和简单加粗
+  let html=m.text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/`([^`]+)`/g,'<code style="background:rgba(0,0,0,.06);padding:1px 5px;border-radius:3px;font-size:12px">$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
+    .replace(/\n/g,'<br>');
+  div.innerHTML=`
+    <div style="max-width:78%;padding:10px 14px;border-radius:${isUser?'16px 16px 4px 16px':'16px 16px 16px 4px'};
+      background:${isUser?'var(--blue)':'var(--card2)'};
+      color:${isUser?'#fff':'var(--text)'};
+      border:${isUser?'none':'1px solid var(--border)'};
+      font-size:14px;line-height:1.6;word-break:break-word">${html}</div>
+    <div style="font-size:10px;color:var(--sub2);padding:0 4px">${t}</div>`;
+  el.appendChild(div);
+  if(scroll) chatScrollBottom();
+}
+
+function chatScrollBottom(){
+  const el=$('chat-msgs');
+  el.scrollTop=el.scrollHeight;
+}
+
+async function chatSend(){
+  const inp=$('chat-input');
+  const text=inp.value.trim();
+  if(!text||_chatSending) return;
+  _chatSending=true;
+  const btn=$('chat-send-btn');
+  btn.disabled=true; btn.textContent='发送中…';
+  // 先本地显示用户消息
+  const ts=Date.now();
+  chatAppend({role:'user',text,ts},true);
+  inp.value=''; inp.style.height='48px';
+  try{
+    await fetch('/api/chat/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text})});
+    _chatSince=ts;
+  }catch(e){
+    chatAppend({role:'assistant',text:'发送失败: '+e.message,ts:Date.now()},true);
+  }
+  btn.disabled=false; btn.textContent='发送';
+  _chatSending=false;
+}
+
+function chatKey(e){
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();chatSend();}
+}
+
+function G(p){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  $('page-'+p).classList.add('active');
+  $('n-'+p).classList.add('active');
+  // 进入聊天页清除未读
+  if(p==='chat'){
+    _chatUnread=0;
+    $('chat-unread').style.display='none';
+    chatScrollBottom();
+  }
+  // 数据页：首次进入自动加载一次，之后不自动刷新
+  if(!_loaded[p]){
+    _loaded[p]=true;
+    if(p==='overview')  loadOV();
+    if(p==='futures')   loadFT();
+    if(p==='ct')        loadCT();
+    if(p==='watchlist') loadWL();
+    if(p==='history')   SH(_histMode);
+    if(p==='missions')  loadMS();
+    if(p==='tasks')     loadTK();
+    if(p==='chat')      chatInit();
+  }
+}
+
+async function AF(path){
+  const r=await fetch(path);
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  return r.json();
+}
+
+const F=(n,d=2)=>(+n).toFixed(d);
+const FK=n=>{n=+n;if(Math.abs(n)>=1e6)return(n/1e6).toFixed(1)+'M';if(Math.abs(n)>=1e3)return(n/1e3).toFixed(1)+'K';return n.toFixed(2)};
+const PC=v=>+v>0?'green':+v<0?'red':'';
+const PS=v=>+v>0?'+':'';
+const NOW=()=>new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+function snapShow(pfx){
+  const lb=$(pfx+'-loadbtn');
+  if(lb) lb.style.display='none';
+  const bd=$(pfx+'-body');
+  if(bd) bd.style.display='block';
+  const bar=$(pfx+'-bar');
+  if(bar) bar.style.display='flex';
+  const ts=$(pfx+'-ts');
+  if(ts) ts.textContent='快照时间：'+NOW();
+  $('last-ts').textContent=NOW();
+}
+function setTS(){$('last-ts').textContent=NOW()}
+
+// ─── Overview ───
+async function loadOV(){
+  $('ov-stats').innerHTML='<div class="loading"><span class="spin">⟳</span></div>';
+  snapShow('ov');
+  try{
+    const [ov,pos,eq,wb]=await Promise.all([
+      AF('/api/overview'),AF('/api/futures/positions'),AF('/api/ct/equity'),AF('/api/wallet/balance')
+    ]);
+    $('ov-ts').textContent='快照时间：'+new Date(ov.ts).toLocaleTimeString('zh-CN');
+    const fp=+ov.futures_pnl;
+    $('ov-stats').innerHTML=`
+      <div class="sc"><div class="sc-lbl">💰 合约保证金余额</div>
+        <div class="sc-val">${F(ov.futures_balance)}<span style="font-size:13px;color:var(--sub);font-weight:400"> U</span></div>
+        <div class="sc-sub">可用 ${F(ov.futures_avail)} USDT</div></div>
+      <div class="sc"><div class="sc-lbl">📈 合约浮盈亏</div>
+        <div class="sc-val ${PC(fp)}">${PS(fp)}${F(fp)}<span style="font-size:13px;font-weight:400"> U</span></div>
+        <div class="sc-sub">${ov.futures_positions} 个持仓</div></div>
+      <div class="sc"><div class="sc-lbl">🧠 BSC 跟单</div>
+        <div class="sc-val blue">${ov.ct_positions}</div>
+        <div class="sc-sub">今日买入 ${ov.ct_trades_today} 笔 · 投入 ${F(ov.ct_invested)} U</div></div>
+      <div class="sc"><div class="sc-lbl">👛 钱包 USDT</div>
+        <div class="sc-val">${F(ov.wallet_usdt)}</div>
+        <div class="sc-sub">BNB ≈ $${F(ov.wallet_bnb_usd,1)}</div></div>`;
+
+    // 持仓快照
+    const pp=$('ov-pos');
+    if(!pos.length) pp.innerHTML='<div class="empty">暂无持仓</div>';
+    else pp.innerHTML=`<table><thead><tr><th>合约</th><th>方向</th><th>名义(标记价)</th><th>标记价</th><th>浮盈</th><th>盈亏%</th></tr></thead><tbody>
+      ${pos.slice(0,5).map(p=>`<tr>
+        <td><b>${p.symbol}</b></td>
+        <td><span class="tag ${p.side==='LONG'?'tl':'ts'}">${p.side}</span></td>
+        <td>${F(p.notional)} U</td><td>${p.mark}</td>
+        <td class="${PC(p.pnl)}" style="font-weight:600">${PS(p.pnl)}${F(p.pnl)}</td>
+        <td class="${PC(p.pnl_pct)}" style="font-weight:600">${PS(p.pnl_pct)}${F(p.pnl_pct)}%</td>
+      </tr>`).join('')}</tbody></table>`;
+
+    // 钱包资产
+    const ww=$('ov-wallet');
+    const items=Array.isArray(wb)?wb:(wb.data||[]);
+    const filtered=items.filter(i=>parseFloat(i.value||0)>0.01);
+    if(!filtered.length) ww.innerHTML='<div class="empty">钱包暂无资产</div>';
+    else ww.innerHTML=`<table><thead><tr><th>代币</th><th>余额</th><th>单价 (USD)</th><th>价值 (USD)</th></tr></thead><tbody>
+      ${filtered.map(i=>`<tr>
+        <td><b>${i.symbol}</b></td>
+        <td class="mono">${parseFloat(i.balance).toFixed(4)}</td>
+        <td class="mono">${parseFloat(i.price||0).toFixed(4)}</td>
+        <td style="font-weight:600">$${F(i.value||0)}</td>
+      </tr>`).join('')}</tbody></table>`;
+
+    renderBarChart(pos.map(p=>({label:p.symbol,value:p.pnl})));
+    if(eq.length) renderLineChart(eq);
+    else $('cw-eq').innerHTML='<div class="empty" style="padding:20px">暂无资金曲线</div>';
+  }catch(e){$('ov-stats').innerHTML=`<div class="empty">加载失败: ${e.message}</div>`}
+}
+
+function renderBarChart(data){
+  if(_pnlChart){_pnlChart.destroy();_pnlChart=null}
+  if(!data.length){
+    $('cw-pnl').innerHTML='<div class="empty" style="padding:20px">暂无持仓</div>';
+    return;
+  }
+  // 确保 canvas 存在（可能被之前的 innerHTML 替换掉了）
+  if(!$('ch-pnl')) $('cw-pnl').innerHTML='<canvas id="ch-pnl"></canvas>';
+  const ctx=$('ch-pnl');if(!ctx)return;
+  _pnlChart=new Chart(ctx,{type:'bar',data:{labels:data.map(d=>d.label),datasets:[{data:data.map(d=>d.value),backgroundColor:data.map(d=>+d.value>=0?'rgba(5,150,105,.7)':'rgba(220,38,38,.7)'),borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6b7280',font:{size:10}},grid:{color:'rgba(0,0,0,.04)'}},y:{ticks:{color:'#6b7280',font:{size:10}},grid:{color:'rgba(0,0,0,.05)'}}}}});
+}
+function renderLineChart(eq){
+  if(_eqChart){_eqChart.destroy();_eqChart=null}
+  if(!$('ch-eq')) $('cw-eq').innerHTML='<canvas id="ch-eq"></canvas>';
+  const ctx=$('ch-eq');if(!ctx)return;
+  _eqChart=new Chart(ctx,{type:'line',data:{labels:eq.map(e=>e.date||''),datasets:[{data:eq.map(e=>e.end_usdt||0),borderColor:'#059669',backgroundColor:'rgba(5,150,105,.06)',fill:true,tension:.35,pointRadius:3,pointBackgroundColor:'#059669'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6b7280',font:{size:10}},grid:{color:'rgba(0,0,0,.04)'}},y:{ticks:{color:'#6b7280',font:{size:10}},grid:{color:'rgba(0,0,0,.05)'}}}}});
+}
+
+// ─── Futures ───
+async function loadFT(){
+  $('ft-stats').innerHTML='<div class="loading"><span class="spin">⟳</span></div>';
+  snapShow('ft');
+  try{
+    const [ov,pos,ords]=await Promise.all([AF('/api/futures/overview'),AF('/api/futures/positions'),AF('/api/futures/orders')]);
+    const fp=+ov.pnl;
+    $('ft-stats').innerHTML=`
+      <div class="sc"><div class="sc-lbl">💰 保证金余额</div>
+        <div class="sc-val">${F(ov.wallet)}<span style="font-size:13px;color:var(--sub);font-weight:400"> U</span></div>
+        <div class="sc-sub">可用 ${F(ov.avail)} U</div></div>
+      <div class="sc"><div class="sc-lbl">📈 总浮盈亏</div>
+        <div class="sc-val ${PC(fp)}" style="font-weight:700">${PS(fp)}${F(fp)} U</div>
+        <div class="sc-sub">${ov.pos_cnt} 个持仓</div></div>
+      <div class="sc"><div class="sc-lbl">📋 活跃挂单</div>
+        <div class="sc-val blue">${ov.ord_cnt}</div>
+        <div class="sc-sub">当前全部挂单</div></div>`;
+
+    if(!pos.length) $('ft-pos').innerHTML='<div class="empty">暂无持仓</div>';
+    else $('ft-pos').innerHTML=`<table><thead><tr><th>合约</th><th>方向</th><th>数量</th><th>开仓价</th><th>标记价</th><th>名义(标记)</th><th>浮盈</th><th>盈亏%</th></tr></thead><tbody>
+      ${pos.map(p=>`<tr>
+        <td><b>${p.symbol}</b></td>
+        <td><span class="tag ${p.side==='LONG'?'tl':'ts'}">${p.side}</span></td>
+        <td>${p.amount}</td><td class="mono">${p.entry}</td><td class="mono">${p.mark}</td>
+        <td>${F(p.notional)} U</td>
+        <td class="${PC(p.pnl)}" style="font-weight:600">${PS(p.pnl)}${F(p.pnl)}</td>
+        <td class="${PC(p.pnl_pct)}" style="font-weight:600">${PS(p.pnl_pct)}${F(p.pnl_pct)}%</td>
+      </tr>`).join('')}</tbody></table>`;
+
+    // 挂单 + 显示数量提示
+    $('ft-ord-note').textContent=ords.length?`共 ${ords.length} 条`:'';
+    if(!ords.length) $('ft-ord').innerHTML='<div class="empty">暂无挂单</div>';
+    else $('ft-ord').innerHTML=`<table><thead><tr><th>合约</th><th>方向</th><th>类型</th><th>挂单价</th><th>触发价</th><th>数量</th><th>下单时间</th></tr></thead><tbody>
+      ${ords.map(o=>`<tr>
+        <td><b>${o.symbol}</b></td>
+        <td><span class="tag ${o.side==='BUY'?'tl':'ts'}">${o.side}</span></td>
+        <td><code>${o.type}</code></td>
+        <td class="mono">${o.price>0?o.price:'—'}</td>
+        <td class="mono">${o.stop>0?o.stop:'—'}</td>
+        <td>${o.qty}</td><td style="color:var(--sub)">${o.time}</td>
+      </tr>`).join('')}</tbody></table>`;
+  }catch(e){$('ft-stats').innerHTML=`<div class="empty">加载失败: ${e.message}</div>`}
+}
+
+// ─── Scanner ───
+async function loadSC(){
+  $('sc-content').innerHTML='<div class="loading"><span class="spin">⟳</span> 扫描中，约 5 秒…</div>';
+  try{
+    const data=await AF('/api/futures/scanner');
+    setTS();
+    if(!data.length){$('sc-content').innerHTML='<div class="empty">暂无信号</div>';return}
+    $('sc-content').innerHTML=`<div style="font-size:12px;color:var(--sub);margin-bottom:14px">扫描完成：${NOW()}，${data.length} 个信号</div>
+    <div class="sgrid">${data.map(s=>{
+      const isL=s.direction==='LONG',clr=s.score>=60?'var(--green)':s.score>=40?'var(--yellow)':'var(--sub2)';
+      return`<div class="scard">
+        <div class="st"><span class="ssym">${s.symbol.replace('USDT','')}<span style="color:var(--sub2);font-size:11px">/USDT</span></span><span class="sscore ${isL?'green':'red'}">${s.score}</span></div>
+        <div><span class="tag ${isL?'tl':'ts'}">${s.direction}</span></div>
+        <div class="sr"><span>当前价</span><span class="sv">${s.price}</span></div>
+        <div class="sr"><span>24h 涨跌</span><span class="sv ${PC(s.chg24)}">${PS(s.chg24)}${s.chg24}%</span></div>
+        <div class="sr"><span>24h 成交</span><span class="sv">${FK(s.vol24m*1e6)}</span></div>
+        <div class="sr"><span>资金费率</span><span class="sv ${PC(s.fr)}">${s.fr}%</span></div>
+        <div class="sbar"><div class="sfill" style="width:${Math.min(100,s.score)}%;background:${clr}"></div></div>
+      </div>`;
+    }).join('')}</div>`;
+  }catch(e){$('sc-content').innerHTML=`<div class="empty">扫描失败: ${e.message}</div>`}
+}
+
+// ─── CT ───
+async function loadCT(){
+  $('ct-stats').innerHTML='<div class="loading"><span class="spin">⟳</span></div>';
+  snapShow('ct');
+  try{
+    const [ov,pos]=await Promise.all([AF('/api/ct/overview'),AF('/api/ct/positions')]);
+    $('fbanner').style.display=ov.fused?'flex':'none';
+    const wr=ov.wins+ov.losses>0?((ov.wins/(ov.wins+ov.losses))*100).toFixed(0):'—';
+    $('ct-stats').innerHTML=`
+      <div class="sc"><div class="sc-lbl">📦 当前持仓</div>
+        <div class="sc-val blue">${ov.open}</div><div class="sc-sub">最多 5 个</div></div>
+      <div class="sc"><div class="sc-lbl">🛒 今日买入</div>
+        <div class="sc-val yellow">${ov.buys_today}</div><div class="sc-sub">笔</div></div>
+      <div class="sc"><div class="sc-lbl">🏆 今日胜 / 负</div>
+        <div class="sc-val"><span class="green">${ov.wins}</span><span style="color:var(--sub2);margin:0 4px;font-size:16px">/</span><span class="red">${ov.losses}</span></div>
+        <div class="sc-sub">胜率 ${wr}%</div></div>
+      <div class="sc"><div class="sc-lbl">🔥 熔断状态</div>
+        <div class="sc-val"><span class="tag ${ov.fused?'tfuse':'ton'}">${ov.fused?'熔断中':'正常'}</span></div>
+        <div class="sc-sub">${ov.equity_days} 天资金记录</div></div>`;
+
+    if(!Array.isArray(pos)||!pos.length){$('ct-pos').innerHTML='<div class="empty">暂无持仓</div>';return}
+    $('ct-pos').innerHTML=`<table><thead><tr><th>代币</th><th>持有</th><th>投入</th><th>买入价</th><th>止损</th><th>移动止损</th><th>保本</th><th>触发地址</th><th>链接</th></tr></thead><tbody>
+      ${pos.map(p=>{
+        const bt=(p.buyers||[]).map(b=>`<span class="btag">${typeof b==='string'?b:(b.label||b.addr||'?')}</span>`).join('');
+        return`<tr>
+          <td><b>$${p.symbol}</b></td>
+          <td>${p.held_h}h</td>
+          <td>${F(p.buy_usd)} U</td>
+          <td class="mono">${p.buy_price.toFixed(8)}</td>
+          <td class="red mono">${p.sl.toFixed(8)}</td>
+          <td class="mono" style="color:var(--sub)">${p.trail_sl>0?p.trail_sl.toFixed(8):'—'}</td>
+          <td>${p.tp1_done?'<span class="tag ton">✅ 已保本</span>':'<span class="tag toff">未触发</span>'}</td>
+          <td><div class="btags">${bt||'—'}</div></td>
+          <td><a class="alink" href="${p.dex_url}" target="_blank">DEX ↗</a></td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+  }catch(e){$('ct-stats').innerHTML=`<div class="empty">加载失败: ${e.message}</div>`}
+}
+
+// ─── Watchlist ───
+async function loadWL(){
+  try{
+    const data=await AF('/api/ct/watchlist');
+    $('wl-cnt').textContent=`监控地址库（${data.length} 个）`;
+    $('wl-table').innerHTML=`<table><thead><tr><th>#</th><th>标签</th><th>评分</th><th>等级</th><th>链上地址</th></tr></thead><tbody>
+      ${data.map((a,i)=>`<tr>
+        <td style="color:var(--sub2)">${i+1}</td>
+        <td><b>${a.label}</b></td>
+        <td style="font-weight:700;color:var(--yellow)">${a.score}</td>
+        <td><span class="tag ${({TOP:'ttop',MID:'tmid',LOW:'tlow'}[a.tier]||'tlow')}">${a.tier}</span></td>
+        <td><a class="alink" href="https://bscscan.com/address/${a.addr}" target="_blank">${a.addr.slice(0,10)}…${a.addr.slice(-6)}</a></td>
+      </tr>`).join('')}</tbody></table>`;
+  }catch(e){$('wl-table').innerHTML=`<div class="empty">加载失败: ${e.message}</div>`}
+}
+
+// ─── History ───
+function SH(m){
+  _histMode=m;
+  $('ht-ft').className='btn btn-out'+(m==='futures'?' sel':'');
+  $('ht-ct').className='btn btn-out'+(m==='ct'?' sel':'');
+  loadHist(m);
+}
+async function loadHist(m){
+  $('hist-body').innerHTML='<div class="loading"><span class="spin">⟳</span></div>';
+  try{
+    if(m==='futures'){
+      $('hist-title').textContent='合约操作历史';
+      const data=await AF('/api/futures/history');
+      if(!data.length){$('hist-body').innerHTML='<div class="empty">暂无记录</div>';return}
+      $('hist-body').innerHTML=`<table><thead><tr><th>时间</th><th>类型</th><th>合约</th><th>操作</th><th>金额</th></tr></thead><tbody>
+        ${data.slice(0,80).map(r=>{
+          const ts=r.ts||r.time||0,t=ts>1e12?new Date(ts):new Date(ts*1000);
+          return`<tr><td style="color:var(--sub)">${t.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</td><td>${r.action||r.type||'—'}</td><td><b>${r.symbol||r.token||'—'}</b></td><td>${r.side||r.direction||'—'}</td><td>${r.amount||r.qty||r.notional||'—'}</td></tr>`;
+        }).join('')}</tbody></table>`;
+    }else{
+      $('hist-title').textContent='BSC 跟单历史';
+      const data=await AF('/api/ct/history');
+      if(!data.length){$('hist-body').innerHTML='<div class="empty">暂无记录</div>';return}
+      $('hist-body').innerHTML=`<table><thead><tr><th>时间</th><th>动作</th><th>代币</th><th>盈亏%</th><th>备注</th></tr></thead><tbody>
+        ${data.slice(0,100).map(r=>{
+          const t=new Date(r.ts||0),pnl=r.pnl_pct;
+          const isFail=r.action==='BUY_FAIL';
+          // BUY_FAIL 提取错误摘要
+          const note=isFail?(r.error||'').replace(/\n/g,' ').slice(0,60)+'…':(r.reason||'');
+          return`<tr style="${isFail?'background:var(--red-bg)':''}">
+            <td style="color:var(--sub)">${t.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+            <td><code style="${isFail?'background:var(--red-bg);color:var(--red)':''}">${r.action||'—'}</code></td>
+            <td><b>${r.token||r.symbol||'—'}</b></td>
+            <td class="${PC(pnl)}" style="font-weight:600">${pnl!=null?(PS(pnl)+F(pnl,1)+'%'):'—'}</td>
+            <td style="font-size:11px;color:${isFail?'var(--red)':'var(--sub)'}">${note}</td>
+          </tr>`;
+        }).join('')}</tbody></table>`;
+    }
+  }catch(e){$('hist-body').innerHTML=`<div class="empty">加载失败: ${e.message}</div>`}
+}
+
+// ─── Missions ───
+async function loadMS(){
+  $('ms-cards').innerHTML='<div class="loading"><span class="spin">⟳</span></div>';
+  try{
+    const tasks=await AF('/api/tasks/manual');
+    if(!tasks.length){$('ms-cards').innerHTML='<div class="empty">暂无任务</div>';return}
+    $('ms-cards').innerHTML=`<div class="tgrid">${tasks.map(t=>{
+      const stag=t.status==='done'?'<span class="tag ton">✅ 已完成</span>':
+                  t.status==='active'?'<span class="tag tl">🟢 进行中</span>':
+                  '<span class="tag twait">⏳ 等待中</span>';
+      const subs=(t.subtasks||[]).map(s=>`<div class="trow">
+        <div class="tcheck ${s.done?'done':'pend'}">${s.done?'✓':'·'}</div>
+        <div><div>${s.name}</div>${s.detail?`<div class="tdetail">${s.detail}</div>`:''}</div>
+      </div>`).join('');
+      return`<div class="tcard">
+        <div class="thead2"><div><div class="tname">${t.name}</div><div class="tsub">${t.status_text||''}</div></div>${stag}</div>
+        ${subs?`<div class="tlist">${subs}</div>`:''}
+        ${t.note?`<div class="tnote">📌 ${t.note}</div>`:''}
+      </div>`;
+    }).join('')}</div>`;
+    setTS();
+  }catch(e){$('ms-cards').innerHTML=`<div class="empty">加载失败: ${e.message}</div>`}
+}
+
+// ─── Tasks ───
+async function loadTK(){
+  try{
+    const [procs,crons]=await Promise.all([AF('/api/tasks/processes'),AF('/api/tasks/cron')]);
+    const allOk=Array.isArray(procs)&&procs.every(p=>p.running);
+    $('sys-dot').className='sys-dot'+(allOk?'':' off');
+    $('tk-procs').innerHTML=(Array.isArray(procs)?procs:[]).map(p=>`<div class="pcard">
+      <div class="phead"><span class="pname">${p.name}</span><span class="tag ${p.running?'ton':'toff'}">${p.running?'🟢 运行中':'🔴 停止'}</span></div>
+      ${p.pids&&p.pids.length?`<div style="font-size:11px;color:var(--sub2);margin-bottom:2px">PID: ${p.pids.join(', ')}</div>`:''}
+      ${p.last_log?`<div class="plog">${p.last_log}</div>`:''}
+    </div>`).join('');
+    const jobs=Array.isArray(crons)?crons:(crons&&crons.jobs?crons.jobs:[]);
+    $('tk-cron').innerHTML=!jobs.length?'<div class="empty">暂无 Cron 任务</div>':
+      `<table><thead><tr><th>名称</th><th>执行频率</th><th>状态</th><th>类型</th></tr></thead><tbody>
+      ${jobs.map(j=>`<tr>
+        <td><b>${j.name||j.id||'—'}</b></td>
+        <td style="font-size:12px;color:var(--sub);font-family:monospace">${j.freq||j.every||'—'}</td>
+        <td><span class="tag ${j.enabled===false?'toff':'ton'}">${j.enabled===false?'禁用':'启用'}</span></td>
+        <td style="font-size:11px;color:var(--sub2)">${j.deleteAfterRun?'⚡ 一次性':'循环'}</td>
+      </tr>`).join('')}</tbody></table>`;
+    setTS();
+  }catch(e){$('tk-procs').innerHTML=`<div class="empty">加载失败: ${e.message}</div>`}
+}
+
+// 初始化：首页自动加载总览（当前活跃页面）
+G('overview');
+</script>
+</body>
+</html>

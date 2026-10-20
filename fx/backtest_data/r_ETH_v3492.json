@@ -1,0 +1,82 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-09-12 02:15",
+      "close_ts": "2026-09-12 17:50",
+      "symbol": "ETHUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 2513.11,
+      "exit_price": 2524.93,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.2703,
+      "hold_min": 935.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-09-18 21:45",
+      "close_ts": "2026-09-19 05:45",
+      "symbol": "ETHUSDT",
+      "direction": "short",
+      "mode": "reversal",
+      "entry_price": 2625.85,
+      "exit_price": 2625.7,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -0.1943,
+      "hold_min": 480.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-09-19 01:45",
+      "close_ts": "2026-09-19 09:45",
+      "symbol": "ETHUSDT",
+      "direction": "short",
+      "mode": "reversal",
+      "entry_price": 2612.0,
+      "exit_price": 2635.18,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -1.0874,
+      "hold_min": 480.0,
+      "signal_score": 65
+    }
+  ],
+  "stats": {
+    "symbol": "ETHUSDT",
+    "days": 60,
+    "total_trades": 3,
+    "win_trades": 1,
+    "loss_trades": 2,
+    "win_rate_pct": 33.3,
+    "total_pnl_u": -1.01,
+    "total_win_u": 0.27,
+    "total_loss_u": -1.28,
+    "profit_factor": 0.21,
+    "max_drawdown_u": 1.28,
+    "max_single_loss": -1.09,
+    "avg_hold_min": 631.7,
+    "by_mode": {
+      "pullback": {
+        "n": 1,
+        "win": 1,
+        "pnl": 0.27,
+        "win_rate": 100.0
+      },
+      "reversal": {
+        "n": 2,
+        "win": 0,
+        "pnl": -1.28,
+        "win_rate": 0.0
+      }
+    },
+    "funnel": {
+      "judge_pass": 16,
+      "filter_bear_reversal": 0,
+      "filter_settle_win": 2,
+      "filter_cooldown": 6,
+      "filter_same_dir": 0,
+      "filter_calc_sl": 0,
+      "filter_score": 5,
+      "opened": 3
+    }
+  }
+}

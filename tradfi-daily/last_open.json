@@ -1,0 +1,37 @@
+{
+  "timestamp": "2026-08-27T12:52:16Z",
+  "results": [
+    {
+      "sym": "SNDKUSDT",
+      "ticker": "SNDK",
+      "entry_oid": 6779579711,
+      "qty": 1.34,
+      "sl_algo": 1000002530534323,
+      "tp1_algo": 1000002530534345,
+      "tp2_algo": 1000002530534364,
+      "entry": 1558.89,
+      "sl": 1549.07,
+      "tp1": 1583.66,
+      "tp2": 1600.18,
+      "notional": 700,
+      "leverage": 3,
+      "rr": 2.5
+    },
+    {
+      "sym": "SNXXUSDT",
+      "ticker": "SNXX",
+      "entry_oid": 1037306374,
+      "qty": 105.9,
+      "sl_algo": 1000002530534434,
+      "tp1_algo": 1000002530534446,
+      "tp2_algo": 1000002530534461,
+      "entry": 14.16,
+      "sl": 14.01,
+      "tp1": 14.6,
+      "tp2": 14.89,
+      "notional": 500,
+      "leverage": 3,
+      "rr": 2.9
+    }
+  ]
+}

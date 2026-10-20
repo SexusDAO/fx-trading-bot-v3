@@ -1,0 +1,76 @@
+{
+  "trades": [
+    {
+      "direction": "LONG",
+      "entry": 1870.630125,
+      "exit": 1924.7,
+      "pnl": 102.91164588189243,
+      "reason": "TP",
+      "close_time": 1784120400000,
+      "second_score": 87,
+      "position_size_usd": 600,
+      "tp_source": "unknown"
+    },
+    {
+      "direction": "SHORT",
+      "entry": 1838.0222,
+      "exit": 1842.88,
+      "pnl": -8.00235165821166,
+      "reason": "SL",
+      "close_time": 1784307600000,
+      "second_score": 70,
+      "position_size_usd": 250,
+      "tp_source": "unknown"
+    },
+    {
+      "direction": "SHORT",
+      "entry": 1844.7163,
+      "exit": 1856.7,
+      "pnl": -20.38492314509267,
+      "reason": "SL",
+      "close_time": 1784397600000,
+      "second_score": 77,
+      "position_size_usd": 400,
+      "tp_source": "unknown"
+    },
+    {
+      "direction": "SHORT",
+      "entry": 1890.51925,
+      "exit": 1913.75,
+      "pnl": -27.18750417378706,
+      "reason": "SL",
+      "close_time": 1785078000000,
+      "second_score": 83,
+      "position_size_usd": 400,
+      "tp_source": "unknown"
+    }
+  ],
+  "position_size_stats": {
+    "250U": 1,
+    "400U": 3,
+    "600U": 1,
+    "800U": 0,
+    "1000U": 0
+  },
+  "tp_source_stats": {
+    "liq_zone": 0,
+    "structure": 0,
+    "rr_fallback": 0
+  },
+  "logs": [
+    "📋 挂单 LONG | 打分=87 仓位=$600 | 入场=1870.63 SL=1854.94 TP=1934.80 (tp_source=unknown)",
+    "✅ 成交 LONG @ 1870.63 | 仓位=$600×5",
+    "✅ 平仓 TP @ 1924.70 | PnL=$102.91",
+    "📋 挂单 SHORT | 打分=70 仓位=$250 | 入场=1838.02 SL=1849.79 TP=1808.61 (tp_source=unknown)",
+    "✅ 成交 SHORT @ 1838.02 | 仓位=$250×5",
+    "❌ 平仓 SL @ 1842.88 | PnL=$-8.00",
+    "📋 挂单 SHORT | 打分=77 仓位=$400 | 入场=1846.66 SL=1863.60 TP=1804.31 (tp_source=unknown)",
+    "📋 挂单 SHORT | 打分=77 仓位=$400 | 入场=1844.72 SL=1863.52 TP=1797.71 (tp_source=unknown)",
+    "✅ 成交 SHORT @ 1844.72 | 仓位=$400×5",
+    "❌ 平仓 SL @ 1856.70 | PnL=$-20.38",
+    "📋 挂单 SHORT | 打分=83 仓位=$400 | 入场=1890.52 SL=1916.22 TP=1826.27 (tp_source=unknown)",
+    "✅ 成交 SHORT @ 1890.52 | 仓位=$400×5",
+    "❌ 平仓 SL @ 1913.75 | PnL=$-27.19",
+    "⚠️ 跳过：二次分64 < 70"
+  ]
+}

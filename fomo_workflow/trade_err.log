@@ -1,0 +1,262 @@
+[WS-PAIR] 连接断开: received 1000 (OK) You have reached your plan limit of 2 web socket connections. Upgrade your plan now for higher limits.; then sent 1000 (OK) You have reached your plan limit of 2 web socket connections. Upgrade your plan now for higher limits.
+[WS-PAIR] 断线次数 1/3（窗口 60s）
+[WS-PAIR] 连接断开: received 1000 (OK) You have reached your plan limit of 2 web socket connections. Upgrade your plan now for higher limits.; then sent 1000 (OK) You have reached your plan limit of 2 web socket connections. Upgrade your plan now for higher limits.
+[WS-PAIR] 断线次数 2/3（窗口 60s）
+[WS-PAIR] 连接断开: received 1000 (OK) You have reached your plan limit of 2 web socket connections. Upgrade your plan now for higher limits.; then sent 1000 (OK) You have reached your plan limit of 2 web socket connections. Upgrade your plan now for higher limits.
+[WS-PAIR] 断线次数 3/3（窗口 60s）
+[WS-PAIR] ❗ 超过限速阈值，启动降级模式
+[WS-PAIR] 🔴 已降级到 DexScreener 轮询模式
+[Twitter] Clawby x_search 异常: SOCKSHTTPSConnectionPool(host='api.openclawby.com', port=443): Read timed out. (read timeout=15)
+[Twitter] Clawby x_search 异常: SOCKSHTTPSConnectionPool(host='api.openclawby.com', port=443): Read timed out. (read timeout=15)
+[Twitter] Clawby x_search 异常: SOCKSHTTPSConnectionPool(host='api.openclawby.com', port=443): Read timed out. (read timeout=15)
+[Twitter] Clawby x_search 异常: SOCKSHTTPSConnectionPool(host='api.openclawby.com', port=443): Read timed out. (read timeout=15)
+[Twitter] Clawby x_search 异常: SOCKSHTTPSConnectionPool(host='api.openclawby.com', port=443): Read timed out. (read timeout=15)
+[Twitter] Clawby x_search 异常: SOCKSHTTPSConnectionPool(host='api.openclawby.com', port=443): Read timed out. (read timeout=15)
+Traceback (most recent call last):
+  File "/root/.openclaw/workspace/fomo_workflow/ws_monitor.py", line 208, in <module>
+    _log(f"[INIT] 鲸鱼黑名单加载: {len(_WHALE_BLACKLIST)} 个接盘地址")
+    ^^^^
+NameError: name '_log' is not defined
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/root/.openclaw/workspace/fomo_workflow/main.py", line 80, in <module>
+    cmd_start()
+  File "/root/.openclaw/workspace/fomo_workflow/main.py", line 40, in cmd_start
+    from ws_monitor import main
+  File "/root/.openclaw/workspace/fomo_workflow/ws_monitor.py", line 210, in <module>
+    _log(f"[INIT] 鲸鱼黑名单加载失败: {_e_bl}")
+    ^^^^
+NameError: name '_log' is not defined
+Traceback (most recent call last):
+  File "/root/.openclaw/workspace/fomo_workflow/ws_monitor.py", line 208, in <module>
+    _log(f"[INIT] 鲸鱼黑名单加载: {len(_WHALE_BLACKLIST)} 个接盘地址")
+    ^^^^
+NameError: name '_log' is not defined
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/root/.openclaw/workspace/fomo_workflow/main.py", line 80, in <module>
+    cmd_start()
+  File "/root/.openclaw/workspace/fomo_workflow/main.py", line 40, in cmd_start
+    from ws_monitor import main
+  File "/root/.openclaw/workspace/fomo_workflow/ws_monitor.py", line 210, in <module>
+    _log(f"[INIT] 鲸鱼黑名单加载失败: {_e_bl}")
+    ^^^^
+NameError: name '_log' is not defined
+Traceback (most recent call last):
+  File "/root/.openclaw/workspace/fomo_workflow/ws_monitor.py", line 208, in <module>
+    _log(f"[INIT] 鲸鱼黑名单加载: {len(_WHALE_BLACKLIST)} 个接盘地址")
+    ^^^^
+NameError: name '_log' is not defined
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/root/.openclaw/workspace/fomo_workflow/main.py", line 80, in <module>
+    cmd_start()
+  File "/root/.openclaw/workspace/fomo_workflow/main.py", line 40, in cmd_start
+    from ws_monitor import main
+  File "/root/.openclaw/workspace/fomo_workflow/ws_monitor.py", line 210, in <module>
+    _log(f"[INIT] 鲸鱼黑名单加载失败: {_e_bl}")
+    ^^^^
+NameError: name '_log' is not defined
+Traceback (most recent call last):
+  File "/root/.openclaw/workspace/fomo_workflow/ws_monitor.py", line 208, in <module>
+    _log(f"[INIT] 鲸鱼黑名单加载: {len(_WHALE_BLACKLIST)} 个接盘地址")
+    ^^^^
+NameError: name '_log' is not defined
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/root/.openclaw/workspace/fomo_workflow/main.py", line 80, in <module>
+    cmd_start()
+  File "/root/.openclaw/workspace/fomo_workflow/main.py", line 40, in cmd_start
+    from ws_monitor import main
+  File "/root/.openclaw/workspace/fomo_workflow/ws_monitor.py", line 210, in <module>
+    _log(f"[INIT] 鲸鱼黑名单加载失败: {_e_bl}")
+    ^^^^
+NameError: name '_log' is not defined
+Traceback (most recent call last):
+  File "/root/.openclaw/workspace/fomo_workflow/ws_monitor.py", line 208, in <module>
+    _log(f"[INIT] 鲸鱼黑名单加载: {len(_WHALE_BLACKLIST)} 个接盘地址")
+    ^^^^
+NameError: name '_log' is not defined
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/root/.openclaw/workspace/fomo_workflow/main.py", line 80, in <module>
+    cmd_start()
+  File "/root/.openclaw/workspace/fomo_workflow/main.py", line 40, in cmd_start
+    from ws_monitor import main
+  File "/root/.openclaw/workspace/fomo_workflow/ws_monitor.py", line 210, in <module>
+    _log(f"[INIT] 鲸鱼黑名单加载失败: {_e_bl}")
+    ^^^^
+NameError: name '_log' is not defined
+Traceback (most recent call last):
+  File "/root/.openclaw/workspace/fomo_workflow/ws_monitor.py", line 208, in <module>
+    _log(f"[INIT] 鲸鱼黑名单加载: {len(_WHALE_BLACKLIST)} 个接盘地址")
+    ^^^^
+NameError: name '_log' is not defined
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/root/.openclaw/workspace/fomo_workflow/main.py", line 80, in <module>
+    cmd_start()
+  File "/root/.openclaw/workspace/fomo_workflow/main.py", line 40, in cmd_start
+    from ws_monitor import main
+  File "/root/.openclaw/workspace/fomo_workflow/ws_monitor.py", line 210, in <module>
+    _log(f"[INIT] 鲸鱼黑名单加载失败: {_e_bl}")
+    ^^^^
+NameError: name '_log' is not defined
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search 异常: SOCKSHTTPSConnectionPool(host='api.openclawby.com', port=443): Max retries exceeded with url: /api/relay (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:992)')))
+[Twitter] Clawby x_search 异常: SOCKSHTTPSConnectionPool(host='api.openclawby.com', port=443): Max retries exceeded with url: /api/relay (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:992)')))
+[Twitter] Clawby x_search 异常: SOCKSHTTPSConnectionPool(host='api.openclawby.com', port=443): Max retries exceeded with url: /api/relay (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:992)')))
+[Twitter] Clawby x_search 异常: SOCKSHTTPSConnectionPool(host='api.openclawby.com', port=443): Max retries exceeded with url: /api/relay (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:992)')))
+[Twitter] Clawby x_search 异常: SOCKSHTTPSConnectionPool(host='api.openclawby.com', port=443): Max retries exceeded with url: /api/relay (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:992)')))
+[Twitter] Clawby x_search 异常: SOCKSHTTPSConnectionPool(host='api.openclawby.com', port=443): Max retries exceeded with url: /api/relay (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:992)')))
+[Twitter] Clawby x_search 异常: SOCKSHTTPSConnectionPool(host='api.openclawby.com', port=443): Max retries exceeded with url: /api/relay (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:992)')))
+[Twitter] Clawby x_search 异常: SOCKSHTTPSConnectionPool(host='api.openclawby.com', port=443): Max retries exceeded with url: /api/relay (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:992)')))
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502
+[Twitter] Clawby x_search HTTP 502 (失败 1/3)
+[Twitter] Clawby x_search HTTP 502 (失败 2/3)
+[Twitter] Clawby x_search HTTP 502 (失败 1/3)
+[Twitter] Clawby x_search HTTP 502 (失败 2/3)
+[Twitter] Clawby x_search HTTP 502 (失败 1/3)
+[Twitter] Clawby x_search HTTP 502 (失败 2/3)
+[Twitter] Clawby x_search 连续失败 3 次，熔断 600s
+[Twitter] Clawby x_search 连续失败 4 次，熔断 600s
+[Twitter] Clawby x_search 连续失败 5 次，熔断 600s
+[Twitter] Clawby x_search 连续失败 6 次，熔断 600s
+[Twitter] Clawby x_search 连续失败 7 次，熔断 600s

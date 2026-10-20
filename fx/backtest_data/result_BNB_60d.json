@@ -1,0 +1,173 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-08-24 12:30",
+      "close_ts": "2026-08-24 13:35",
+      "symbol": "BNBUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 705.99,
+      "exit_price": 698.5244,
+      "close_reason": "tp1_partial",
+      "pnl": 0.4287,
+      "hold_min": 65.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-08-24 12:30",
+      "close_ts": "2026-08-24 14:20",
+      "symbol": "BNBUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 705.99,
+      "exit_price": 705.28401,
+      "close_reason": "sl",
+      "pnl": -0.05,
+      "hold_min": 110.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-08-24 19:00",
+      "close_ts": "2026-08-25 07:50",
+      "symbol": "BNBUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 703.33,
+      "exit_price": 706.73,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.2834,
+      "hold_min": 770.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-09-04 01:30",
+      "close_ts": "2026-09-04 09:35",
+      "symbol": "BNBUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 722.84,
+      "exit_price": 719.4,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.2759,
+      "hold_min": 485.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-09-08 07:00",
+      "close_ts": "2026-09-08 07:35",
+      "symbol": "BNBUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 748.0,
+      "exit_price": 757.25497,
+      "close_reason": "sl",
+      "pnl": -1.4373,
+      "hold_min": 35.0,
+      "signal_score": 60
+    },
+    {
+      "open_ts": "2026-09-16 20:00",
+      "close_ts": "2026-09-16 23:20",
+      "symbol": "BNBUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 719.56,
+      "exit_price": 723.88516,
+      "close_reason": "sl",
+      "pnl": -0.8011,
+      "hold_min": 200.0,
+      "signal_score": 60
+    },
+    {
+      "open_ts": "2026-09-25 12:00",
+      "close_ts": "2026-09-25 20:35",
+      "symbol": "BNBUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 779.74,
+      "exit_price": 776.17,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.2578,
+      "hold_min": 515.0,
+      "signal_score": 60
+    },
+    {
+      "open_ts": "2026-09-28 01:15",
+      "close_ts": "2026-09-28 17:05",
+      "symbol": "BNBUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 774.27,
+      "exit_price": 773.46,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -0.0954,
+      "hold_min": 950.0,
+      "signal_score": 60
+    },
+    {
+      "open_ts": "2026-10-01 18:45",
+      "close_ts": "2026-10-02 02:45",
+      "symbol": "BNBUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 770.83,
+      "exit_price": 773.12,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -0.4971,
+      "hold_min": 480.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-02 14:30",
+      "close_ts": "2026-10-03 13:05",
+      "symbol": "BNBUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 775.93,
+      "exit_price": 773.02,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.175,
+      "hold_min": 1355.0,
+      "signal_score": 60
+    }
+  ],
+  "stats": {
+    "symbol": "BNBUSDT",
+    "days": 60,
+    "total_trades": 10,
+    "win_trades": 5,
+    "loss_trades": 5,
+    "win_rate_pct": 50.0,
+    "total_pnl_u": -1.46,
+    "total_win_u": 1.42,
+    "total_loss_u": -2.88,
+    "profit_factor": 0.49,
+    "max_drawdown_u": 2.57,
+    "max_single_loss": -1.44,
+    "avg_hold_min": 544.4,
+    "by_mode": {
+      "stop_hunt": {
+        "n": 9,
+        "win": 4,
+        "pnl": -1.74,
+        "win_rate": 44.4
+      },
+      "pullback": {
+        "n": 1,
+        "win": 1,
+        "pnl": 0.28,
+        "win_rate": 100.0
+      }
+    },
+    "funnel": {
+      "judge_pass": 28,
+      "filter_bear_reversal": 0,
+      "filter_settle_win": 0,
+      "filter_cooldown": 15,
+      "filter_same_dir": 0,
+      "filter_calc_sl": 0,
+      "filter_score": 4,
+      "opened": 9
+    }
+  }
+}

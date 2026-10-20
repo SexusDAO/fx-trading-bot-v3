@@ -1,0 +1,182 @@
+[
+  {
+    "symbol": "1000PEPEUSDT",
+    "direction": "LONG",
+    "entry": 0.00271865,
+    "exit": 0.0029282,
+    "result": "win",
+    "second_score": 78,
+    "position_size_usd": 400,
+    "scene": "A_pullback",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阳线",
+      "body": 3.4e-05,
+      "lower_shadow_ratio": 0.33,
+      "upper_shadow_ratio": 0.04,
+      "volume_vs_avg3": 1.3,
+      "confirmations": [
+        "阳线收盘",
+        "止跌放量"
+      ],
+      "confirmation_count": 2
+    }
+  },
+  {
+    "symbol": "1000PEPEUSDT",
+    "direction": "LONG",
+    "entry": 0.00285543,
+    "exit": 0.0028154,
+    "result": "loss",
+    "second_score": 86,
+    "position_size_usd": 600,
+    "scene": "A_pullback",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阳线",
+      "body": 2.42e-05,
+      "lower_shadow_ratio": 0.06,
+      "upper_shadow_ratio": 0.31,
+      "volume_vs_avg3": 1.28,
+      "confirmations": [
+        "阳线收盘",
+        "止跌放量"
+      ],
+      "confirmation_count": 2
+    }
+  },
+  {
+    "symbol": "1000PEPEUSDT",
+    "direction": "LONG",
+    "entry": 0.00292745,
+    "exit": 0.0029135,
+    "result": "loss",
+    "second_score": 76,
+    "position_size_usd": 250,
+    "scene": "A_pullback",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阴线",
+      "body": 2.36e-05,
+      "lower_shadow_ratio": 1.69,
+      "upper_shadow_ratio": 0.11,
+      "volume_vs_avg3": 1.1,
+      "confirmations": [
+        "长下影线（锤子形态）"
+      ],
+      "confirmation_count": 1
+    }
+  },
+  {
+    "symbol": "1000PEPEUSDT",
+    "direction": "SHORT",
+    "entry": 0.00283773,
+    "exit": 0.0028301,
+    "result": "loss",
+    "second_score": 72,
+    "position_size_usd": 250,
+    "scene": "E_short",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阳线",
+      "body": 3.46e-05,
+      "lower_shadow_ratio": 0.3,
+      "upper_shadow_ratio": 0.41,
+      "volume_vs_avg3": 1.25,
+      "confirmations": [
+        "见顶放量"
+      ],
+      "confirmation_count": 1
+    }
+  },
+  {
+    "symbol": "1000PEPEUSDT",
+    "direction": "SHORT",
+    "entry": 0.00282735,
+    "exit": 0.0027358,
+    "result": "win",
+    "second_score": 72,
+    "position_size_usd": 250,
+    "scene": "E_short",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阴线",
+      "body": 1.08e-05,
+      "lower_shadow_ratio": 2.04,
+      "upper_shadow_ratio": 0.83,
+      "volume_vs_avg3": 0.87,
+      "confirmations": [
+        "阴线收盘"
+      ],
+      "confirmation_count": 1
+    }
+  },
+  {
+    "symbol": "1000PEPEUSDT",
+    "direction": "LONG",
+    "entry": 0.00275325,
+    "exit": 0.0028752,
+    "result": "win",
+    "second_score": 86,
+    "position_size_usd": 600,
+    "scene": "A_pullback",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阳线",
+      "body": 2.36e-05,
+      "lower_shadow_ratio": 0.36,
+      "upper_shadow_ratio": 0.0,
+      "volume_vs_avg3": 1.6,
+      "confirmations": [
+        "阳线收盘",
+        "止跌放量"
+      ],
+      "confirmation_count": 2
+    }
+  },
+  {
+    "symbol": "1000PEPEUSDT",
+    "direction": "LONG",
+    "entry": 0.00289939,
+    "exit": 0.0028748,
+    "result": "loss",
+    "second_score": 93,
+    "position_size_usd": 800,
+    "scene": "A_pullback",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阳线",
+      "body": 9.8e-06,
+      "lower_shadow_ratio": 0.92,
+      "upper_shadow_ratio": 0.74,
+      "volume_vs_avg3": 1.33,
+      "confirmations": [
+        "阳线收盘",
+        "止跌放量"
+      ],
+      "confirmation_count": 2
+    }
+  },
+  {
+    "symbol": "1000PEPEUSDT",
+    "direction": "SHORT",
+    "entry": 0.00292475,
+    "exit": 0,
+    "result": "end",
+    "second_score": 72,
+    "position_size_usd": 250,
+    "scene": "E_short",
+    "entry_source": "structure",
+    "entry_candle_analysis": {
+      "direction": "阳线",
+      "body": 3.2e-06,
+      "lower_shadow_ratio": 2.59,
+      "upper_shadow_ratio": 3.06,
+      "volume_vs_avg3": 0.41,
+      "confirmations": [
+        "长上影线（射击之星）"
+      ],
+      "confirmation_count": 1
+    }
+  }
+]

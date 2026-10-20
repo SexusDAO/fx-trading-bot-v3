@@ -1,0 +1,184 @@
+{
+  "summary": {
+    "total_spots": 15,
+    "avg_rsi": 47.33933333333333,
+    "avg_macd": -0.00034,
+    "avg_vol": 1.1298772648085742,
+    "ema_distribution": {
+      "\u591a\u6392": 3,
+      "\u7a7a\u6392": 2,
+      "\u6df7\u4e71": 4,
+      "N/A": 6
+    },
+    "open_rate_70": 0.13333333333333333,
+    "open_rate_65": 0.2,
+    "open_rate_60": 0.6
+  },
+  "spots": [
+    {
+      "rsi": 27.59,
+      "macd_hist": -0.0004,
+      "ema_align": "\u6df7\u4e71",
+      "ema_score": 50,
+      "vol_ratio": 1.2982398642347146,
+      "price": 0.3863,
+      "gain": 7.170592803520581,
+      "time": 1785232800000,
+      "score": 57.46
+    },
+    {
+      "rsi": 54.58,
+      "macd_hist": 0.0003,
+      "ema_align": "\u591a\u6392",
+      "ema_score": 85,
+      "vol_ratio": 0.5344199936911107,
+      "price": 0.4005,
+      "gain": 6.791510611735331,
+      "time": 1785384000000,
+      "score": 66.28
+    },
+    {
+      "rsi": 49.01,
+      "macd_hist": 0,
+      "ema_align": "N/A",
+      "ema_score": 50,
+      "vol_ratio": 0.940320749159742,
+      "price": 0.3839,
+      "gain": 6.590257879656157,
+      "time": 1785052800000,
+      "score": 57.5
+    },
+    {
+      "rsi": 60.54,
+      "macd_hist": -0.0003,
+      "ema_align": "N/A",
+      "ema_score": 50,
+      "vol_ratio": 1.0908546204766916,
+      "price": 0.3843,
+      "gain": 6.479313036690095,
+      "time": 1785070800000,
+      "score": 63.47
+    },
+    {
+      "rsi": 45.61,
+      "macd_hist": -0.0014,
+      "ema_align": "\u6df7\u4e71",
+      "ema_score": 50,
+      "vol_ratio": 1.2987548677982959,
+      "price": 0.3931,
+      "gain": 4.731620452810991,
+      "time": 1785337200000,
+      "score": 60.36
+    },
+    {
+      "rsi": 30.67,
+      "macd_hist": -0.0001,
+      "ema_align": "\u7a7a\u6392",
+      "ema_score": 15,
+      "vol_ratio": 0.8431867165760258,
+      "price": 0.3783,
+      "gain": 4.520222045995228,
+      "time": 1785610800000,
+      "score": 51.74
+    },
+    {
+      "rsi": 60.81,
+      "macd_hist": 0.001,
+      "ema_align": "N/A",
+      "ema_score": 50,
+      "vol_ratio": 0.8474266113948234,
+      "price": 0.3973,
+      "gain": 4.354392146992208,
+      "time": 1785099600000,
+      "score": 60.6
+    },
+    {
+      "rsi": 35.93,
+      "macd_hist": -0.0002,
+      "ema_align": "\u7a7a\u6392",
+      "ema_score": 15,
+      "vol_ratio": 0.7473949832348745,
+      "price": 0.3801,
+      "gain": 4.314654038410951,
+      "time": 1785628800000,
+      "score": 51.73
+    },
+    {
+      "rsi": 40.56,
+      "macd_hist": -0.0005,
+      "ema_align": "\u6df7\u4e71",
+      "ema_score": 50,
+      "vol_ratio": 1.0937273792069682,
+      "price": 0.3942,
+      "gain": 4.312531709791988,
+      "time": 1785355200000,
+      "score": 60.45
+    },
+    {
+      "rsi": 35.1,
+      "macd_hist": -0.0017,
+      "ema_align": "\u6df7\u4e71",
+      "ema_score": 50,
+      "vol_ratio": 0.6441519568584825,
+      "price": 0.3893,
+      "gain": 4.238376573336762,
+      "time": 1785214800000,
+      "score": 60.33
+    },
+    {
+      "rsi": 50.4,
+      "macd_hist": -0.0011,
+      "ema_align": "\u591a\u6392",
+      "ema_score": 85,
+      "vol_ratio": 1.5949998876632214,
+      "price": 0.3939,
+      "gain": 3.9350088855039385,
+      "time": 1785294000000,
+      "score": 73.14
+    },
+    {
+      "rsi": 50.72,
+      "macd_hist": -0.0014,
+      "ema_align": "\u591a\u6392",
+      "ema_score": 85,
+      "vol_ratio": 3.4268384143021673,
+      "price": 0.4027,
+      "gain": 3.600695306679914,
+      "time": 1785160800000,
+      "score": 76.11
+    },
+    {
+      "rsi": 51.8,
+      "macd_hist": 0,
+      "ema_align": "N/A",
+      "ema_score": 50,
+      "vol_ratio": 0.930565849604193,
+      "price": 0.378,
+      "gain": 3.4391534391534426,
+      "time": 1785020400000,
+      "score": 57.5
+    },
+    {
+      "rsi": 66.77,
+      "macd_hist": 0.0007,
+      "ema_align": "N/A",
+      "ema_score": 50,
+      "vol_ratio": 0.6572770779273016,
+      "price": 0.4054,
+      "gain": 3.182042427232369,
+      "time": 1785121200000,
+      "score": 60.57
+    },
+    {
+      "rsi": 50,
+      "macd_hist": 0,
+      "ema_align": "N/A",
+      "ema_score": 50,
+      "vol_ratio": 1,
+      "price": 0.3741,
+      "gain": 3.1275060144346405,
+      "time": 1784966400000,
+      "score": 57.5
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+[
+  {
+    "date": "2026-07-28",
+    "start_sol": 1.3586,
+    "end_sol": 1.3586,
+    "pnl_sol": 0.0,
+    "pnl_pct": 0.0,
+    "trades": 0,
+    "wins": 0,
+    "losses": 0
+  },
+  {
+    "date": "2026-07-29",
+    "start_sol": 0.817264,
+    "end_sol": 0.817264,
+    "pnl_sol": 0.0,
+    "pnl_pct": 0.0,
+    "trades": 1,
+    "wins": 0,
+    "losses": 0
+  },
+  {
+    "date": "2026-07-30",
+    "start_sol": 0.817264,
+    "end_sol": 0.817264,
+    "pnl_sol": 0.0,
+    "pnl_pct": 0.0,
+    "trades": 0,
+    "wins": 0,
+    "losses": 0
+  },
+  {
+    "date": "2026-07-31",
+    "start_sol": 0.119006,
+    "end_sol": 0.119006,
+    "pnl_sol": 0.0,
+    "pnl_pct": 0.0,
+    "trades": 0,
+    "wins": 0,
+    "losses": 0
+  }
+]

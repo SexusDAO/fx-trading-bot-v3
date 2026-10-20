@@ -1,0 +1,72 @@
+[
+  {
+    "time": 1783339200000,
+    "price": 1719.97,
+    "amount": 255700000.0,
+    "side": "long",
+    "symbol": "ETHUSDT"
+  },
+  {
+    "time": 1783371600000,
+    "price": 1840.59,
+    "amount": 335000000.0,
+    "side": "short",
+    "symbol": "ETHUSDT"
+  },
+  {
+    "time": 1783900800000,
+    "price": 1862.72,
+    "amount": 268000000.0,
+    "side": "short",
+    "symbol": "ETHUSDT"
+  },
+  {
+    "time": 1783911600000,
+    "price": 1757.44,
+    "amount": 248500000.0,
+    "side": "long",
+    "symbol": "ETHUSDT"
+  },
+  {
+    "time": 1784030400000,
+    "price": 1840.62,
+    "amount": 674100000.0,
+    "side": "short",
+    "symbol": "ETHUSDT"
+  },
+  {
+    "time": 1784116800000,
+    "price": 1934.8,
+    "amount": 378900000.0,
+    "side": "short",
+    "symbol": "ETHUSDT"
+  },
+  {
+    "time": 1784264400000,
+    "price": 1805.26,
+    "amount": 267100000.0,
+    "side": "long",
+    "symbol": "ETHUSDT"
+  },
+  {
+    "time": 1785103200000,
+    "price": 1969.05,
+    "amount": 281700000.0,
+    "side": "short",
+    "symbol": "ETHUSDT"
+  },
+  {
+    "time": 1785189600000,
+    "price": 1879.54,
+    "amount": 321800000.0,
+    "side": "long",
+    "symbol": "ETHUSDT"
+  },
+  {
+    "time": 1785607200000,
+    "price": 1819.16,
+    "amount": 406800000.0,
+    "side": "long",
+    "symbol": "ETHUSDT"
+  }
+]

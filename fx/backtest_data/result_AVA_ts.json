@@ -1,0 +1,150 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-10-13 16:15",
+      "close_ts": "2026-10-14 00:15",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2274,
+      "exit_price": 0.2393,
+      "close_reason": "time_stop",
+      "pnl": 5.0331,
+      "hold_min": 480.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-13 21:15",
+      "close_ts": "2026-10-14 04:30",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2358,
+      "exit_price": 0.27117,
+      "close_reason": "tp1_partial",
+      "pnl": 7.4,
+      "hold_min": 435.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-14 01:15",
+      "close_ts": "2026-10-14 05:00",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2426,
+      "exit_price": 0.27899,
+      "close_reason": "tp1_partial",
+      "pnl": 7.4,
+      "hold_min": 225.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-13 21:15",
+      "close_ts": "2026-10-14 13:15",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2358,
+      "exit_price": 0.2498,
+      "close_reason": "time_stop",
+      "pnl": 2.8686,
+      "hold_min": 960.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-14 11:15",
+      "close_ts": "2026-10-14 16:45",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "range_bounce",
+      "entry_price": 0.25,
+      "exit_price": 0.2875,
+      "close_reason": "tp1_partial",
+      "pnl": 7.4,
+      "hold_min": 330.0,
+      "signal_score": 80
+    },
+    {
+      "open_ts": "2026-10-14 01:15",
+      "close_ts": "2026-10-14 21:30",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2426,
+      "exit_price": 0.2806,
+      "close_reason": "time_stop",
+      "pnl": 7.7318,
+      "hold_min": 1215.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-14 11:15",
+      "close_ts": "2026-10-15 03:15",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "range_bounce",
+      "entry_price": 0.25,
+      "exit_price": 0.2791,
+      "close_reason": "time_stop",
+      "pnl": 5.72,
+      "hold_min": 960.0,
+      "signal_score": 80
+    },
+    {
+      "open_ts": "2026-10-15 01:00",
+      "close_ts": "2026-10-15 05:00",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "range_bounce",
+      "entry_price": 0.2737,
+      "exit_price": 0.2531725,
+      "close_reason": "sl",
+      "pnl": -7.7,
+      "hold_min": 240.0,
+      "signal_score": 80
+    },
+    {
+      "open_ts": "2026-10-16 14:30",
+      "close_ts": "2026-10-16 22:30",
+      "symbol": "AVAUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.2772,
+      "exit_price": 0.2926,
+      "close_reason": "time_stop",
+      "pnl": 5.3556,
+      "hold_min": 480.0,
+      "signal_score": 50
+    }
+  ],
+  "stats": {
+    "symbol": "AVAUSDT",
+    "days": 7,
+    "total_trades": 9,
+    "win_trades": 8,
+    "loss_trades": 1,
+    "win_rate_pct": 88.9,
+    "total_pnl_u": 41.21,
+    "total_win_u": 48.91,
+    "total_loss_u": -7.7,
+    "profit_factor": 6.35,
+    "max_drawdown_u": 7.7,
+    "max_single_loss": -7.7,
+    "avg_hold_min": 722.5,
+    "by_mode": {
+      "pullback": {
+        "n": 6,
+        "win": 6,
+        "pnl": 35.79,
+        "win_rate": 100.0
+      },
+      "range_bounce": {
+        "n": 3,
+        "win": 2,
+        "pnl": 5.42,
+        "win_rate": 66.7
+      }
+    }
+  }
+}

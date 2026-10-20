@@ -1,0 +1,26 @@
+{
+  "SOLUSDT": {
+    "score": 10,
+    "cached_at": "2026-08-03T10:22:01Z"
+  },
+  "BTCUSDT": {
+    "score": 10,
+    "cached_at": "2026-08-03T10:21:58Z"
+  },
+  "ETHUSDT": {
+    "score": 10,
+    "cached_at": "2026-08-03T10:22:03Z"
+  },
+  "PTBUSDT": {
+    "score": 0,
+    "cached_at": "2026-08-03T08:36:59Z"
+  },
+  "ZEREBROUSDT": {
+    "score": 0,
+    "cached_at": "2026-08-03T09:35:44Z"
+  },
+  "BEATUSDT": {
+    "score": 0,
+    "cached_at": "2026-08-03T09:56:56Z"
+  }
+}

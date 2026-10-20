@@ -1,0 +1,40 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-09-28 12:00",
+      "close_ts": "2026-09-28 12:15",
+      "symbol": "SOLUSDT",
+      "direction": "long",
+      "mode": "reversal",
+      "entry_price": 118.66,
+      "exit_price": 115.6935,
+      "close_reason": "sl",
+      "pnl": 2.3,
+      "hold_min": 15.0,
+      "signal_score": 50
+    }
+  ],
+  "stats": {
+    "symbol": "SOLUSDT",
+    "days": 30,
+    "total_trades": 1,
+    "win_trades": 1,
+    "loss_trades": 0,
+    "win_rate_pct": 100.0,
+    "total_pnl_u": 2.3,
+    "total_win_u": 2.3,
+    "total_loss_u": 0,
+    "profit_factor": 999,
+    "max_drawdown_u": 0.0,
+    "max_single_loss": 2.3,
+    "avg_hold_min": 15.0,
+    "by_mode": {
+      "reversal": {
+        "n": 1,
+        "win": 1,
+        "pnl": 2.3,
+        "win_rate": 100.0
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+# Secrets
+.secrets.json
+.arc_private_key
+
+# Runtime data
+.seen_tokens.json
+*.log
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+.DS_Store
+Thumbs.db

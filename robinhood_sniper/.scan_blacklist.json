@@ -1,0 +1,1885 @@
+{
+  "0xf178660beb042aef74f98c2c633a5c75611e3c0f": {
+    "symbol": "RSA",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$3825 是1h均速的12倍（人为脉冲）",
+    "ts": 1788437393
+  },
+  "0x5f61aedd424463e2f4cc1953adcb3b89300f1e18": {
+    "symbol": "0x5f61aedd...",
+    "reason": "太老 222min",
+    "ts": 1788442219
+  },
+  "0x56a0c0d25ec1c9baf65d5202d7fe28d40b64652a": {
+    "symbol": "0x56a0c0d2...",
+    "reason": "太老 51min",
+    "ts": 1788442243
+  },
+  "0x63f3678f7193db06efba7c6e34b1cb6c92eebf60": {
+    "symbol": "MRBEAST",
+    "reason": "评分不足 5/7",
+    "ts": 1788442259
+  },
+  "0x2ab22c973adec24e4e4b6dedd43025d1bb615b01": {
+    "symbol": "0x2ab22c97...",
+    "reason": "太老 35min",
+    "ts": 1788442265
+  },
+  "0x407343ea13643b54014bea78e9038de5d2451e18": {
+    "symbol": "0x407343ea...",
+    "reason": "太老 1898min",
+    "ts": 1788442402
+  },
+  "0x2638e93a419599f7fc3dd59b899b6de16d9803d4": {
+    "symbol": "ABTC",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$4300 是1h均速的12倍（人为脉冲）",
+    "ts": 1788442589
+  },
+  "0xce791c4438832760ae7deb1c2d807d17f4af0760": {
+    "symbol": "0xce791c44...",
+    "reason": "太老 85min",
+    "ts": 1788442699
+  },
+  "0x78b75747cd45e8df1c07bdbd40745f30c38c9d41": {
+    "symbol": "CUTL",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+51%>50%（典型拉盘砸盘信号）",
+    "ts": 1788444005
+  },
+  "0xdff1d2e8c5e9ccbf38b62ab883a8d29a6bce6b66": {
+    "symbol": "MOGGY",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$162 是1h均速的12倍（人为脉冲）",
+    "ts": 1788444215
+  },
+  "0x4823c4542fe97e1c46d49d56b0d600ef1bcf624d": {
+    "symbol": "0x4823c454...",
+    "reason": "MC超上限 $75k",
+    "ts": 1788444413
+  },
+  "0x3b542b9b72441e4ba0e70885f983075c51ea5c16": {
+    "symbol": "0x3b542b9b...",
+    "reason": "太老 101min",
+    "ts": 1788444419
+  },
+  "0x7ab96eacdeb43e95565e4a4f741089a3d8425eb0": {
+    "symbol": "0x7ab96eac...",
+    "reason": "太老 38min",
+    "ts": 1788444769
+  },
+  "0x5448b3bd27851bfd39eb83b79efbe28b7270c0ed": {
+    "symbol": "HUGCOIN",
+    "reason": "评分不足 3/4",
+    "ts": 1788445010
+  },
+  "0x7a9e26bcec462b235c06bc2aed2a7fe5207a7057": {
+    "symbol": "GOBLIN",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$162 是1h均速的12倍（人为脉冲）",
+    "ts": 1788445465
+  },
+  "0x3000f9c88b7e34a9b2557286a72bb3404372627f": {
+    "symbol": "MURAL",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+131%>50%（典型拉盘砸盘信号）",
+    "ts": 1788445561
+  },
+  "0x2bf78d3dc6b2222bcbfe8c712c9c33120b3058bc": {
+    "symbol": "0x2bf78d3d...",
+    "reason": "太老 32min",
+    "ts": 1788445739
+  },
+  "0x77afdf18afd292a174fba713da4b81f3626adbdb": {
+    "symbol": "GC",
+    "reason": "评分不足 2/4",
+    "ts": 1788446006
+  },
+  "0x92834ec9d9363ed29c7492a9803ad40a7457dbdb": {
+    "symbol": "GC",
+    "reason": "评分不足 2/4",
+    "ts": 1788446307
+  },
+  "0x767114f472653de35f80682d1e319f7b4516e96c": {
+    "symbol": "0x767114f4...",
+    "reason": "太老 802min",
+    "ts": 1788446343
+  },
+  "0x2112a316a2e56d7300092e5a41d2a84dd11d3bd6": {
+    "symbol": "0x2112a316...",
+    "reason": "太老 365min",
+    "ts": 1788446645
+  },
+  "0xe106ef4b76dbfdafb62897527863338bdfbd6d05": {
+    "symbol": "0xe106ef4b...",
+    "reason": "太老 52min",
+    "ts": 1788446759
+  },
+  "0xb1c2f69b6334f1e9e806f6500906103d4c66f6e6": {
+    "symbol": "MEMEMAN",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$6795 是1h均速的12倍（人为脉冲）",
+    "ts": 1788446762
+  },
+  "0x38a8ef398289d4fc21b3c335278049a181835709": {
+    "symbol": "0x38a8ef39...",
+    "reason": "太老 55min",
+    "ts": 1788447664
+  },
+  "0x9c45c8e90ae6c5351b96d81a86c9d6703eb81e18": {
+    "symbol": "0x9c45c8e9...",
+    "reason": "MC超上限 $154k",
+    "ts": 1788447955
+  },
+  "0xad94a6ea748e1ae0397c979d19c707f8de089ed3": {
+    "symbol": "0xad94a6ea...",
+    "reason": "太老 46min",
+    "ts": 1788448074
+  },
+  "0x247bfbad214d70d350bf54f691c90cd39d46a631": {
+    "symbol": "RGRAM",
+    "reason": "🚫 R4-天花板拒绝: MC$44k 已接近TP1$50k，无止盈空间",
+    "ts": 1788448142
+  },
+  "0xf0c4bf4c582cb3836e98394b1d4e7b7281101be8": {
+    "symbol": "0xf0c4bf4c...",
+    "reason": "MC超上限 $753k",
+    "ts": 1788448287
+  },
+  "0xa2691423e091cf030db50e183bb8e17aea3e5e82": {
+    "symbol": "0xa2691423...",
+    "reason": "MC超上限 $167k",
+    "ts": 1788448387
+  },
+  "0xa01bc586cd5f4f253bfab4e44400c52dbc18bc50": {
+    "symbol": "0xa01bc586...",
+    "reason": "MC超上限 $4624k",
+    "ts": 1788449716
+  },
+  "0xd444622c16aa92c33b56f922ee9fd64776789171": {
+    "symbol": "0xd444622c...",
+    "reason": "MC超上限 $590k",
+    "ts": 1788449998
+  },
+  "0xb51d57cbe67152fd163f59d1e0f950c6b647fb07": {
+    "symbol": "0xb51d57cb...",
+    "reason": "太老 159min",
+    "ts": 1788450558
+  },
+  "0x9f637f4ee9079602011b6641e07a30711856b2ea": {
+    "symbol": "0x9f637f4e...",
+    "reason": "太老 79min",
+    "ts": 1788451145
+  },
+  "0xf1cc6285ebc1aa058a4ba7d86e4ca651f68a2ffb": {
+    "symbol": "CHUD",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$1013 是1h均速的12倍（人为脉冲）",
+    "ts": 1788451180
+  },
+  "0xfe8d0f281f12581da6df0c3980ca556f4cf4231c": {
+    "symbol": "GRASS",
+    "reason": "评分不足 3/4",
+    "ts": 1788451265
+  },
+  "0x32ac8c1d7672667d5ebdea22935f7b06fc8d496f": {
+    "symbol": "0x32ac8c1d...",
+    "reason": "太老 51285min",
+    "ts": 1788451319
+  },
+  "0x3230dafded80807b941e89be40b327e858fea0c7": {
+    "symbol": "0x3230dafd...",
+    "reason": "太老 104min",
+    "ts": 1788451761
+  },
+  "0x15b4ba895feed50f3192f145a5c84172f2f7de17": {
+    "symbol": "UFO",
+    "reason": "评分不足 6/7",
+    "ts": 1788452179
+  },
+  "0x016af08f535c3729385d8080472e3a4f9d8e7cd0": {
+    "symbol": "RICH",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$119846754290 是1h均速的12倍（人为脉冲）",
+    "ts": 1788452537
+  },
+  "0x2a1c75de22ccaefee15208e75ef7d735da4ed2f7": {
+    "symbol": "Pixel Cat",
+    "reason": "🚫 R4-天花板拒绝: MC$56k 已接近TP1$50k，无止盈空间",
+    "ts": 1788452587
+  },
+  "0x3f0ed089be2a7836d208f19d25f30b5042cb9da7": {
+    "symbol": "0x3f0ed089...",
+    "reason": "太老 2147min",
+    "ts": 1788452648
+  },
+  "0x7d4727a173aab10d158d6f164b671c92f99d6647": {
+    "symbol": "0x7d4727a1...",
+    "reason": "太老 85min",
+    "ts": 1788452705
+  },
+  "0x9fa1c5e90a11294f83a9f135b81ad1b537a5ffdc": {
+    "symbol": "ZEAL",
+    "reason": "🚫 R4-天花板拒绝: MC$55k 已接近TP1$50k，无止盈空间",
+    "ts": 1788452768
+  },
+  "0x06e0284edfd5cedc77e2589fdcdeed3e57f21e18": {
+    "symbol": "0x06e0284e...",
+    "reason": "太老 91min",
+    "ts": 1788452774
+  },
+  "0x855331a2f182796c85c1e63228da72060f37c5f0": {
+    "symbol": "0x855331a2...",
+    "reason": "太老 98min",
+    "ts": 1788452780
+  },
+  "0xa988699dbb9eb4e35651a0f2a4cd3231118edc32": {
+    "symbol": "0xa988699d...",
+    "reason": "太老 47min",
+    "ts": 1788452881
+  },
+  "0x1003ebf9ee3c44685ff38927c3fdd9a0de9310f6": {
+    "symbol": "0x1003ebf9...",
+    "reason": "太老 47min",
+    "ts": 1788453066
+  },
+  "0xaeb3ececa97d662aa8f63d427370554ab56a56e3": {
+    "symbol": "0xaeb3ecec...",
+    "reason": "太老 45min",
+    "ts": 1788453074
+  },
+  "0x4bbb8bfa18e8fe517a148ec04adac95918aca1f0": {
+    "symbol": "0x4bbb8bfa...",
+    "reason": "太老 511min",
+    "ts": 1788453079
+  },
+  "0x89314dd83f307d7d9bc19ff261888027fa531658": {
+    "symbol": "0x89314dd8...",
+    "reason": "MC超上限 $3194k",
+    "ts": 1788453131
+  },
+  "0x6e883faef4ff101eb1c00a6a41a4aabcc29c6723": {
+    "symbol": "tsniper",
+    "reason": "评分不足 2/4",
+    "ts": 1788453231
+  },
+  "0x67c61bfb169ce68a61ef28e4ce9d7f53efbd1e18": {
+    "symbol": "biohacking",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+159%>50%（典型拉盘砸盘信号）",
+    "ts": 1788453301
+  },
+  "0x3416734f2242c84a89cd220008f16146fa9eeaba": {
+    "symbol": "GOD",
+    "reason": "评分不足 2/4",
+    "ts": 1788453461
+  },
+  "0x844695760f5107592eba975a8281b52f113b0367": {
+    "symbol": "0x84469576...",
+    "reason": "太老 54min",
+    "ts": 1788453788
+  },
+  "0x1e6ea1e89151cdc8443968bf047cfa3177181e18": {
+    "symbol": "0x1e6ea1e8...",
+    "reason": "太老 1304min",
+    "ts": 1788454272
+  },
+  "0x997173e7957fa6e1899ab6c0e647f3b27b4611c0": {
+    "symbol": "0x997173e7...",
+    "reason": "太老 1202min",
+    "ts": 1788454633
+  },
+  "0xc10fba63da3709b44b5a4d8d9813cbc148fba894": {
+    "symbol": "RETARD",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+58%>50%（典型拉盘砸盘信号）",
+    "ts": 1788454641
+  },
+  "0xafc87b8ffdf56ef1e588f30a01eb660cf238319d": {
+    "symbol": "COOPER",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$162 是1h均速的12倍（人为脉冲）",
+    "ts": 1788454713
+  },
+  "0x4cf6b98699821ad707b31addfc04f39d86f01e18": {
+    "symbol": "0x4cf6b986...",
+    "reason": "太老 37min",
+    "ts": 1788454945
+  },
+  "0x0839c5b96873eda366ba9c184f955df66386163c": {
+    "symbol": "DITO",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$254844493 是1h均速的12倍（人为脉冲）",
+    "ts": 1788455033
+  },
+  "0xd34ef024e4dd1fbc1047091952b8617af88b1edd": {
+    "symbol": "0xd34ef024...",
+    "reason": "MC超上限 $80k",
+    "ts": 1788455106
+  },
+  "0x97c769410b264d16b29de3b75a01b501ccd10512": {
+    "symbol": "PROTON",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+103%>50%（典型拉盘砸盘信号）",
+    "ts": 1788455108
+  },
+  "0xae348dc08bcff3d06c61880ae35ffe2ee74e3a5a": {
+    "symbol": "0xae348dc0...",
+    "reason": "MC超上限 $266k",
+    "ts": 1788455290
+  },
+  "0xe9770adbc96795e9e920d3860a7389c04861ec12": {
+    "symbol": "HYPO",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$96 是1h均速的12倍（人为脉冲）",
+    "ts": 1788455383
+  },
+  "0x4bd2f56720ad5d5aa077d64e57420a357cb91e18": {
+    "symbol": "0x4bd2f567...",
+    "reason": "MC超上限 $723k",
+    "ts": 1788455471
+  },
+  "0x72d203d4e41a697e3033dd65b5483c10efb85100": {
+    "symbol": "CYBERCAB",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+122%>50%（典型拉盘砸盘信号）",
+    "ts": 1788456250
+  },
+  "0x9151e735df10790c327f73bdb4605f082f197088": {
+    "symbol": "SIKA",
+    "reason": "评分不足 2/4",
+    "ts": 1788456307
+  },
+  "0x43f2ee437e5dd8721cfb87b6efba83b097d91e18": {
+    "symbol": "0x43f2ee43...",
+    "reason": "MC超上限 $184k",
+    "ts": 1788456313
+  },
+  "0xe98f057d6cd602dabc0efc504cdbaaf25c53fcea": {
+    "symbol": "ROBL",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$287 是1h均速的12倍（人为脉冲）",
+    "ts": 1788456700
+  },
+  "0x9cb19d6e3f87543826e50f61ff4c5a6cdf3b1e18": {
+    "symbol": "0x9cb19d6e...",
+    "reason": "太老 1367min",
+    "ts": 1788456732
+  },
+  "0x8663212d38822ef0f5a8c65b4479e352b10143f1": {
+    "symbol": "0x8663212d...",
+    "reason": "MC超上限 $122k",
+    "ts": 1788456857
+  },
+  "0x5d4e1b8ac7085ee4944db8123e1a07c88a1a7499": {
+    "symbol": "0x5d4e1b8a...",
+    "reason": "MC超上限 $97k",
+    "ts": 1788457035
+  },
+  "0x037cf4732435f0fdf5337289bd314dc79945d665": {
+    "symbol": "Lime",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$575157018711 是1h均速的12倍（人为脉冲）",
+    "ts": 1788457282
+  },
+  "0xb471e4e4b4106f3fe06ddfff16fb19b664902f90": {
+    "symbol": "0xb471e4e4...",
+    "reason": "MC超上限 $89k",
+    "ts": 1788457879
+  },
+  "0x27f69f6a0ddbd2aa763ff35cb633c08a7dc9d0e9": {
+    "symbol": "0x27f69f6a...",
+    "reason": "太老 112min",
+    "ts": 1788457993
+  },
+  "0x8d3b5246be12824dd61ccde7af974c3c1e867a34": {
+    "symbol": "0x8d3b5246...",
+    "reason": "MC超上限 $233k",
+    "ts": 1788458058
+  },
+  "0xe0c9d675758ded8ef359846a8f9b522f9f01620b": {
+    "symbol": "0xe0c9d675...",
+    "reason": "太老 84min",
+    "ts": 1788458175
+  },
+  "0x5b805d4f80c8e5d00cfdb26fa0b7ba1cdf2dfb03": {
+    "symbol": "AAPE",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$1194 是1h均速的12倍（人为脉冲）",
+    "ts": 1788458418
+  },
+  "0x9d0f048529e8d712c707d8493d0a9c23dab4835e": {
+    "symbol": "0x9d0f0485...",
+    "reason": "太老 378min",
+    "ts": 1788459436
+  },
+  "0x53d390daf87517c0af4624862cf9a2d0141034e1": {
+    "symbol": "HJ",
+    "reason": "评分不足 2/4",
+    "ts": 1788459470
+  },
+  "0x128f2d5fc65fa184a506c8f4db4763772603de78": {
+    "symbol": "0x128f2d5f...",
+    "reason": "太老 37min",
+    "ts": 1788459543
+  },
+  "0xfffcf671638026902427109f9f9e68061a475c30": {
+    "symbol": "0xfffcf671...",
+    "reason": "MC超上限 $478k",
+    "ts": 1788459616
+  },
+  "0x6b923060f1cce4ed17811bc1f2c79a56d8865aae": {
+    "symbol": "0x6b923060...",
+    "reason": "太老 35min",
+    "ts": 1788459668
+  },
+  "0x9b30d922f31324cda87feae4b9fc81885a359fb0": {
+    "symbol": "BULL",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+67%>50%（典型拉盘砸盘信号）",
+    "ts": 1788459853
+  },
+  "0x887af63bd843a1f06edfc450856afe0f753d942b": {
+    "symbol": "0x887af63b...",
+    "reason": "MC超上限 $187k",
+    "ts": 1788459978
+  },
+  "0x4cd5af99278f88c94b1777152d56f3e56171a0ee": {
+    "symbol": "0x4cd5af99...",
+    "reason": "太老 42min",
+    "ts": 1788460329
+  },
+  "0x7185ddbe86bf59f21438989a5554e4abe73e1e18": {
+    "symbol": "0x7185ddbe...",
+    "reason": "太老 64min",
+    "ts": 1788460335
+  },
+  "0x6efde4a83efbf391ca7a13494446920891dce608": {
+    "symbol": "0x6efde4a8...",
+    "reason": "太老 50min",
+    "ts": 1788460458
+  },
+  "0x7c068f0f79515ea15cacdf07023d33d89529bff5": {
+    "symbol": "0x7c068f0f...",
+    "reason": "太老 114min",
+    "ts": 1788460511
+  },
+  "0xc66972cb293b77b52b3f5af7f592abc4fb82a1ae": {
+    "symbol": "0xc66972cb...",
+    "reason": "太老 51min",
+    "ts": 1788460751
+  },
+  "0x0d626d55745f33129c1153bde849627b89d299da": {
+    "symbol": "FARMS",
+    "reason": "🚫 R6-真实持有人不足: 总3人 去关联后3人 < 50人",
+    "ts": 1788460807
+  },
+  "0x7981992155389b44c17e08422749d77023be2ba3": {
+    "symbol": "0x79819921...",
+    "reason": "太老 39min",
+    "ts": 1788460935
+  },
+  "0xd578b7a33e6688607f32d51727d70e7cda5427fe": {
+    "symbol": "0xd578b7a3...",
+    "reason": "MC超上限 $102k",
+    "ts": 1788460941
+  },
+  "0xab528169dcc80d68837a33b1e2b866bb7d7ee301": {
+    "symbol": "0xab528169...",
+    "reason": "太老 923min",
+    "ts": 1788461238
+  },
+  "0xaeeec8c7a7be109db246742051ced3a9e8e260bc": {
+    "symbol": "0xaeeec8c7...",
+    "reason": "MC超上限 $74k",
+    "ts": 1788461841
+  },
+  "0x44c9e8257b2bcd5009ce490f3c27a159f637e7f8": {
+    "symbol": "0x44c9e825...",
+    "reason": "太老 291min",
+    "ts": 1788461846
+  },
+  "0x05d73a652529f0b1a6dd2b89de26b449ec9f1e18": {
+    "symbol": "0x05d73a65...",
+    "reason": "太老 4054min",
+    "ts": 1788462127
+  },
+  "0x3d7341a260a2ee460c9d68e302c2e0c883487039": {
+    "symbol": "SILVERBACK",
+    "reason": "🚫 R4-天花板拒绝: MC$43k 已接近TP1$50k，无止盈空间",
+    "ts": 1788462206
+  },
+  "0x6e3fdfd69fbe1572ab63b09a3fb7b47c1912167f": {
+    "symbol": "0x6e3fdfd6...",
+    "reason": "MC超上限 $122k",
+    "ts": 1788462211
+  },
+  "0x89867bfc1ca389f656097838b307664a5063cbf6": {
+    "symbol": "0x89867bfc...",
+    "reason": "太老 51min",
+    "ts": 1788462269
+  },
+  "0xc5cfb1a50a9fc816b6419b08807d79fe34901e18": {
+    "symbol": "0xc5cfb1a5...",
+    "reason": "MC超上限 $883k",
+    "ts": 1788462371
+  },
+  "0x277cadb1b78bc71f66eac7713dffa6d95b498035": {
+    "symbol": "0x277cadb1...",
+    "reason": "MC超上限 $362k",
+    "ts": 1788462446
+  },
+  "0xbb0a14b28db546e6309a86c4e829f04d51d11fd1": {
+    "symbol": "0xbb0a14b2...",
+    "reason": "太老 73min",
+    "ts": 1788462856
+  },
+  "0xe931b424989bb79af9d7ce0501054d9a0a65da08": {
+    "symbol": "0xe931b424...",
+    "reason": "MC超上限 $145k",
+    "ts": 1788462976
+  },
+  "0xef1c4ba3070565d5c88c0849a749b5ece9721e18": {
+    "symbol": "0xef1c4ba3...",
+    "reason": "太老 47min",
+    "ts": 1788463028
+  },
+  "0x2b0b9da3f4842e57324064592880bd25afe3472c": {
+    "symbol": "0x2b0b9da3...",
+    "reason": "太老 53min",
+    "ts": 1788463033
+  },
+  "0x1acc20324a077b9614b0c4a757b8ffd3ca378888": {
+    "symbol": "OMARCHY",
+    "reason": "🚫 R6-真实持有人不足: 总4人 去关联后4人 < 50人",
+    "ts": 1788463092
+  },
+  "0x653547323a595c5855e0e72d2ecfbbfb1a6bbd69": {
+    "symbol": "0x65354732...",
+    "reason": "太老 186min",
+    "ts": 1788463520
+  },
+  "0x6f0f788d86c2785755674da1364d307a97385901": {
+    "symbol": "0x6f0f788d...",
+    "reason": "太老 2396min",
+    "ts": 1788464068
+  },
+  "0xc916e331d52f8b86349b6827fcc6748a78a891aa": {
+    "symbol": "0xc916e331...",
+    "reason": "太老 30min",
+    "ts": 1788464181
+  },
+  "0x94d21edc71bb0b3cdc6c00f3c7849e6409097777": {
+    "symbol": "0x94d21edc...",
+    "reason": "太老 60min",
+    "ts": 1788464770
+  },
+  "0x7048f2dcdcd8a2a9870661846d30cb5c1cfa58a5": {
+    "symbol": "SCION",
+    "reason": "🚫 R4-天花板拒绝: MC$47k 已接近TP1$50k，无止盈空间",
+    "ts": 1788464898
+  },
+  "0x8c6ef7f9fffa46bb685ee82af7497d841541018d": {
+    "symbol": "0x8c6ef7f9...",
+    "reason": "MC超上限 $76k",
+    "ts": 1788465382
+  },
+  "0x616de7490ba40d87b71cbe4b0b0e0de40c64c91c": {
+    "symbol": "0x616de749...",
+    "reason": "太老 78647min",
+    "ts": 1788465987
+  },
+  "0x8df62d145d97a47dc9906b933461c9ead665427f": {
+    "symbol": "0x8df62d14...",
+    "reason": "MC超上限 $60k",
+    "ts": 1788466038
+  },
+  "0x88ca10a715d1f526b4f3c02e9cfdd03ceed0f6a0": {
+    "symbol": "RCAT",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$3360 是1h均速的12倍（人为脉冲）",
+    "ts": 1788466211
+  },
+  "0xbe54596a4e5004ef80f57eaae9c7eee6b7646ebb": {
+    "symbol": "0xbe54596a...",
+    "reason": "太老 47min",
+    "ts": 1788466216
+  },
+  "0x5347ac7033d72f8c92724cede71e1c7fe8d9238c": {
+    "symbol": "0x5347ac70...",
+    "reason": "MC超上限 $1533k",
+    "ts": 1788466464
+  },
+  "0x51c2232789bd9ed5217bde721c0da31cfe084cca": {
+    "symbol": "0x51c22327...",
+    "reason": "MC超上限 $67k",
+    "ts": 1788466572
+  },
+  "0x7cd3c3c6e7a509421cd956d4bed11acfb935f75d": {
+    "symbol": "0x7cd3c3c6...",
+    "reason": "MC超上限 $850k",
+    "ts": 1788466577
+  },
+  "0xfa19ccf5720c6761093a3a01c85aca7246df74fe": {
+    "symbol": "FOMO",
+    "reason": "🚫 R4-天花板拒绝: MC$57k 已接近TP1$50k，无止盈空间",
+    "ts": 1788466643
+  },
+  "0x78204d97bdac0332785fe6dd99e9a6b4f52d91ee": {
+    "symbol": "0x78204d97...",
+    "reason": "太老 60min",
+    "ts": 1788466904
+  },
+  "0xf3f8d02e37623a82ece8041b583f1f78b352fcef": {
+    "symbol": "0xf3f8d02e...",
+    "reason": "MC超上限 $116k",
+    "ts": 1788466909
+  },
+  "0x4ae26f83a141ed7651c81e3b98708807844a04d5": {
+    "symbol": "0x4ae26f83...",
+    "reason": "MC超上限 $207k",
+    "ts": 1788467069
+  },
+  "0xfee7558ebd267f352da0a172cb95d95e4a09f801": {
+    "symbol": "RyanAir",
+    "reason": "🚫 R6-真实持有人不足: 总42人 去关联后42人 < 50人",
+    "ts": 1788467173
+  },
+  "0xa29cbc0ca94fbf410dc96ba6642b1fd93c5ddcf7": {
+    "symbol": "0xa29cbc0c...",
+    "reason": "太老 6125min",
+    "ts": 1788467246
+  },
+  "0x5f5864179e56f6e75c1acfb9026b45c6ea816e5e": {
+    "symbol": "0x5f586417...",
+    "reason": "MC超上限 $68k",
+    "ts": 1788467293
+  },
+  "0x9ced16b09c67238dc9e60ea3e8f97c5dabe40dbb": {
+    "symbol": "0x9ced16b0...",
+    "reason": "太老 221min",
+    "ts": 1788467299
+  },
+  "0x8fa91aa425967f06ea44cb58bc8b06ae989d1eb8": {
+    "symbol": "0x8fa91aa4...",
+    "reason": "MC超上限 $81k",
+    "ts": 1788467360
+  },
+  "0x502db6f6a0c6c230a0cc6647d02715f37b802a55": {
+    "symbol": "0x502db6f6...",
+    "reason": "MC超上限 $195k",
+    "ts": 1788467365
+  },
+  "0x32d35023afcf1a5c29242fb228bba9da14cc43bf": {
+    "symbol": "HOOD",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$61648 是1h均速的12倍（人为脉冲）",
+    "ts": 1788467478
+  },
+  "0x91767b7e31ecf3a2e44c1dc76fe75173f598e1cb": {
+    "symbol": "0x91767b7e...",
+    "reason": "MC超上限 $118k",
+    "ts": 1788468023
+  },
+  "0x39802268185c5116085b330f1013c7ab35627460": {
+    "symbol": "0x39802268...",
+    "reason": "MC超上限 $157k",
+    "ts": 1788468028
+  },
+  "0x1f33f0aa420553e859509ec1d974e2eb7e449987": {
+    "symbol": "0x1f33f0aa...",
+    "reason": "MC超上限 $242k",
+    "ts": 1788468076
+  },
+  "0xa4586bbcd0f6891bc377029b3d1c4732e7e1378c": {
+    "symbol": "0xa4586bbc...",
+    "reason": "MC超上限 $68k",
+    "ts": 1788468204
+  },
+  "0xee5d62d5276529dff50918885140ecda1d87dc02": {
+    "symbol": "0xee5d62d5...",
+    "reason": "MC超上限 $90k",
+    "ts": 1788468435
+  },
+  "0x96de27daa8ef3acc45e2a813c0b9d39288c0ab01": {
+    "symbol": "0x96de27da...",
+    "reason": "MC超上限 $64k",
+    "ts": 1788468636
+  },
+  "0xd7f22d909aae9e8abc79d4f4b23b93c830dc5405": {
+    "symbol": "0xd7f22d90...",
+    "reason": "MC超上限 $85k",
+    "ts": 1788468793
+  },
+  "0xab093def657f15df31b33922a95e047add645b29": {
+    "symbol": "0xab093def...",
+    "reason": "太老 1811min",
+    "ts": 1788469110
+  },
+  "0x21c48a15fca66d7156cf656e2abf0789524e68cb": {
+    "symbol": "0x21c48a15...",
+    "reason": "太老 43min",
+    "ts": 1788469219
+  },
+  "0x4e6fd69e1e09b6e79e5d6b10da2dd74e5a3fbf31": {
+    "symbol": "0x4e6fd69e...",
+    "reason": "MC超上限 $259k",
+    "ts": 1788469483
+  },
+  "0x8fcf98e1348d3ddee46cdd15a5c7d9a8d423077d": {
+    "symbol": "0x8fcf98e1...",
+    "reason": "MC超上限 $3292k",
+    "ts": 1788469910
+  },
+  "0x828570e158ba08c6e9f99e03923cc8232d3155ab": {
+    "symbol": "FINE",
+    "reason": "评分不足 7/8",
+    "ts": 1788469927
+  },
+  "0x8f21138afcbe82e12061fd02630bb488d7585fd8": {
+    "symbol": "0x8f21138a...",
+    "reason": "太老 85min",
+    "ts": 1788470774
+  },
+  "0x9c183d1d4937000cc6dac9d246f66d4adc7a9eb7": {
+    "symbol": "0x9c183d1d...",
+    "reason": "太老 33min",
+    "ts": 1788470871
+  },
+  "0xb553607d0c418223affd765143c26cf327495d06": {
+    "symbol": "0xb553607d...",
+    "reason": "MC超上限 $112k",
+    "ts": 1788471027
+  },
+  "0x73f528eaa7d65abea39097df57877f2fe625ab34": {
+    "symbol": "0x73f528ea...",
+    "reason": "MC超上限 $129k",
+    "ts": 1788471032
+  },
+  "0x798579d7d5698b3ddfc2ac5719941af84061c7af": {
+    "symbol": "0x798579d7...",
+    "reason": "MC超上限 $104k",
+    "ts": 1788471347
+  },
+  "0x11210ddb87c4bb1a6d66823dee8e74a87424d395": {
+    "symbol": "0x11210ddb...",
+    "reason": "MC超上限 $120k",
+    "ts": 1788471352
+  },
+  "0x25ff0c6b7042cc0f541effdd354457cb52cff609": {
+    "symbol": "0x25ff0c6b...",
+    "reason": "太老 34min",
+    "ts": 1788471451
+  },
+  "0x2805de16d80c918b04e3ea0ad708ac8ad45d1c01": {
+    "symbol": "0x2805de16...",
+    "reason": "太老 58min",
+    "ts": 1788471456
+  },
+  "0xbafcec4e4fa6d0f7b82da6e47e62204955b71e76": {
+    "symbol": "0xbafcec4e...",
+    "reason": "MC超上限 $69k",
+    "ts": 1788471769
+  },
+  "0xe608850d6f3a9a184c3c8fc46eaecdc24bfa1d65": {
+    "symbol": "0xe608850d...",
+    "reason": "MC超上限 $82k",
+    "ts": 1788471873
+  },
+  "0x6f256027faf72dc73153373df71b5fe5ca161e18": {
+    "symbol": "0x6f256027...",
+    "reason": "太老 44min",
+    "ts": 1788472420
+  },
+  "0x7648f37c2314466726a28f7a5edbdb8dc7b3e23f": {
+    "symbol": "0x7648f37c...",
+    "reason": "太老 83min",
+    "ts": 1788472578
+  },
+  "0x05fd7edef8d4199666aa26f7c70354a290281e18": {
+    "symbol": "0x05fd7ede...",
+    "reason": "MC超上限 $137k",
+    "ts": 1788472647
+  },
+  "0xf2451a31a0ada3aca28c6649623a4e7176081e18": {
+    "symbol": "0xf2451a31...",
+    "reason": "MC超上限 $1293k",
+    "ts": 1788472960
+  },
+  "0x77a76b7571945c764e24363f188048bdf27e969d": {
+    "symbol": "0x77a76b75...",
+    "reason": "太老 35min",
+    "ts": 1788473131
+  },
+  "0x1fec99f84c1d8f9ab90a016c1b73ff3e0649cfb1": {
+    "symbol": "Goodspeed",
+    "reason": "🚫 R6-真实持有人不足: 总5人 去关联后5人 < 50人",
+    "ts": 1788473353
+  },
+  "0xf39a492d391970410b4ee685bdea448a5bda698a": {
+    "symbol": "0xf39a492d...",
+    "reason": "太老 40min",
+    "ts": 1788473501
+  },
+  "0xada85e113fc5c33046cae2fc66006fd84f093c9b": {
+    "symbol": "0xada85e11...",
+    "reason": "MC超上限 $228k",
+    "ts": 1788473725
+  },
+  "0x73a1cf17c5f1727a354862eceddf6ceb1f0f5809": {
+    "symbol": "PVP",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+74%>50%（典型拉盘砸盘信号）",
+    "ts": 1788474033
+  },
+  "0x21d3462d3f0a5f661ed46d033a8cf05595c11e18": {
+    "symbol": "0x21d3462d...",
+    "reason": "太老 1544min",
+    "ts": 1788474400
+  },
+  "0xf434ee3d84bf1f81f3a7f0582cab33c232733635": {
+    "symbol": "0xf434ee3d...",
+    "reason": "MC超上限 $86k",
+    "ts": 1788474404
+  },
+  "0x0dbc9d99033b3615c27b3b70432524930f7c1e18": {
+    "symbol": "0x0dbc9d99...",
+    "reason": "MC超上限 $549k",
+    "ts": 1788474452
+  },
+  "0xda2598c976e62e7e15dcca75169b404712e48b04": {
+    "symbol": "0xda2598c9...",
+    "reason": "太老 30min",
+    "ts": 1788474824
+  },
+  "0x26c8dd3740e20e5126f1428d335c639cecb93c95": {
+    "symbol": "0x26c8dd37...",
+    "reason": "MC超上限 $101k",
+    "ts": 1788474925
+  },
+  "0x208092689248d96aa7f30aab09ff6a7e05b41e18": {
+    "symbol": "0x20809268...",
+    "reason": "太老 58min",
+    "ts": 1788474994
+  },
+  "0x1d855400cddd748e65f3bb3fb0e55542fcd9d701": {
+    "symbol": "0x1d855400...",
+    "reason": "太老 2746min",
+    "ts": 1788475052
+  },
+  "0x0b6a2ff9c899fe41870cdaa2733f2a07f9da9ac4": {
+    "symbol": "0x0b6a2ff9...",
+    "reason": "太老 438min",
+    "ts": 1788475164
+  },
+  "0xe813d00694c61b9246aa5174ad37c805b0e2b0fe": {
+    "symbol": "TH",
+    "reason": "🚫 R6-真实持有人不足: 总3人 去关联后3人 < 50人",
+    "ts": 1788475361
+  },
+  "0xf3081494b87e8d5fb7960f066e931d1d0e6e3d67": {
+    "symbol": "0xf3081494...",
+    "reason": "太老 10047min",
+    "ts": 1788475951
+  },
+  "0xa2b0a8f53b7114d12c568d547b496a9ff3541e18": {
+    "symbol": "0xa2b0a8f5...",
+    "reason": "太老 114min",
+    "ts": 1788476312
+  },
+  "0xea191ccbffdd4404b9af93e46df7b0ff21745c3b": {
+    "symbol": "0xea191ccb...",
+    "reason": "太老 6255min",
+    "ts": 1788476317
+  },
+  "0x75509491022590523ea6be71483012e2f293ecb7": {
+    "symbol": "U+1F917.",
+    "reason": "🚫 R6-真实持有人不足: 总38人 去关联后38人 < 50人",
+    "ts": 1788476903
+  },
+  "0x665ab4ab7b60e6fc2004fbd1b8a17f49d0e71e18": {
+    "symbol": "0x665ab4ab...",
+    "reason": "太老 2621min",
+    "ts": 1788477222
+  },
+  "0x58ea4360128b60023f0e63e33529ba7c6f49b814": {
+    "symbol": "ASTRA",
+    "reason": "评分不足 6/8",
+    "ts": 1788477286
+  },
+  "0xd65e8a7743735cd9b61f281906d36384e155c29e": {
+    "symbol": "0xd65e8a77...",
+    "reason": "MC超上限 $63k",
+    "ts": 1788477392
+  },
+  "0xac0985d44a2ecc7da89d7fdc62f3e508173b7238": {
+    "symbol": "DUCK",
+    "reason": "🚫 R6-真实持有人不足: 总3人 去关联后3人 < 50人",
+    "ts": 1788477506
+  },
+  "0x10bd6e251f203f9cddc1bfe1431e017ea9717777": {
+    "symbol": "BATMAM",
+    "reason": "🚫 R6-真实持有人不足: 总19人 去关联后19人 < 50人",
+    "ts": 1788477619
+  },
+  "0x67963972e05e439354b4a762e50b96338c8f7467": {
+    "symbol": "DOGGYCOIN",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+163%>50%（典型拉盘砸盘信号）",
+    "ts": 1788477716
+  },
+  "0x6b841bc8a321ad03aad8ad7baeea86cd66510f6c": {
+    "symbol": "CATVIC",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$162 是1h均速的12倍（人为脉冲）",
+    "ts": 1788477958
+  },
+  "0xad066e27a97b23c6f2ada0cfaf5edae4b3ac2ce2": {
+    "symbol": "0xad066e27...",
+    "reason": "太老 164min",
+    "ts": 1788478550
+  },
+  "0xacef2e09adb47ad6abebad9ff06689e60615c2b6": {
+    "symbol": "0xacef2e09...",
+    "reason": "MC超上限 $742k",
+    "ts": 1788478712
+  },
+  "0x9d20ff8c16df3c40852eb81a4972ca3f30803a01": {
+    "symbol": "NUCLEON",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+61%>50%（典型拉盘砸盘信号）",
+    "ts": 1788479321
+  },
+  "0x9731c7f2dc2c28472b7dbd2281d00bee782bf324": {
+    "symbol": "0x9731c7f2...",
+    "reason": "MC超上限 $88k",
+    "ts": 1788479481
+  },
+  "0x9eebc9d0162eab236ad4672caef8dba40dc06c24": {
+    "symbol": "CREDITLINE",
+    "reason": "🚫 R4-天花板拒绝: MC$42k 已接近TP1$50k，无止盈空间",
+    "ts": 1788479484
+  },
+  "0x41b13c429675015d32377305d03222cbddb20ca0": {
+    "symbol": "0x41b13c42...",
+    "reason": "太老 159min",
+    "ts": 1788479807
+  },
+  "0x33e40f04067901452cb727aa19d0d3c7d80479aa": {
+    "symbol": "0x33e40f04...",
+    "reason": "MC超上限 $247k",
+    "ts": 1788479811
+  },
+  "0x19d75f4a94c56449b96b4320635c39f3ee842c32": {
+    "symbol": "DEEPEYE",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$143 是1h均速的12倍（人为脉冲）",
+    "ts": 1788479861
+  },
+  "0x7812122ddb953a93bf8a0cd43ede87dadcc79507": {
+    "symbol": "0x7812122d...",
+    "reason": "MC超上限 $68k",
+    "ts": 1788480298
+  },
+  "0x2ea98073e7c3b0781f8cec3690eacb8f5c83507d": {
+    "symbol": "0x2ea98073...",
+    "reason": "太老 2898min",
+    "ts": 1788480305
+  },
+  "0xbbd6a9cecc76be37f4f4ea4924bf12db295b12f7": {
+    "symbol": "0xbbd6a9ce...",
+    "reason": "MC超上限 $74k",
+    "ts": 1788480580
+  },
+  "0x15384a0895608ad3c9bbd3c26e568fb60535f041": {
+    "symbol": "PATIENCE",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+82%>50%（典型拉盘砸盘信号）",
+    "ts": 1788480899
+  },
+  "0x9fe6d319ccf4c16fd7e42905be33fa0a07c20a76": {
+    "symbol": "0x9fe6d319...",
+    "reason": "太老 49min",
+    "ts": 1788481064
+  },
+  "0x850aa6d7bb0ad22b0201dde8a7a1a7a2e16714a1": {
+    "symbol": "0x850aa6d7...",
+    "reason": "MC超上限 $177k",
+    "ts": 1788481416
+  },
+  "0x3e2cf3aec80adcffcae3436938934be970894066": {
+    "symbol": "0x3e2cf3ae...",
+    "reason": "太老 60min",
+    "ts": 1788481538
+  },
+  "0x91652e4c0feb89f024e7133e9155a81cad7a1e18": {
+    "symbol": "0x91652e4c...",
+    "reason": "太老 83min",
+    "ts": 1788482618
+  },
+  "0x0b8bbbe6c7439e938477f57e8a88598813125adc": {
+    "symbol": "0x0b8bbbe6...",
+    "reason": "MC超上限 $111k",
+    "ts": 1788483034
+  },
+  "0xd489ab742a5b9c1258adefcba8c35c51f1444e64": {
+    "symbol": "0xd489ab74...",
+    "reason": "太老 44min",
+    "ts": 1788483542
+  },
+  "0xcbb3459375f03241a6201a6f42c2dbf3ce441e18": {
+    "symbol": "0xcbb34593...",
+    "reason": "太老 60min",
+    "ts": 1788483648
+  },
+  "0x27c99fbde9d0d2aa4f4bfb4943f237843ddf6958": {
+    "symbol": "0x27c99fbd...",
+    "reason": "太老 990min",
+    "ts": 1788483703
+  },
+  "0x73c2de14c7fa0a57cc2d9722b959ea70b881ffe4": {
+    "symbol": "0x73c2de14...",
+    "reason": "太老 89min",
+    "ts": 1788484125
+  },
+  "0x4d371478c5be5f0e13b59bf4a6e4e954e6ac3e53": {
+    "symbol": "0x4d371478...",
+    "reason": "MC超上限 $66k",
+    "ts": 1788484710
+  },
+  "0xb05618fe540d0be2bd193153de86a9f84de0d76a": {
+    "symbol": "0xb05618fe...",
+    "reason": "太老 728min",
+    "ts": 1788484715
+  },
+  "0xba471f0248bca5d3e5184deb8007f4223298b278": {
+    "symbol": "0xba471f02...",
+    "reason": "太老 1543min",
+    "ts": 1788484720
+  },
+  "0xb768438870789bd9742cbba26aed052a9e4287d5": {
+    "symbol": "0xb7684388...",
+    "reason": "MC超上限 $189k",
+    "ts": 1788486240
+  },
+  "0xd121535b8d74492b306aafba2bae811fab91294e": {
+    "symbol": "0xd121535b...",
+    "reason": "MC超上限 $62k",
+    "ts": 1788486408
+  },
+  "0xa9bfd5b8c08482f42f25c442b678af9eb475a9be": {
+    "symbol": "0xa9bfd5b8...",
+    "reason": "太老 61min",
+    "ts": 1788486635
+  },
+  "0x015e1ab33655db6aa6337899e38807cbe3d62955": {
+    "symbol": "TRUMPE",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$112630763829 是1h均速的12倍（人为脉冲）",
+    "ts": 1788486862
+  },
+  "0x2f3f735c5fe24c1ced9358683924ea9815d74663": {
+    "symbol": "0x2f3f735c...",
+    "reason": "太老 62409min",
+    "ts": 1788487258
+  },
+  "0x5e322c422d38121eec265d8af136c51fe9ca1e18": {
+    "symbol": "0x5e322c42...",
+    "reason": "太老 64min",
+    "ts": 1788487437
+  },
+  "0x74291964ba29d4597308ebe89389cfc16a651f89": {
+    "symbol": "0x74291964...",
+    "reason": "MC超上限 $60k",
+    "ts": 1788487774
+  },
+  "0x3fb3391a79baaaa749809b1bd6314bbf935be887": {
+    "symbol": "ROBINMOUSE",
+    "reason": "评分不足 5/8",
+    "ts": 1788488110
+  },
+  "0xc60ba256b44334a0cd2c7242e98b88f031abb006": {
+    "symbol": "0xc60ba256...",
+    "reason": "MC超上限 $4677k",
+    "ts": 1788488270
+  },
+  "0xaf373c34f403f811fd269999b1b8a1677ca4f158": {
+    "symbol": "0xaf373c34...",
+    "reason": "MC超上限 $351k",
+    "ts": 1788488389
+  },
+  "0xb086eccd0019a23fd772f0789224ae5dee632f90": {
+    "symbol": "GBC",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$4307 是1h均速的12倍（人为脉冲）",
+    "ts": 1788488440
+  },
+  "0x43304ba2ece7cdb58d0c572b10ae64fc0697088a": {
+    "symbol": "GBC",
+    "reason": "🚫 R6-真实持有人不足: 总7人 去关联后7人 < 50人",
+    "ts": 1788488622
+  },
+  "0x72a9676fed3a14ff3dd8b419e1accbf032cbe1c8": {
+    "symbol": "0x72a9676f...",
+    "reason": "太老 31min",
+    "ts": 1788488786
+  },
+  "0xbebacca31e990e36c3293b100d48e41773c61e18": {
+    "symbol": "0xbebacca3...",
+    "reason": "太老 4311min",
+    "ts": 1788488996
+  },
+  "0x5ad0bfb84c1565a2433e0c9c0c62adfca204a901": {
+    "symbol": "DAWN",
+    "reason": "评分不足 7/8",
+    "ts": 1788489066
+  },
+  "0xdd0b80c2a4b341676c5316f0107f6939ae021e18": {
+    "symbol": "0xdd0b80c2...",
+    "reason": "太老 108min",
+    "ts": 1788489554
+  },
+  "0x13ed6728d3230574f7d7b77a0b5965f969d7e780": {
+    "symbol": "0x13ed6728...",
+    "reason": "MC超上限 $120k",
+    "ts": 1788489559
+  },
+  "0x4d7c94d8a25056d3101087b364b2b046c8899a95": {
+    "symbol": "0x4d7c94d8...",
+    "reason": "太老 1084min",
+    "ts": 1788489833
+  },
+  "0x619d1c43fcaf0c90cfdecfcbc9eb4a54988778ab": {
+    "symbol": "0x619d1c43...",
+    "reason": "太老 46min",
+    "ts": 1788489946
+  },
+  "0x8071a272f5b754fa41e6ca22d1531fb0e41f15ce": {
+    "symbol": "0x8071a272...",
+    "reason": "MC超上限 $73k",
+    "ts": 1788489954
+  },
+  "0xe6326071164f45521b531ed8d5dd79b5cc0ea9e3": {
+    "symbol": "0xe6326071...",
+    "reason": "MC超上限 $123k",
+    "ts": 1788491258
+  },
+  "0xb934cabf87781f7eb13265de4cb2ce090d00c4e3": {
+    "symbol": "0xb934cabf...",
+    "reason": "MC超上限 $97k",
+    "ts": 1788491264
+  },
+  "0x654c7cdd774b9648ec5fdb02d3a43de6a7189531": {
+    "symbol": "0x654c7cdd...",
+    "reason": "MC超上限 $77k",
+    "ts": 1788491379
+  },
+  "0x1547dc6e2c028ed289fa375dd78e580bb58d07c7": {
+    "symbol": "0x1547dc6e...",
+    "reason": "MC超上限 $111k",
+    "ts": 1788494448
+  },
+  "0xe0514a254b465c8c804f77230fb1059f84b21e18": {
+    "symbol": "0xe0514a25...",
+    "reason": "太老 35min",
+    "ts": 1788494554
+  },
+  "0x03dfbbe0ac4e7bcdafd08ed41a400326b77d8c80": {
+    "symbol": "0x03dfbbe0...",
+    "reason": "MC超上限 $527k",
+    "ts": 1788494619
+  },
+  "0xc8c49dca6e690c94a6dc77360d5487f73f635b44": {
+    "symbol": "0xc8c49dca...",
+    "reason": "MC超上限 $187k",
+    "ts": 1788494674
+  },
+  "0xe2dae1c072b9f66bed999873b94798b2152af7e1": {
+    "symbol": "0xe2dae1c0...",
+    "reason": "MC超上限 $74k",
+    "ts": 1788495275
+  },
+  "0xb8df008a58aea00bd1c0241379bd2acf59ad6901": {
+    "symbol": "AMC",
+    "reason": "安全风控未通过: ❌ 风险等级 HIGH",
+    "ts": 1788495545
+  },
+  "0xffdf39735165e784e32041640290bec1d4ae1c62": {
+    "symbol": "0xffdf3973...",
+    "reason": "MC超上限 $220k",
+    "ts": 1788495766
+  },
+  "0xea616f82cd629c8e1d0eb0bbacd97467a1317777": {
+    "symbol": "0xea616f82...",
+    "reason": "太老 96min",
+    "ts": 1788496183
+  },
+  "0xef67e3064bef1a27e81925ec7132f23e533bd5f6": {
+    "symbol": "0xef67e306...",
+    "reason": "MC超上限 $354k",
+    "ts": 1788496188
+  },
+  "0x96f9ea2be7c099ca5af9e363583a42774b915fb9": {
+    "symbol": "0x96f9ea2b...",
+    "reason": "太老 42min",
+    "ts": 1788496193
+  },
+  "0x33c042495874a5ae3fd5f367a1228631597d788c": {
+    "symbol": "0x33c04249...",
+    "reason": "太老 44min",
+    "ts": 1788496239
+  },
+  "0x3c205df1996dca72b3dc2cc6dbfab1a0725e1e18": {
+    "symbol": "0x3c205df1...",
+    "reason": "太老 116min",
+    "ts": 1788496563
+  },
+  "0xd96fc8bbb3034ad3007025deeb83a21a4c10497f": {
+    "symbol": "0xd96fc8bb...",
+    "reason": "太老 42689min",
+    "ts": 1788496727
+  },
+  "0xec1da6f616aafe4a4710ac5da30918b3650016dd": {
+    "symbol": "0xec1da6f6...",
+    "reason": "太老 132min",
+    "ts": 1788497317
+  },
+  "0xd8fc7a6dabe501f85dcc8581cc66e50f1ea27940": {
+    "symbol": "ROBIN",
+    "reason": "🚫 R6-真实持有人不足: 总12人 去关联后12人 < 50人",
+    "ts": 1788497803
+  },
+  "0xd0f48eb618f14b72df5f04a5c4d4a0dc8e5fb601": {
+    "symbol": "0xd0f48eb6...",
+    "reason": "太老 36min",
+    "ts": 1788498048
+  },
+  "0x7b0891e4edb4f718b5657cb09451e2c459c91fca": {
+    "symbol": "0x7b0891e4...",
+    "reason": "太老 53min",
+    "ts": 1788498787
+  },
+  "0x4f4a977d3bf0d8b374e1004c325d1158bed64d12": {
+    "symbol": "0x4f4a977d...",
+    "reason": "MC超上限 $81k",
+    "ts": 1788498897
+  },
+  "0xd006a2953572f68b77c2c36ad9a80ea0593436c0": {
+    "symbol": "0xd006a295...",
+    "reason": "MC超上限 $62k",
+    "ts": 1788498996
+  },
+  "0x4ffb83d51bc4e2658ccd6cbff684f68559c4c28c": {
+    "symbol": "0x4ffb83d5...",
+    "reason": "MC超上限 $61k",
+    "ts": 1788499064
+  },
+  "0x5982f195a5232bdffc7339ebf4edf59f162effe9": {
+    "symbol": "0x5982f195...",
+    "reason": "太老 168min",
+    "ts": 1788500275
+  },
+  "0x8d4d82e03de1bf2fb844c27eb6e81da9abf523b9": {
+    "symbol": "BUBBLE",
+    "reason": "🚫 R6-真实持有人不足: 总4人 去关联后4人 < 30人",
+    "ts": 1788500488
+  },
+  "0x0f0c09bd14a7bf0a7d2b0c3362895642fcc6a13d": {
+    "symbol": "0x0f0c09bd...",
+    "reason": "MC超上限 $74k",
+    "ts": 1788500823
+  },
+  "0xccb835cbea2a26870660ce314f7dedf4412f0308": {
+    "symbol": "0xccb835cb...",
+    "reason": "太老 41min",
+    "ts": 1788501126
+  },
+  "0x8aec464e645ac07976ce748423a02f797c871b4b": {
+    "symbol": "TEST",
+    "reason": "🚫 R6-真实持有人不足: 总3人 去关联后3人 < 30人",
+    "ts": 1788501239
+  },
+  "0x99452d7519e103daf9bc9f02311dd164a073a7a2": {
+    "symbol": "0x99452d75...",
+    "reason": "太老 56min",
+    "ts": 1788501466
+  },
+  "0xf7e8a7c50eef98eabeed5bdd71e22c96c300e33d": {
+    "symbol": "0xf7e8a7c5...",
+    "reason": "太老 107min",
+    "ts": 1788501793
+  },
+  "0xc0c82cc308e493a3b966b87b9f9862b6ce84068f": {
+    "symbol": "Gat ciberp",
+    "reason": "🚫 R4-天花板拒绝: MC$58k 已接近TP1$50k，无止盈空间",
+    "ts": 1788501953
+  },
+  "0xf5f5f51c4ab83c303c4fad5b6a0838e106ef1e18": {
+    "symbol": "0xf5f5f51c...",
+    "reason": "太老 146min",
+    "ts": 1788501958
+  },
+  "0x5e857cb15616b907db0999940ef76a2ce6061e18": {
+    "symbol": "0x5e857cb1...",
+    "reason": "太老 169min",
+    "ts": 1788502448
+  },
+  "0x64ee81557b0a4fd8ac2ef80b1030c0e5f43f1501": {
+    "symbol": "0x64ee8155...",
+    "reason": "MC超上限 $115k",
+    "ts": 1788502921,
+    "ttl": 86400
+  },
+  "0x699aeb1ba72d8bf8393bea076660fd8a304ed420": {
+    "symbol": "Gatsby",
+    "reason": "🚫 R6-真实持有人不足: 总3人 去关联后3人 < 30人",
+    "ts": 1788503258,
+    "ttl": 3600
+  },
+  "0xc6fb16ec24cc41c915fb4efc3e7300d6887c1501": {
+    "symbol": "CHILL",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+445%>50%（典型拉盘砸盘信号）",
+    "ts": 1788503394,
+    "ttl": 3600
+  },
+  "0x5c9d8bf97a9a18e355b231c4cfeafc12a75ae4c6": {
+    "symbol": "0x5c9d8bf9...",
+    "reason": "MC超上限 $148k",
+    "ts": 1788503399,
+    "ttl": 86400
+  },
+  "0x957967f8a5b6da02316c15121d97753b6a0f890a": {
+    "symbol": "UNIPONS",
+    "reason": "🚫 R6-真实持有人不足: 总3人 去关联后3人 < 30人",
+    "ts": 1788503707,
+    "ttl": 3600
+  },
+  "0x66ce11064169985ed1eb72c1909d337bba800123": {
+    "symbol": "QVR",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$595 是1h均速的12倍（人为脉冲）",
+    "ts": 1788503882,
+    "ttl": 7200
+  },
+  "0xe15b43fd6e8b384920e63b23cc6923fa1a4a9a92": {
+    "symbol": "IPHONE",
+    "reason": "🚫 R4-天花板拒绝: MC$55k 已接近TP1$50k，无止盈空间",
+    "ts": 1788504283,
+    "ttl": 86400
+  },
+  "0x4c24e2bd3ad36af26b805bfbe629ea614323e0a0": {
+    "symbol": "0x4c24e2bd...",
+    "reason": "太老 72min",
+    "ts": 1788505307,
+    "ttl": 86400
+  },
+  "0x5e1f3557801cc208105ee27c7ce351d435030f69": {
+    "symbol": "spy",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+185%>50%（典型拉盘砸盘信号）",
+    "ts": 1788505424,
+    "ttl": 3600
+  },
+  "0xbd634555643665ed304a8ad63e15fec6775adce9": {
+    "symbol": "UNIPONS",
+    "reason": "🚫 R6-真实持有人不足: 总4人 去关联后4人 < 30人",
+    "ts": 1788506089,
+    "ttl": 3600
+  },
+  "0x37336e5441e1ea20a6684f22aafc29fd266e1786": {
+    "symbol": "RCOMBINATOR",
+    "reason": "🚫 R4-天花板拒绝: MC$52k 已接近TP1$50k，无止盈空间",
+    "ts": 1788506098,
+    "ttl": 86400
+  },
+  "0xab90213eed4de78772db157f0a86ad218749fb06": {
+    "symbol": "0xab90213e...",
+    "reason": "太老 30min",
+    "ts": 1788507358,
+    "ttl": 86400
+  },
+  "0x136dea0e15971e38e1d98ad8f642dd1d14e05f01": {
+    "symbol": "APE",
+    "reason": "安全风控未通过: ❌ 风险等级 HIGH",
+    "ts": 1788507561,
+    "ttl": 86400
+  },
+  "0x84229b4feb41a4e61ee8046edc4e4b9d3337508d": {
+    "symbol": "KIWI",
+    "reason": "🚫 R2.5-卖压主导拒绝: 0买/10卖 买卖比=0.00<0.9（出货信号）",
+    "ts": 1788507583,
+    "ttl": 1800
+  },
+  "0x4778d8ad4e7a0644d936753974e757d9eca6eb16": {
+    "symbol": "0x4778d8ad...",
+    "reason": "MC超上限 $187k",
+    "ts": 1788507611,
+    "ttl": 86400
+  },
+  "0xcb7b48dad1ec42a0e4211fb581e9951240e11601": {
+    "symbol": "0xcb7b48da...",
+    "reason": "太老 90min",
+    "ts": 1788507646,
+    "ttl": 86400
+  },
+  "0x10e99ab02cb279a5fec39602391b5130f0d15ec6": {
+    "symbol": "0x10e99ab0...",
+    "reason": "MC超上限 $285k",
+    "ts": 1788507837,
+    "ttl": 86400
+  },
+  "0xf2c9130fef940a96a4ba4e1bbc419ec0517f1e18": {
+    "symbol": "0xf2c9130f...",
+    "reason": "MC超上限 $74k",
+    "ts": 1788508440,
+    "ttl": 86400
+  },
+  "0xed996de448b7499db2e20b9ab4226420c0828601": {
+    "symbol": "0xed996de4...",
+    "reason": "太老 57min",
+    "ts": 1788508798,
+    "ttl": 86400
+  },
+  "0xf4e69b2bd6b846f11ed5f7553907c851d2a75c1c": {
+    "symbol": "$LEAK",
+    "reason": "🚫 R2-刷单拒绝: 买卖单量相当 30买/28卖 差距仅7%（机器刷单特征）",
+    "ts": 1788508919,
+    "ttl": 1800
+  },
+  "0x192753ae7300887ead209da120612a69d051fa01": {
+    "symbol": "TTM",
+    "reason": "🚫 R2-刷单拒绝: 买卖单量相当 51买/55卖 差距仅7%（机器刷单特征）",
+    "ts": 1788509462,
+    "ttl": 1800
+  },
+  "0xe41fdd306d3f3fec0813ee69c189a0e1b27f1e18": {
+    "symbol": "0xe41fdd30...",
+    "reason": "MC超上限 $69k",
+    "ts": 1788509569,
+    "ttl": 86400
+  },
+  "0xade76ad1f5249e7d90a04837568ebf386f0ac201": {
+    "symbol": "0xade76ad1...",
+    "reason": "MC超上限 $89k",
+    "ts": 1788509688,
+    "ttl": 86400
+  },
+  "0xc2e5a3d71f2040e8d8c093b6b1a30c042f87c67e": {
+    "symbol": "0xc2e5a3d7...",
+    "reason": "太老 4496min",
+    "ts": 1788510057,
+    "ttl": 86400
+  },
+  "0xabc78afb6fd5ad0c31716587ed20091ce26caee8": {
+    "symbol": "0xabc78afb...",
+    "reason": "MC超上限 $64k",
+    "ts": 1788510349,
+    "ttl": 86400
+  },
+  "0x04ec617cc5de7f24a8503732d87eedeee6d05884": {
+    "symbol": "0x04ec617c...",
+    "reason": "MC超上限 $71k",
+    "ts": 1788510898,
+    "ttl": 86400
+  },
+  "0x6c619dfb59dba58b02a01450b5f20bb140b75b0e": {
+    "symbol": "TCRCL",
+    "reason": "🚫 R6-真实持有人不足: 总5人 去关联后5人 < 30人",
+    "ts": 1788511162,
+    "ttl": 3600
+  },
+  "0xfd8a9e1f3de31ca988142cd68b52746f49845419": {
+    "symbol": "Tendies",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+56%>50%（典型拉盘砸盘信号）",
+    "ts": 1788511393,
+    "ttl": 3600
+  },
+  "0xd5fee75b0e9084262b22f934aa39a6898f584eea": {
+    "symbol": "KIWI",
+    "reason": "🚫 R6-真实持有人不足: 总14人 去关联后14人 < 30人",
+    "ts": 1788511709,
+    "ttl": 3600
+  },
+  "0xf92fbdfaf906d172dc0ab24e4bbc1225a2341f4d": {
+    "symbol": "PLTR",
+    "reason": "🚫 R2-刷单拒绝: 买卖单量相当 82买/74卖 差距仅10%（机器刷单特征）",
+    "ts": 1788511796,
+    "ttl": 1800
+  },
+  "0x472f06a250023c07c052ee4f9e8428497d02017d": {
+    "symbol": "TCRCL",
+    "reason": "🚫 R6-真实持有人不足: 总4人 去关联后4人 < 30人",
+    "ts": 1788511873,
+    "ttl": 3600
+  },
+  "0x55a810c2072062f553c8a0dab003ccb8710e5c11": {
+    "symbol": "TCRCL",
+    "reason": "🚫 R6-真实持有人不足: 总4人 去关联后4人 < 30人",
+    "ts": 1788512079,
+    "ttl": 3600
+  },
+  "0x5d8c7212a3d5d2c22d3849a7a7918c6a61c31961": {
+    "symbol": "ROBINHOOD",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+80%>50%（典型拉盘砸盘信号）",
+    "ts": 1788512405,
+    "ttl": 3600
+  },
+  "0x894a265f9896c57070e35799579e139ce18d4591": {
+    "symbol": "TCRCL",
+    "reason": "🚫 R6-真实持有人不足: 总5人 去关联后5人 < 30人",
+    "ts": 1788512602,
+    "ttl": 3600
+  },
+  "0x192ebd106c780b5663164eeb3da44052d5e61e18": {
+    "symbol": "0x192ebd10...",
+    "reason": "太老 599min",
+    "ts": 1788512687,
+    "ttl": 86400
+  },
+  "0x898be0a96de28d0b594c646b625d5ed230a5bdaf": {
+    "symbol": "TCRCL",
+    "reason": "🚫 R6-真实持有人不足: 总6人 去关联后6人 < 30人",
+    "ts": 1788512783,
+    "ttl": 3600
+  },
+  "0xa4f285ec2dc214660cc3407364ee65c25fffdf60": {
+    "symbol": "DISP",
+    "reason": "🚫 R4-天花板拒绝: MC$44k 已接近TP1$30k，无止盈空间",
+    "ts": 1788512817,
+    "ttl": 86400
+  },
+  "0x33f2576404c563062654846f81c2015ea60d3eca": {
+    "symbol": "MSFT",
+    "reason": "🚫 R1-拉盘拒绝: 5min涨幅+97%>50%（典型拉盘砸盘信号）",
+    "ts": 1788513231,
+    "ttl": 3600
+  },
+  "0xe4902ea6a8a05f09f14032f837b50fa374dc3261": {
+    "symbol": "0xe4902ea6...",
+    "reason": "太老 334min",
+    "ts": 1788513236,
+    "ttl": 86400
+  },
+  "0xcf7eb31b8bcbbf21112345b929afe47f99fc02e0": {
+    "symbol": "HALT",
+    "reason": "🚫 R6-真实持有人不足: 总3人 去关联后3人 < 30人",
+    "ts": 1788513468,
+    "ttl": 3600
+  },
+  "0x3b4246f0d621c85c648b010299afd773caf179e8": {
+    "symbol": "0x3b4246f0...",
+    "reason": "太老 50min",
+    "ts": 1788513658,
+    "ttl": 86400
+  },
+  "0x29ea36cbc9faed8d472499345a7380e89ca00e01": {
+    "symbol": "ADAM ",
+    "reason": "🚫 R6-真实持有人不足: 总17人 去关联后17人 < 30人",
+    "ts": 1788513707,
+    "ttl": 3600
+  },
+  "0x922fc3ec6c81ff26c1d3ffdde6adbd203279a89e": {
+    "symbol": "BROKE",
+    "reason": "🚫 R6-真实持有人不足: 总5人 去关联后5人 < 30人",
+    "ts": 1788514038,
+    "ttl": 3600
+  },
+  "0x0a83fe17ab7557eeef300b7664f8e25f1677fcab": {
+    "symbol": "0x0a83fe17...",
+    "reason": "太老 33min",
+    "ts": 1788514261,
+    "ttl": 86400
+  },
+  "0x82be8de5f46bba84c72e4e034d20f9f219e972f2": {
+    "symbol": "0x82be8de5...",
+    "reason": "太老 59min",
+    "ts": 1788514386,
+    "ttl": 86400
+  },
+  "0x84712b16f87a9eeda912017da897f9d3d61fd661": {
+    "symbol": "0x84712b16...",
+    "reason": "MC超上限 $54k",
+    "ts": 1788515098,
+    "ttl": 86400
+  },
+  "0x187010dac5991d980a2b578f3ac84f36cd87164a": {
+    "symbol": "ALEXA",
+    "reason": "评分不足 5/8",
+    "ts": 1788515510,
+    "ttl": 86400
+  },
+  "0xedc0fcfbecc85d0b1cbf6cccafa94e498738ff67": {
+    "symbol": "SlopGPT",
+    "reason": "🚫 R2.5-卖压主导拒绝: 0买/11卖 买卖比=0.00<0.9（出货信号）",
+    "ts": 1788515524,
+    "ttl": 1800
+  },
+  "0xf62d3aeaa328f6a1145d57644d7ed84a411d447e": {
+    "symbol": "0xf62d3aea...",
+    "reason": "MC超上限 $187k",
+    "ts": 1788515881,
+    "ttl": 86400
+  },
+  "0xa18036d54950e67353fde071c4bf587c512a3ca2": {
+    "symbol": "0xa18036d5...",
+    "reason": "太老 73526min",
+    "ts": 1788516117,
+    "ttl": 86400
+  },
+  "0x6885d7f98dd2696f71672baa1ea910c09232e570": {
+    "symbol": "APES",
+    "reason": "🚫 R2-刷单拒绝: 买卖单量相当 53买/53卖 差距仅0%（机器刷单特征）",
+    "ts": 1788516297,
+    "ttl": 1800
+  },
+  "0xf314dce93a02e9b5d266e37484ec26a11f25db79": {
+    "symbol": "0xf314dce9...",
+    "reason": "MC超上限 $63k",
+    "ts": 1788516430,
+    "ttl": 86400
+  },
+  "0x45945f8be303442a6cfd055c1cfb1dadf5161e18": {
+    "symbol": "CHAT",
+    "reason": "🚫 R2.5-卖压主导拒绝: 5买/10卖 买卖比=0.50<0.9（出货信号）",
+    "ts": 1788516900,
+    "ttl": 1800
+  },
+  "0xf9dd68611c409799ae2bd002ba523e7e069ba4be": {
+    "symbol": "0xf9dd6861...",
+    "reason": "太老 1168min",
+    "ts": 1788517079,
+    "ttl": 86400
+  },
+  "0x52d7bf1d389ddd9f7b7d9661032e97c1b66f5f20": {
+    "symbol": "UNIPONS",
+    "reason": "🚫 R6-真实持有人不足: 总3人 去关联后3人 < 30人",
+    "ts": 1788518183,
+    "ttl": 3600
+  },
+  "0xd4f6b393376291fde5b111e9578fca109d40967f": {
+    "symbol": "0xd4f6b393...",
+    "reason": "MC超上限 $54k",
+    "ts": 1788518215,
+    "ttl": 86400
+  },
+  "0x847fe6bf2cd60e2e881bfc6e09ac61fa68ccfd62": {
+    "symbol": "MOGGY",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$162 是1h均速的12倍（人为脉冲）",
+    "ts": 1788518348,
+    "ttl": 7200
+  },
+  "0x5dc1546be4a8687815f20c83f8758e7173904034": {
+    "symbol": "0x5dc1546b...",
+    "reason": "MC超上限 $153k",
+    "ts": 1788518406,
+    "ttl": 86400
+  },
+  "0x0f421d05e67b9e25d754e8e685af91b37bff6cef": {
+    "symbol": "0x0f421d05...",
+    "reason": "太老 262min",
+    "ts": 1788518641,
+    "ttl": 86400
+  },
+  "0x51d1abab4d1e7b50642a25d3f7b2823067ebf9d7": {
+    "symbol": "0x51d1abab...",
+    "reason": "太老 564min",
+    "ts": 1788518876,
+    "ttl": 86400
+  },
+  "0x6c062edd9cff2b84368d3c188b116245f588094f": {
+    "symbol": "NVDA",
+    "reason": "🚫 R6-真实持有人不足: 总6人 去关联后6人 < 30人",
+    "ts": 1788518969,
+    "ttl": 3600
+  },
+  "0x68f8f61897d17abd10ebc4eaf483e4c189f51e18": {
+    "symbol": "0x68f8f618...",
+    "reason": "太老 570min",
+    "ts": 1788519069,
+    "ttl": 86400
+  },
+  "0x27bb21857a36171e496c819b0d666d99978769fb": {
+    "symbol": "NVDA",
+    "reason": "🚫 R6-真实持有人不足: 总8人 去关联后8人 < 30人",
+    "ts": 1788519149,
+    "ttl": 3600
+  },
+  "0x806103bfbf5d3dca1a15d62a5e3d3eda823aa4e2": {
+    "symbol": "0x806103bf...",
+    "reason": "太老 41min",
+    "ts": 1788519315,
+    "ttl": 86400
+  },
+  "0xde3468d1d52f550ed2de940831629e0c5fde1e18": {
+    "symbol": "0xde3468d1...",
+    "reason": "MC超上限 $77k",
+    "ts": 1788519320,
+    "ttl": 86400
+  },
+  "0x58905ada30e4541022b56b85c83be2e2bcb8f247": {
+    "symbol": "0x58905ada...",
+    "reason": "太老 116min",
+    "ts": 1788519356,
+    "ttl": 86400
+  },
+  "0x938dd92943663d869c40a96900c1eb807a79c8ca": {
+    "symbol": "0x938dd929...",
+    "reason": "太老 109min",
+    "ts": 1788519362,
+    "ttl": 86400
+  },
+  "0xf139f7f7f9c99cbe9cd96d4fcfa6a8f23390dafc": {
+    "symbol": "0xf139f7f7...",
+    "reason": "太老 679min",
+    "ts": 1788519594,
+    "ttl": 86400
+  },
+  "0x68b66d36c9e14d61f7f917fb3021720094c40532": {
+    "symbol": "NVDA",
+    "reason": "🚫 R6-真实持有人不足: 总7人 去关联后7人 < 30人",
+    "ts": 1788520142,
+    "ttl": 3600
+  },
+  "0xbdb0fe43694e2aefa5851ff4b45cc1d257f4bb54": {
+    "symbol": "UNIPONS",
+    "reason": "🚫 R6-真实持有人不足: 总3人 去关联后3人 < 30人",
+    "ts": 1788520171,
+    "ttl": 3600
+  },
+  "0x264ebcbddd1146d7b0dcfdf4a83a94248cd1a448": {
+    "symbol": "ELON",
+    "reason": "🚫 R6-真实持有人不足: 总21人 去关联后21人 < 30人",
+    "ts": 1788520178,
+    "ttl": 3600
+  },
+  "0x9065a9d9fd9f0605dbb90d5079a3789d3056ee86": {
+    "symbol": "18932",
+    "reason": "🚫 R2.5-卖压主导拒绝: 0买/13卖 买卖比=0.00<0.9（出货信号）",
+    "ts": 1788520339,
+    "ttl": 1800
+  },
+  "0xfc6ba657f2e6c2a2569272c70e4781183f970f71": {
+    "symbol": "18932",
+    "reason": "🚫 R2.5-卖压主导拒绝: 0买/16卖 买卖比=0.00<0.9（出货信号）",
+    "ts": 1788520455,
+    "ttl": 1800
+  },
+  "0xb613a657454b9d39e04839a9f10e1b224fbb86a6": {
+    "symbol": "0xb613a657...",
+    "reason": "MC超上限 $80k",
+    "ts": 1788520555,
+    "ttl": 86400
+  },
+  "0x5614587115c01fa7123861c52c80831ef5dbdbdb": {
+    "symbol": "0x56145871...",
+    "reason": "太老 112min",
+    "ts": 1788520741,
+    "ttl": 86400
+  },
+  "0xed4fbda09cb7f5add61bd6729d584c6684e81e18": {
+    "symbol": "0xed4fbda0...",
+    "reason": "MC超上限 $70k",
+    "ts": 1788521016,
+    "ttl": 86400
+  },
+  "0xfa22044134d988f07e92447ab73b29fa43287b49": {
+    "symbol": "0xfa220441...",
+    "reason": "MC超上限 $70k",
+    "ts": 1788521355,
+    "ttl": 86400
+  },
+  "0x5fc50af22065727ca4aafd32f4908cf53b400ce8": {
+    "symbol": "CATFISH",
+    "reason": "安全风控未通过: ❌ 风险等级 HIGH",
+    "ts": 1788521491,
+    "ttl": 86400
+  },
+  "0xe801b33366826e54d284d1120d5d6988631506dd": {
+    "symbol": "0xe801b333...",
+    "reason": "MC超上限 $57k",
+    "ts": 1788521525,
+    "ttl": 86400
+  },
+  "0xdc87320710042bfe18d85741b61bc2c2487e7048": {
+    "symbol": "MO",
+    "reason": "评分不足 7/8",
+    "ts": 1788521727,
+    "ttl": 86400
+  },
+  "0x39d7e739366777b372297e03c92d69205d5bdb4e": {
+    "symbol": "0x39d7e739...",
+    "reason": "太老 45min",
+    "ts": 1788522195,
+    "ttl": 86400
+  },
+  "0x5759a852243a56a48853af1d28fd4e0f33747c9b": {
+    "symbol": "0x5759a852...",
+    "reason": "太老 55min",
+    "ts": 1788522479,
+    "ttl": 86400
+  },
+  "0x7a99d79134a26ce90f0cb98b8eab2c8557e1660a": {
+    "symbol": "0x7a99d791...",
+    "reason": "MC超上限 $305k",
+    "ts": 1788522666,
+    "ttl": 86400
+  },
+  "0x8cafcf3aa6f10d901f88db2c8818e6fe787f8ccf": {
+    "symbol": "0x8cafcf3a...",
+    "reason": "MC超上限 $74k",
+    "ts": 1788522785,
+    "ttl": 86400
+  },
+  "0xc8bd315ab59de415bccfacadbfb36ebca5ba49de": {
+    "symbol": "NVDA",
+    "reason": "🚫 R3-脉冲拒绝: 5min成交量$89 是1h均速的12倍（人为脉冲）",
+    "ts": 1788523080,
+    "ttl": 7200
+  },
+  "0x0208eafc9492f0d1b36421ba234160d219f1632f": {
+    "symbol": "0x0208eafc...",
+    "reason": "太老 106min",
+    "ts": 1788523622,
+    "ttl": 86400
+  },
+  "0x2faebbf2f808b7c06adda6f5f3f546f59f519d7c": {
+    "symbol": "NVDA",
+    "reason": "🚫 R6-真实持有人不足: 总5人 去关联后5人 < 30人",
+    "ts": 1788523677,
+    "ttl": 3600
+  },
+  "0xddfe27aa52549043bc7290907ed8851ae994be7c": {
+    "symbol": "0xddfe27aa...",
+    "reason": "MC超上限 $122k",
+    "ts": 1788523753,
+    "ttl": 86400
+  },
+  "0xc6e8c393d46b685c2fb2177f759f2b16eb7a7d54": {
+    "symbol": "0xc6e8c393...",
+    "reason": "MC超上限 $49k",
+    "ts": 1788523817,
+    "ttl": 86400
+  },
+  "0xc90faf835dfa1fe2e64b8a806a9c2f1940f11e18": {
+    "symbol": "0xc90faf83...",
+    "reason": "太老 39min",
+    "ts": 1788523922,
+    "ttl": 86400
+  },
+  "0x31f49cd40827c308b1fbc23314c0d069ee746b15": {
+    "symbol": "0x31f49cd4...",
+    "reason": "MC超上限 $46k",
+    "ts": 1788524249,
+    "ttl": 86400
+  },
+  "0x21f62792e1260edc9ba0a642a5030da857d33b4d": {
+    "symbol": "0x21f62792...",
+    "reason": "太老 681min",
+    "ts": 1788524356,
+    "ttl": 86400
+  },
+  "0x60a4f839f3e6a42a2af117447de6ede5934bb263": {
+    "symbol": "0x60a4f839...",
+    "reason": "MC超上限 $239k",
+    "ts": 1788525097,
+    "ttl": 86400
+  },
+  "0xd14a84104940cb82ce30266fe154e13364b5fe97": {
+    "symbol": "0xd14a8410...",
+    "reason": "太老 114min",
+    "ts": 1788525369,
+    "ttl": 86400
+  },
+  "0xbd6db331dc964d245e63bec1235918de8de7046a": {
+    "symbol": "0xbd6db331...",
+    "reason": "MC超上限 $313k",
+    "ts": 1788525722,
+    "ttl": 86400
+  },
+  "0x2167870f3619bd4b2f0a5ace17951d405fef60f1": {
+    "symbol": "meo",
+    "reason": "🚫 R2.5-卖压主导拒绝: 7买/9卖 买卖比=0.78<0.9（出货信号）",
+    "ts": 1788525965,
+    "ttl": 1800
+  },
+  "0x0de3f1d1ea59605583b5370c762dce57abfb1f4a": {
+    "symbol": "0x0de3f1d1...",
+    "reason": "太老 7415min",
+    "ts": 1788525970,
+    "ttl": 86400
+  },
+  "0x13eeef00f92d2e1e0019a830103a0b1c1f240a71": {
+    "symbol": "ElonCoin",
+    "reason": "🚫 R2-刷单拒绝: 买卖单量相当 32买/37卖 差距仅14%（机器刷单特征）",
+    "ts": 1788526026,
+    "ttl": 1800
+  }
+}

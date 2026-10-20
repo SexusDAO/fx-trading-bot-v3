@@ -1,0 +1,50 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-10-01 00:45",
+      "close_ts": "2026-10-01 08:45",
+      "symbol": "APRUSDT",
+      "direction": "LONG",
+      "mode": "range_bounce",
+      "entry_price": 0.1426,
+      "exit_price": 0.1398,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -2.1635,
+      "hold_min": 480.0,
+      "signal_score": 60
+    }
+  ],
+  "stats": {
+    "symbol": "APRUSDT",
+    "days": 30,
+    "total_trades": 1,
+    "win_trades": 0,
+    "loss_trades": 1,
+    "win_rate_pct": 0.0,
+    "total_pnl_u": -2.16,
+    "total_win_u": 0,
+    "total_loss_u": -2.16,
+    "profit_factor": 0.0,
+    "max_drawdown_u": 2.16,
+    "max_single_loss": -2.16,
+    "avg_hold_min": 480.0,
+    "by_mode": {
+      "range_bounce": {
+        "n": 1,
+        "win": 0,
+        "pnl": -2.16,
+        "win_rate": 0.0
+      }
+    },
+    "funnel": {
+      "judge_pass": 17,
+      "filter_bear_reversal": 0,
+      "filter_settle_win": 0,
+      "filter_cooldown": 7,
+      "filter_same_dir": 0,
+      "filter_calc_sl": 0,
+      "filter_score": 9,
+      "opened": 1
+    }
+  }
+}

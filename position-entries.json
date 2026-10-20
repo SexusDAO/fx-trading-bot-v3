@@ -1,0 +1,26 @@
+{
+  "SOXLUSDT_LONG_20260720": {
+    "entryPrice": 140.71,
+    "entryLogic": "半导体 ETF，跟随行业趋势，均线多头排列",
+    "keySupport": 135.00,
+    "stopLoss": 129.45,
+    "takeProfit": 147.77,
+    "entryTime": "2026-07-20T00:00:00Z"
+  },
+  "1000PEPEUSDT_LONG_20260720": {
+    "entryPrice": 0.0028717,
+    "entryLogic": "Meme 币超跌反弹，成交量放大",
+    "keySupport": 0.00275,
+    "stopLoss": 0.00264,
+    "takeProfit": 0.00305,
+    "entryTime": "2026-07-20T00:00:00Z"
+  },
+  "SKHYUSDT_LONG_20260720": {
+    "entryPrice": 157.96,
+    "entryLogic": "SK 海力士相关代币，跟随正股走势",
+    "keySupport": 152.00,
+    "stopLoss": 145.32,
+    "takeProfit": 167.44,
+    "entryTime": "2026-07-20T00:00:00Z"
+  }
+}

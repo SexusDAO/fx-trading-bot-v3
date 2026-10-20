@@ -1,0 +1,62 @@
+[
+  {
+    "symbol": "BLESSUSDT",
+    "type": "gainer",
+    "change_pct": 79.285,
+    "current_price": 0.016808
+  },
+  {
+    "symbol": "HOMEUSDT",
+    "type": "gainer",
+    "change_pct": 44.422,
+    "current_price": 0.008557
+  },
+  {
+    "symbol": "UAIUSDT",
+    "type": "gainer",
+    "change_pct": 35.505,
+    "current_price": 0.5553
+  },
+  {
+    "symbol": "STARUSDT",
+    "type": "gainer",
+    "change_pct": 27.814,
+    "current_price": 0.09664
+  },
+  {
+    "symbol": "MANTRAUSDT",
+    "type": "gainer",
+    "change_pct": 18.91,
+    "current_price": 0.006263
+  },
+  {
+    "symbol": "BTWUSDT",
+    "type": "loser",
+    "change_pct": -31.555,
+    "current_price": 0.08097
+  },
+  {
+    "symbol": "AIOUSDT",
+    "type": "loser",
+    "change_pct": -24.201,
+    "current_price": 0.03915
+  },
+  {
+    "symbol": "BEATUSDT",
+    "type": "loser",
+    "change_pct": -21.11,
+    "current_price": 3.909
+  },
+  {
+    "symbol": "COTIUSDT",
+    "type": "loser",
+    "change_pct": -13.917,
+    "current_price": 0.012606
+  },
+  {
+    "symbol": "IDOLUSDT",
+    "type": "loser",
+    "change_pct": -12.825,
+    "current_price": 0.02114
+  }
+]

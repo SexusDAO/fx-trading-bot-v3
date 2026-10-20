@@ -1,0 +1,23 @@
+[
+  {
+    "time": 1783699200000,
+    "price": 0.00286926,
+    "amount": 10005045.0,
+    "side": "short",
+    "symbol": "PEPEUSDT"
+  },
+  {
+    "time": 1784034000000,
+    "price": 0.00290857,
+    "amount": 10005500.0,
+    "side": "short",
+    "symbol": "PEPEUSDT"
+  },
+  {
+    "time": 1784120400000,
+    "price": 0.00296078,
+    "amount": 10005140.0,
+    "side": "short",
+    "symbol": "PEPEUSDT"
+  }
+]

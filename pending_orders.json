@@ -1,0 +1,80 @@
+{
+  "SOXSUSDT": {
+    "sym": "SOXSUSDT",
+    "direction": "LONG",
+    "score": 94,
+    "tp": 49.087,
+    "a_order": {
+      "order_id": 350368753,
+      "price": 46.91,
+      "qty": 10.0,
+      "status": "open",
+      "placed_at": 1787401733.8375204
+    },
+    "b_order": {
+      "trigger_price": 49.087,
+      "qty": 9.0,
+      "sl": 48.56425,
+      "status": "watching",
+      "placed_at": null,
+      "order_id": null,
+      "signal_valid_until": null
+    },
+    "meta": {
+      "status": "active",
+      "placed_at": 1787401733.8375204,
+      "expire_at": 1787430533.8375204,
+      "protect_end": 1787416133.8375204,
+      "recheck_interval": 30,
+      "last_recheck_ts": 1787401733.8375204,
+      "score_history": [
+        {
+          "ts": 1787401733.8375204,
+          "score": 94
+        }
+      ],
+      "adjust_count_h": 0,
+      "adjust_hour": 496500,
+      "last_adjust_ts": 0
+    }
+  },
+  "ACEUSDT": {
+    "sym": "ACEUSDT",
+    "direction": "LONG",
+    "score": 96,
+    "tp": 0.286464,
+    "a_order": {
+      "order_id": 5537732862,
+      "price": 0.23795,
+      "qty": 2101.0,
+      "status": "open",
+      "placed_at": 1787404342.3089554
+    },
+    "b_order": {
+      "trigger_price": 0.286464,
+      "qty": 1588.0,
+      "sl": 0.262044,
+      "status": "watching",
+      "placed_at": null,
+      "order_id": null,
+      "signal_valid_until": null
+    },
+    "meta": {
+      "status": "active",
+      "placed_at": 1787404342.3089554,
+      "expire_at": 1787433142.3089554,
+      "protect_end": 1787418742.3089554,
+      "recheck_interval": 30,
+      "last_recheck_ts": 1787404342.3089554,
+      "score_history": [
+        {
+          "ts": 1787404342.3089554,
+          "score": 96
+        }
+      ],
+      "adjust_count_h": 0,
+      "adjust_hour": 496501,
+      "last_adjust_ts": 0
+    }
+  }
+}

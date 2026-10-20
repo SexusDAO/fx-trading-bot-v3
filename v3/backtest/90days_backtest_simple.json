@@ -1,0 +1,538 @@
+[
+  {
+    "symbol": "ETHUSDT",
+    "period": "2024-01 ETH 上涨",
+    "scene_stats": {
+      "A_pullback": 16,
+      "E_short": 7
+    },
+    "scene_wins": {
+      "A_pullback": 3,
+      "E_short": 1
+    },
+    "scene_losses": {
+      "E_short": 3,
+      "A_pullback": 1
+    },
+    "total_trades": 8,
+    "winning_trades": 4,
+    "win_rate": 50.0,
+    "total_pnl": 308.6608151137706,
+    "profit_factor": 8.621613902764055,
+    "max_consecutive_losses": 2,
+    "trades": [
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 177.8069646891029,
+        "reason": "TP",
+        "second_score": 93
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 75.75596015129729,
+        "reason": "TP",
+        "second_score": 86
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": -8.00235165821166,
+        "reason": "SL",
+        "second_score": 72
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": -12.740576965682918,
+        "reason": "SL",
+        "second_score": 76
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 54.02767773158909,
+        "reason": "TP",
+        "second_score": 86
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": -16.992190108616914,
+        "reason": "SL",
+        "second_score": 72
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -2.762972492213447,
+        "reason": "SL",
+        "second_score": 76
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": 41.56830376650628,
+        "reason": "TP",
+        "second_score": 72
+      }
+    ]
+  },
+  {
+    "symbol": "1000PEPEUSDT",
+    "period": "2024-07 PEPE 下跌",
+    "scene_stats": {
+      "A_pullback": 23,
+      "E_short": 4
+    },
+    "scene_wins": {
+      "A_pullback": 3,
+      "E_short": 1
+    },
+    "scene_losses": {
+      "A_pullback": 2,
+      "E_short": 1
+    },
+    "total_trades": 7,
+    "winning_trades": 4,
+    "win_rate": 57.14285714285714,
+    "total_pnl": 344.76996476195495,
+    "profit_factor": 7.986860565117514,
+    "max_consecutive_losses": 1,
+    "trades": [
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 170.57730859066075,
+        "reason": "TP",
+        "second_score": 78
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -43.044305060883985,
+        "reason": "SL",
+        "second_score": 86
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 52.8830552187057,
+        "reason": "TP",
+        "second_score": 76
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": -2.5636688479875187,
+        "reason": "SL",
+        "second_score": 72
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": 29.13505579429512,
+        "reason": "TP",
+        "second_score": 72
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 141.52002179242686,
+        "reason": "TP",
+        "second_score": 86
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -3.7375027252619692,
+        "reason": "SL",
+        "second_score": 100
+      }
+    ]
+  },
+  {
+    "symbol": "BTCUSDT",
+    "period": "2026-07 BTCUSDT",
+    "scene_stats": {
+      "A_pullback": 24,
+      "E_short": 5
+    },
+    "scene_wins": {
+      "A_pullback": 3,
+      "E_short": 1
+    },
+    "scene_losses": {
+      "A_pullback": 9,
+      "E_short": 2
+    },
+    "total_trades": 15,
+    "winning_trades": 4,
+    "win_rate": 26.666666666666668,
+    "total_pnl": -92.36722246198828,
+    "profit_factor": 0.42846505508399757,
+    "max_consecutive_losses": 9,
+    "trades": [
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -16.201940892445787,
+        "reason": "SL",
+        "second_score": 86
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 29.87671970618145,
+        "reason": "TP",
+        "second_score": 75
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 33.48941114585215,
+        "reason": "TP",
+        "second_score": 86
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -14.85150375559408,
+        "reason": "SL",
+        "second_score": 86
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -8.311234874882434,
+        "reason": "SL",
+        "second_score": 83
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -6.347714911559043,
+        "reason": "SL",
+        "second_score": 86
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -26.46850756964763,
+        "reason": "SL",
+        "second_score": 93
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -30.86174149043148,
+        "reason": "SL",
+        "second_score": 100
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -18.098120871499308,
+        "reason": "SL",
+        "second_score": 93
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -17.0495685624445,
+        "reason": "SL",
+        "second_score": 86
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -10.628240598481044,
+        "reason": "SL",
+        "second_score": 76
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": -0.961561910150144,
+        "reason": "SL",
+        "second_score": 73
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": 4.813405363975746,
+        "reason": "SL",
+        "second_score": 72
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": -11.832419112023985,
+        "reason": "SL",
+        "second_score": 72
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 1.0657958711618052,
+        "reason": "SL",
+        "second_score": 78
+      }
+    ]
+  },
+  {
+    "symbol": "ETHUSDT",
+    "period": "2026-07 ETHUSDT",
+    "scene_stats": {
+      "A_pullback": 16,
+      "E_short": 7
+    },
+    "scene_wins": {
+      "A_pullback": 3,
+      "E_short": 1
+    },
+    "scene_losses": {
+      "E_short": 3,
+      "A_pullback": 1
+    },
+    "total_trades": 8,
+    "winning_trades": 4,
+    "win_rate": 50.0,
+    "total_pnl": 308.6608151137706,
+    "profit_factor": 8.621613902764055,
+    "max_consecutive_losses": 2,
+    "trades": [
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 177.8069646891029,
+        "reason": "TP",
+        "second_score": 93
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 75.75596015129729,
+        "reason": "TP",
+        "second_score": 86
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": -8.00235165821166,
+        "reason": "SL",
+        "second_score": 72
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": -12.740576965682918,
+        "reason": "SL",
+        "second_score": 76
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 54.02767773158909,
+        "reason": "TP",
+        "second_score": 86
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": -16.992190108616914,
+        "reason": "SL",
+        "second_score": 72
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -2.762972492213447,
+        "reason": "SL",
+        "second_score": 76
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": 41.56830376650628,
+        "reason": "TP",
+        "second_score": 72
+      }
+    ]
+  },
+  {
+    "symbol": "1000PEPEUSDT",
+    "period": "2026-07 1000PEPEUSDT",
+    "scene_stats": {
+      "A_pullback": 23,
+      "E_short": 4
+    },
+    "scene_wins": {
+      "A_pullback": 3,
+      "E_short": 1
+    },
+    "scene_losses": {
+      "A_pullback": 2,
+      "E_short": 1
+    },
+    "total_trades": 7,
+    "winning_trades": 4,
+    "win_rate": 57.14285714285714,
+    "total_pnl": 344.76996476195495,
+    "profit_factor": 7.986860565117514,
+    "max_consecutive_losses": 1,
+    "trades": [
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 170.57730859066075,
+        "reason": "TP",
+        "second_score": 78
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -43.044305060883985,
+        "reason": "SL",
+        "second_score": 86
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 52.8830552187057,
+        "reason": "TP",
+        "second_score": 76
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": -2.5636688479875187,
+        "reason": "SL",
+        "second_score": 72
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": 29.13505579429512,
+        "reason": "TP",
+        "second_score": 72
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 141.52002179242686,
+        "reason": "TP",
+        "second_score": 86
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -3.7375027252619692,
+        "reason": "SL",
+        "second_score": 100
+      }
+    ]
+  },
+  {
+    "symbol": "SOLUSDT",
+    "period": "2026-07 SOLUSDT",
+    "scene_stats": {
+      "A_pullback": 20,
+      "E_short": 4
+    },
+    "scene_wins": {
+      "A_pullback": 2,
+      "E_short": 1
+    },
+    "scene_losses": {
+      "A_pullback": 6,
+      "E_short": 2
+    },
+    "total_trades": 11,
+    "winning_trades": 3,
+    "win_rate": 27.27272727272727,
+    "total_pnl": 88.62281760189354,
+    "profit_factor": 1.5878736907438447,
+    "max_consecutive_losses": 4,
+    "trades": [
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 98.14866499209256,
+        "reason": "TP",
+        "second_score": 78
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -25.45341476094017,
+        "reason": "SL",
+        "second_score": 86
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -17.1189665045764,
+        "reason": "SL",
+        "second_score": 76
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": -5.741687151635895,
+        "reason": "SL",
+        "second_score": 72
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": -11.108719607357516,
+        "reason": "SL",
+        "second_score": 76
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": 112.34660367575042,
+        "reason": "TP",
+        "second_score": 93
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -37.13071501020704,
+        "reason": "SL",
+        "second_score": 93
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -20.63657663090714,
+        "reason": "SL",
+        "second_score": 78
+      },
+      {
+        "direction": "SHORT",
+        "scene": "E_short",
+        "pnl": 28.879009659836594,
+        "reason": "TP",
+        "second_score": 72
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -25.43127885316272,
+        "reason": "SL",
+        "second_score": 86
+      },
+      {
+        "direction": "LONG",
+        "scene": "A_pullback",
+        "pnl": -8.130102206999135,
+        "reason": "SL",
+        "second_score": 75
+      }
+    ]
+  }
+]

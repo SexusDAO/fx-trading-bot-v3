@@ -1,0 +1,153 @@
+# Git 忽略项 - 不上传到 GitHub 的文件
+
+# API 密钥和敏感配置
+TOOLS.md
+twitter_config.json
+proxy_config.json
+coinglass_config.json
+
+# 身份和人格文件
+SOUL.md
+IDENTITY.md
+USER.md
+AGENTS.md
+BOOTSTRAP.md
+HEARTBEAT.md
+
+# 运行时状态文件（频繁变动，用不同机制恢复）
+ws_cache/
+__pycache__/
+*.pyc
+*.log
+*.log.txt
+*.log.bak*
+
+# fomo_workflow 敏感/运行时文件
+fomo_workflow/config.py
+fomo_workflow/state.json
+fomo_workflow/trade.log
+fomo_workflow/evm_watchlist.json
+fomo_workflow/__pycache__/
+
+# 运行时 JSON 状态（每轮都变，不需要版本控制）
+arb_state.json
+paper_sim_state.json
+paper_test_state.json
+paper_test_state_backup_*.json
+paper_test_state_dirty_*.json
+paper_watchlist.json
+paper_watchlist_backup_*.json
+pending_orders.json
+daily_task_log.json
+circuit_breaker.json
+config/circuit_breaker.json
+watchlist.json
+fx/logs/
+
+# 回测结果（本地临时）
+backtest_*_result.json
+
+# reports 目录（运行时生成）
+reports/
+
+# 媒体输出
+openclaw-media/
+
+# tailscale 二进制
+tailscale
+tailscaled
+tailscale-state/
+
+# 安全：密钥与代理配置（v3.83 起不再跟踪）
+fx/.env
+fx/.env.*
+!fx/.env.example
+.env
+.env.*
+proxy_config.json
+coinglass_config.json
+square_config.json
+fomo_workflow/config.py
+*.pem
+*.key
+
+# ── 身份和 agent 配置文件（不进仓库）──────────────────────────────
+AGENTS.md
+SOUL.md
+IDENTITY.md
+USER.md
+HEARTBEAT.md
+BOOTSTRAP.md
+TOOLS.md
+MEMORY.md
+
+# ── 持仓 / 钱包 / 信号日志（敏感 + 运行时）─────────────────────
+positions.json
+*positions*.json
+manual_positions.json
+meme_new_launch_positions.json
+signal_log.jsonl
+bsc_kol_wallets*.json
+smart_watchlist.json
+
+# ── 备份文件 & nohup 输出 ──────────────────────────────────────────
+*.bak
+*.bak_*
+nohup.out
+
+# ── circuit breaker / watchlist（运行时状态）─────────────────────
+circuit_breaker.json
+**/circuit_breaker.json
+watchlist.json
+watchlist.json.bak
+**/watchlist.json
+v3/config/pos_state*.json
+
+# ── 运行时 state / log json（每轮变动，含持仓/余额信息）────────────────────
+*_state.json
+*state*.json
+cw_state.json
+sol_cw_state.json
+bank_short_state.json
+daily-state.json
+on_long_state.json
+on_monitor_state.json
+paper_fx_state.json
+pos_state.json
+position_state.json
+multi_coin_hunter_state.json
+arb/state.json
+fomo_workflow/state.json
+.rh_whale_state.json
+.whale_alert_state.json
+robinhood_sniper/.position_state.json
+fx_major/logs/
+.openclaw/workspace-state.json
+
+# ── 交易日志 ──────────────────────────────────────────────────────────────────
+trade_log.json
+cw_log.json
+sol_cw_log.json
+daily_task_log.json
+position-monitor-log.json
+logs/webchat_log.json
+
+# ── 跟踪钱包 / KOL 列表（运营数据）──────────────────────────────────────────
+hoodwatch_whales.json
+stalkchain_kols.json
+robinhood_sniper/.smart_wallets.json
+bsc_monitor/smart_watchlist_backup.json
+fomo_workflow/kol_watchlist.json
+fomo_workflow/evm_watchlist.json
+fomo_workflow/whale_blacklist.json
+fomo_workflow/.first_seen.json
+fomo_workflow/.shadow_tracker.json
+fomo_workflow/buy_failures.json
+fomo_workflow/deployer_blacklist.json
+arc_sniper/.first_seen.json
+arc_sniper/.processed_signals.json
+bsc_monitor/.binance_dedup.json
+bsc_monitor/.seen_pairs.json
+
+# ── gmgn-api-test（测试脚本，含会话凭证）────────────────────────────────────
+gmgn-api-test/

@@ -1,0 +1,919 @@
+2026-09-06 15:49:05,864 CRIT Supervisor is running as root.  Privileges were not dropped because no user is specified in the config file.  If you intend to run as root, you can set user=root in the config file to avoid this message.
+2026-09-06 15:49:05,869 INFO RPC interface 'supervisor' initialized
+2026-09-06 15:49:05,870 CRIT Server 'unix_http_server' running without any HTTP authentication checking
+2026-09-06 15:49:05,879 INFO daemonizing the supervisord process
+2026-09-06 15:49:05,881 INFO supervisord started with pid 15807
+2026-09-06 15:49:06,892 INFO spawned: 'fomo_workflow' with pid 15808
+2026-09-06 15:49:12,229 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-06 15:49:14,036 CRIT Supervisor is running as root.  Privileges were not dropped because no user is specified in the config file.  If you intend to run as root, you can set user=root in the config file to avoid this message.
+2026-09-06 16:24:11,243 INFO waiting for fomo_workflow to stop
+2026-09-06 16:24:11,268 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-06 16:24:11,294 INFO spawned: 'fomo_workflow' with pid 26467
+2026-09-06 16:24:16,876 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-06 16:49:57,483 INFO waiting for fomo_workflow to stop
+2026-09-06 16:49:57,492 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-06 16:49:57,505 INFO spawned: 'fomo_workflow' with pid 35145
+2026-09-06 16:50:02,799 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-06 17:20:32,088 INFO waiting for fomo_workflow to stop
+2026-09-06 17:20:32,108 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-06 17:20:32,124 INFO spawned: 'fomo_workflow' with pid 47648
+2026-09-06 17:20:37,845 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-06 17:31:14,844 INFO waiting for fomo_workflow to stop
+2026-09-06 17:31:14,855 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-06 17:31:14,877 INFO spawned: 'fomo_workflow' with pid 51853
+2026-09-06 17:31:20,343 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-06 17:40:28,770 INFO waiting for fomo_workflow to stop
+2026-09-06 17:40:28,777 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-06 17:40:28,790 INFO spawned: 'fomo_workflow' with pid 55753
+2026-09-06 17:40:33,981 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-07 05:50:39,195 INFO waiting for fomo_workflow to stop
+2026-09-07 05:50:39,211 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-07 05:50:40,229 INFO spawned: 'fomo_workflow' with pid 31760
+2026-09-07 05:50:45,835 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-07 06:36:01,647 INFO waiting for fomo_workflow to stop
+2026-09-07 06:36:01,669 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-07 06:36:02,682 INFO spawned: 'fomo_workflow' with pid 50164
+2026-09-07 06:36:08,143 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-07 06:51:47,124 INFO waiting for fomo_workflow to stop
+2026-09-07 06:51:48,135 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-07 06:51:48,148 INFO spawned: 'fomo_workflow' with pid 56674
+2026-09-07 06:51:53,397 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-07 12:29:39,219 CRIT Supervisor is running as root.  Privileges were not dropped because no user is specified in the config file.  If you intend to run as root, you can set user=root in the config file to avoid this message.
+2026-09-07 12:29:39,527 INFO RPC interface 'supervisor' initialized
+2026-09-07 12:29:39,528 CRIT Server 'unix_http_server' running without any HTTP authentication checking
+2026-09-07 12:29:39,543 INFO daemonizing the supervisord process
+2026-09-07 12:29:39,546 INFO supervisord started with pid 43545
+2026-09-07 12:29:40,562 INFO spawned: 'fomo_workflow' with pid 43548
+2026-09-07 12:29:45,733 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-07 14:09:30,512 INFO waiting for fomo_workflow to stop
+2026-09-07 14:09:30,519 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-07 14:09:30,535 INFO spawned: 'fomo_workflow' with pid 983
+2026-09-07 14:09:35,564 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-07 14:25:04,004 INFO waiting for fomo_workflow to stop
+2026-09-07 14:25:04,010 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-07 14:25:04,028 INFO spawned: 'fomo_workflow' with pid 4507
+2026-09-07 14:25:09,084 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-07 14:39:45,450 INFO waiting for fomo_workflow to stop
+2026-09-07 14:39:45,458 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-07 14:39:45,490 INFO spawned: 'fomo_workflow' with pid 7558
+2026-09-07 14:39:50,724 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-07 14:56:50,586 INFO waiting for fomo_workflow to stop
+2026-09-07 14:56:50,600 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-07 14:56:50,617 INFO spawned: 'fomo_workflow' with pid 11232
+2026-09-07 14:56:55,723 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-07 15:11:13,175 INFO waiting for fomo_workflow to stop
+2026-09-07 15:11:13,186 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-07 15:11:13,206 INFO spawned: 'fomo_workflow' with pid 14498
+2026-09-07 15:11:18,550 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-08 01:17:07,149 INFO waiting for fomo_workflow to stop
+2026-09-08 01:17:07,160 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-08 01:17:07,173 INFO spawned: 'fomo_workflow' with pid 16536
+2026-09-08 01:17:12,274 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-08 01:24:58,068 INFO waiting for fomo_workflow to stop
+2026-09-08 01:24:58,074 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-08 01:24:58,088 INFO spawned: 'fomo_workflow' with pid 18460
+2026-09-08 01:25:03,093 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-08 01:27:52,837 INFO waiting for fomo_workflow to stop
+2026-09-08 01:27:52,845 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-08 01:27:52,864 INFO spawned: 'fomo_workflow' with pid 19202
+2026-09-08 01:27:58,255 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-08 01:32:02,529 INFO waiting for fomo_workflow to stop
+2026-09-08 01:32:02,534 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-08 01:32:02,547 INFO spawned: 'fomo_workflow' with pid 20220
+2026-09-08 01:32:07,550 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-08 02:01:41,718 INFO waiting for fomo_workflow to stop
+2026-09-08 02:01:41,728 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-08 02:01:41,756 INFO spawned: 'fomo_workflow' with pid 26825
+2026-09-08 02:01:46,828 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-08 02:33:55,165 INFO waiting for fomo_workflow to stop
+2026-09-08 02:33:55,174 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-08 02:33:55,197 INFO spawned: 'fomo_workflow' with pid 34347
+2026-09-08 02:34:00,508 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-08 04:11:46,173 INFO waiting for fomo_workflow to stop
+2026-09-08 04:11:46,182 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-08 04:11:46,198 INFO spawned: 'fomo_workflow' with pid 56629
+2026-09-08 04:11:51,267 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-08 07:49:34,684 INFO waiting for fomo_workflow to stop
+2026-09-08 07:49:34,695 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-08 07:49:34,717 INFO spawned: 'fomo_workflow' with pid 38863
+2026-09-08 07:49:40,039 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-08 11:20:12,828 INFO waiting for fomo_workflow to stop
+2026-09-08 11:20:12,839 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-08 11:20:12,858 INFO spawned: 'fomo_workflow' with pid 19341
+2026-09-08 11:20:18,820 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-08 11:22:45,083 INFO waiting for fomo_workflow to stop
+2026-09-08 11:22:45,120 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-08 11:22:45,162 INFO spawned: 'fomo_workflow' with pid 19943
+2026-09-08 11:22:50,351 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-08 11:54:09,904 INFO waiting for fomo_workflow to stop
+2026-09-08 11:54:09,922 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-08 11:54:09,937 INFO spawned: 'fomo_workflow' with pid 27110
+2026-09-08 11:54:15,376 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-08 11:59:45,137 INFO waiting for fomo_workflow to stop
+2026-09-08 11:59:45,150 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-08 11:59:45,171 INFO spawned: 'fomo_workflow' with pid 28387
+2026-09-08 11:59:50,750 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-08 12:02:11,420 INFO waiting for fomo_workflow to stop
+2026-09-08 12:02:11,436 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-08 12:02:11,462 INFO spawned: 'fomo_workflow' with pid 28959
+2026-09-08 12:02:16,644 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-08 12:40:35,665 INFO waiting for fomo_workflow to stop
+2026-09-08 12:40:35,678 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-08 12:40:35,698 INFO spawned: 'fomo_workflow' with pid 37370
+2026-09-08 12:40:40,857 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-09 02:47:23,185 CRIT Supervisor is running as root.  Privileges were not dropped because no user is specified in the config file.  If you intend to run as root, you can set user=root in the config file to avoid this message.
+2026-09-09 02:47:23,190 INFO RPC interface 'supervisor' initialized
+2026-09-09 02:47:23,190 CRIT Server 'unix_http_server' running without any HTTP authentication checking
+2026-09-09 02:47:23,199 INFO daemonizing the supervisord process
+2026-09-09 02:47:23,200 INFO supervisord started with pid 40499
+2026-09-09 02:47:24,211 INFO spawned: 'fomo_workflow' with pid 40501
+2026-09-09 02:47:29,374 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-09 02:47:43,112 INFO waiting for fomo_workflow to stop
+2026-09-09 02:47:43,117 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-09 02:47:43,132 INFO spawned: 'fomo_workflow' with pid 40583
+2026-09-09 02:47:48,466 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-09 04:05:53,758 WARN exited: fomo_workflow (terminated by SIGTERM; not expected)
+2026-09-09 04:05:54,772 INFO spawned: 'fomo_workflow' with pid 58344
+2026-09-09 04:06:00,104 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-09 04:11:10,019 WARN exited: fomo_workflow (terminated by SIGTERM; not expected)
+2026-09-09 04:11:11,031 INFO spawned: 'fomo_workflow' with pid 59598
+2026-09-09 04:11:16,121 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-09 13:15:04,131 INFO waiting for fomo_workflow to stop
+2026-09-09 13:15:04,142 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-09 13:15:04,173 INFO spawned: 'fomo_workflow' with pid 47964
+2026-09-09 13:15:09,409 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-09 18:15:22,564 WARN exited: fomo_workflow (terminated by SIGTERM; not expected)
+2026-09-09 18:15:23,575 INFO spawned: 'fomo_workflow' with pid 49200
+2026-09-09 18:15:25,082 WARN exited: fomo_workflow (terminated by SIGTERM; not expected)
+2026-09-09 18:15:26,093 INFO spawned: 'fomo_workflow' with pid 49238
+2026-09-09 18:15:27,582 WARN exited: fomo_workflow (terminated by SIGTERM; not expected)
+2026-09-09 18:15:29,595 INFO spawned: 'fomo_workflow' with pid 49245
+2026-09-09 18:15:33,441 WARN exited: fomo_workflow (terminated by SIGKILL; not expected)
+2026-09-09 18:15:36,457 INFO spawned: 'fomo_workflow' with pid 49290
+2026-09-09 18:15:36,852 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 18:15:40,867 INFO spawned: 'fomo_workflow' with pid 49294
+2026-09-09 18:15:41,232 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 18:15:46,247 INFO spawned: 'fomo_workflow' with pid 49330
+2026-09-09 18:15:46,548 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 18:15:52,566 INFO spawned: 'fomo_workflow' with pid 49339
+2026-09-09 18:15:52,913 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 18:15:59,935 INFO spawned: 'fomo_workflow' with pid 49379
+2026-09-09 18:16:00,319 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 18:16:08,355 INFO spawned: 'fomo_workflow' with pid 49427
+2026-09-09 18:16:08,786 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 18:16:17,808 INFO spawned: 'fomo_workflow' with pid 49471
+2026-09-09 18:16:18,192 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 18:16:28,211 INFO spawned: 'fomo_workflow' with pid 49519
+2026-09-09 18:16:28,540 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 18:16:39,565 INFO spawned: 'fomo_workflow' with pid 49576
+2026-09-09 18:16:40,535 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 18:16:52,559 INFO spawned: 'fomo_workflow' with pid 49630
+2026-09-09 18:16:57,930 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-09 19:07:31,308 WARN exited: fomo_workflow (terminated by SIGTERM; not expected)
+2026-09-09 19:07:32,321 INFO spawned: 'fomo_workflow' with pid 61217
+2026-09-09 19:07:32,925 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 19:07:33,934 INFO spawned: 'fomo_workflow' with pid 61250
+2026-09-09 19:07:34,232 WARN exited: fomo_workflow (terminated by SIGKILL; not expected)
+2026-09-09 19:07:36,246 INFO spawned: 'fomo_workflow' with pid 61253
+2026-09-09 19:07:36,621 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 19:07:39,637 INFO spawned: 'fomo_workflow' with pid 61260
+2026-09-09 19:07:39,962 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 19:07:43,980 INFO spawned: 'fomo_workflow' with pid 61296
+2026-09-09 19:07:44,374 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 19:07:49,388 INFO spawned: 'fomo_workflow' with pid 61300
+2026-09-09 19:07:49,743 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 19:07:55,759 INFO spawned: 'fomo_workflow' with pid 61344
+2026-09-09 19:07:56,107 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 19:08:03,122 INFO spawned: 'fomo_workflow' with pid 61381
+2026-09-09 19:08:03,448 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 19:08:11,466 INFO spawned: 'fomo_workflow' with pid 61411
+2026-09-09 19:08:12,377 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-09 19:08:21,413 INFO spawned: 'fomo_workflow' with pid 61468
+2026-09-09 19:08:26,467 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-10 01:38:58,512 INFO waiting for fomo_workflow to stop
+2026-09-10 01:38:58,525 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-10 01:38:58,548 INFO spawned: 'fomo_workflow' with pid 25829
+2026-09-10 01:39:03,870 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-10 01:44:17,399 INFO waiting for fomo_workflow to stop
+2026-09-10 01:44:17,404 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-10 01:44:17,420 INFO spawned: 'fomo_workflow' with pid 27105
+2026-09-10 01:44:22,632 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-10 03:20:36,337 INFO waiting for fomo_workflow to stop
+2026-09-10 03:20:36,342 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-10 03:20:36,354 INFO spawned: 'fomo_workflow' with pid 48877
+2026-09-10 03:20:41,551 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-10 17:03:47,623 INFO waiting for fomo_workflow to stop
+2026-09-10 17:03:47,630 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-10 17:03:47,646 INFO spawned: 'fomo_workflow' with pid 35089
+2026-09-10 17:03:52,909 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-10 18:39:08,568 INFO waiting for fomo_workflow to stop
+2026-09-10 18:39:08,577 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-10 18:39:08,596 INFO spawned: 'fomo_workflow' with pid 55846
+2026-09-10 18:39:13,957 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-10 18:41:26,162 INFO waiting for fomo_workflow to stop
+2026-09-10 18:41:26,165 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-10 18:41:26,180 INFO spawned: 'fomo_workflow' with pid 56461
+2026-09-10 18:41:31,292 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-10 18:48:32,894 INFO waiting for fomo_workflow to stop
+2026-09-10 18:48:32,902 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-10 18:48:32,917 INFO spawned: 'fomo_workflow' with pid 57963
+2026-09-10 18:48:38,142 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-11 12:37:57,235 WARN exited: fomo_workflow (terminated by SIGTERM; not expected)
+2026-09-11 12:37:58,257 INFO spawned: 'fomo_workflow' with pid 31108
+2026-09-11 12:38:03,466 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-11 19:05:25,573 INFO waiting for fomo_workflow to stop
+2026-09-11 19:05:25,580 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-11 19:05:25,596 INFO spawned: 'fomo_workflow' with pid 52773
+2026-09-11 19:05:31,011 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-11 19:17:27,376 INFO waiting for fomo_workflow to stop
+2026-09-11 19:17:27,383 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-11 19:17:27,394 INFO spawned: 'fomo_workflow' with pid 55569
+2026-09-11 19:17:32,586 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-11 19:26:58,752 WARN exited: fomo_workflow (terminated by SIGTERM; not expected)
+2026-09-11 19:26:59,763 INFO spawned: 'fomo_workflow' with pid 57655
+2026-09-11 19:27:05,114 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-11 19:28:55,255 WARN exited: fomo_workflow (terminated by SIGTERM; not expected)
+2026-09-11 19:28:56,266 INFO spawned: 'fomo_workflow' with pid 58067
+2026-09-11 19:29:01,537 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-12 15:10:16,714 INFO waiting for fomo_workflow to stop
+2026-09-12 15:10:16,724 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-12 15:10:16,738 INFO spawned: 'fomo_workflow' with pid 57339
+2026-09-12 15:10:21,843 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-12 15:13:14,865 INFO waiting for fomo_workflow to stop
+2026-09-12 15:13:14,876 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-12 15:13:14,890 INFO spawned: 'fomo_workflow' with pid 58028
+2026-09-12 15:13:20,064 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-12 15:16:44,751 INFO waiting for fomo_workflow to stop
+2026-09-12 15:16:44,762 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-12 15:16:44,781 INFO spawned: 'fomo_workflow' with pid 59001
+2026-09-12 15:16:50,267 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-12 15:23:56,831 INFO waiting for fomo_workflow to stop
+2026-09-12 15:23:56,837 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-12 15:23:56,849 INFO spawned: 'fomo_workflow' with pid 60686
+2026-09-12 15:24:01,973 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-12 15:26:25,899 INFO waiting for fomo_workflow to stop
+2026-09-12 15:26:25,903 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-12 15:26:25,916 INFO spawned: 'fomo_workflow' with pid 61265
+2026-09-12 15:26:31,094 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-12 16:08:54,860 INFO waiting for fomo_workflow to stop
+2026-09-12 16:08:54,867 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-12 16:08:54,880 INFO spawned: 'fomo_workflow' with pid 5310
+2026-09-12 16:09:00,125 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-12 16:14:12,608 INFO waiting for fomo_workflow to stop
+2026-09-12 16:14:12,630 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-12 16:14:12,643 INFO spawned: 'fomo_workflow' with pid 6526
+2026-09-12 16:14:17,796 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-12 16:57:29,780 INFO waiting for fomo_workflow to stop
+2026-09-12 16:57:29,792 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-12 16:57:29,808 INFO spawned: 'fomo_workflow' with pid 16317
+2026-09-12 16:57:34,931 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-12 17:10:52,518 INFO waiting for fomo_workflow to stop
+2026-09-12 17:10:52,528 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-12 17:10:52,545 INFO spawned: 'fomo_workflow' with pid 19446
+2026-09-12 17:10:58,002 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-13 14:12:04,873 INFO waiting for fomo_workflow to stop
+2026-09-13 14:12:04,890 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-13 14:12:04,906 INFO spawned: 'fomo_workflow' with pid 30983
+2026-09-13 14:12:10,377 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-13 16:29:02,582 INFO waiting for fomo_workflow to stop
+2026-09-13 16:29:02,588 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-13 16:29:02,598 INFO spawned: 'fomo_workflow' with pid 65110
+2026-09-13 16:29:07,696 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-13 19:47:31,419 INFO waiting for fomo_workflow to stop
+2026-09-13 19:47:31,427 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-13 19:47:31,440 INFO spawned: 'fomo_workflow' with pid 42354
+2026-09-13 19:47:36,690 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-13 19:52:23,361 INFO waiting for fomo_workflow to stop
+2026-09-13 19:52:23,366 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-13 19:52:23,380 INFO spawned: 'fomo_workflow' with pid 43430
+2026-09-13 19:52:24,028 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-13 19:52:25,047 INFO spawned: 'fomo_workflow' with pid 43431
+2026-09-13 19:52:25,476 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-13 19:52:27,491 INFO spawned: 'fomo_workflow' with pid 43467
+2026-09-13 19:52:27,981 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-13 19:52:31,587 INFO spawned: 'fomo_workflow' with pid 43470
+2026-09-13 19:52:32,179 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-13 19:52:36,194 INFO spawned: 'fomo_workflow' with pid 43508
+2026-09-13 19:52:36,606 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-13 19:52:41,622 INFO spawned: 'fomo_workflow' with pid 43509
+2026-09-13 19:52:42,092 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-13 19:52:48,110 INFO spawned: 'fomo_workflow' with pid 43542
+2026-09-13 19:52:49,512 INFO waiting for fomo_workflow to stop
+2026-09-13 19:52:49,518 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-13 19:52:49,535 INFO spawned: 'fomo_workflow' with pid 43549
+2026-09-13 19:52:54,597 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-14 07:23:20,832 INFO waiting for fomo_workflow to stop
+2026-09-14 07:23:20,842 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-14 07:23:20,857 INFO spawned: 'fomo_workflow' with pid 62189
+2026-09-14 07:23:26,006 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-15 07:01:58,844 CRIT Supervisor is running as root.  Privileges were not dropped because no user is specified in the config file.  If you intend to run as root, you can set user=root in the config file to avoid this message.
+2026-09-15 07:01:59,150 INFO RPC interface 'supervisor' initialized
+2026-09-15 07:01:59,151 CRIT Server 'unix_http_server' running without any HTTP authentication checking
+2026-09-15 07:01:59,163 INFO daemonizing the supervisord process
+2026-09-15 07:01:59,168 INFO supervisord started with pid 41714
+2026-09-15 07:02:00,180 INFO spawned: 'fomo_workflow' with pid 41716
+2026-09-15 07:02:05,323 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-15 07:02:25,058 INFO waiting for fomo_workflow to stop
+2026-09-15 07:02:25,063 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-15 07:02:25,078 INFO spawned: 'fomo_workflow' with pid 41830
+2026-09-15 07:02:30,271 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-15 07:04:34,313 INFO waiting for fomo_workflow to stop
+2026-09-15 07:04:34,317 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-15 07:04:34,330 INFO spawned: 'fomo_workflow' with pid 42276
+2026-09-15 07:04:39,494 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-15 07:47:31,596 INFO waiting for fomo_workflow to stop
+2026-09-15 07:47:31,603 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-15 07:47:31,616 INFO spawned: 'fomo_workflow' with pid 51183
+2026-09-15 07:47:36,827 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-15 08:10:29,337 WARN exited: fomo_workflow (terminated by SIGTERM; not expected)
+2026-09-15 08:10:30,347 INFO spawned: 'fomo_workflow' with pid 56109
+2026-09-15 08:10:32,628 WARN exited: fomo_workflow (terminated by SIGTERM; not expected)
+2026-09-15 08:10:33,639 INFO spawned: 'fomo_workflow' with pid 56147
+2026-09-15 08:10:35,915 WARN exited: fomo_workflow (terminated by SIGTERM; not expected)
+2026-09-15 08:10:37,926 INFO spawned: 'fomo_workflow' with pid 56153
+2026-09-15 08:10:38,299 WARN exited: fomo_workflow (terminated by SIGTERM; not expected)
+2026-09-15 08:10:41,310 INFO spawned: 'fomo_workflow' with pid 56160
+2026-09-15 08:10:46,456 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-15 08:19:26,521 WARN exited: fomo_workflow (terminated by SIGKILL; not expected)
+2026-09-15 08:19:27,531 INFO spawned: 'fomo_workflow' with pid 58001
+2026-09-15 08:19:28,119 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:19:29,130 INFO spawned: 'fomo_workflow' with pid 58005
+2026-09-15 08:19:29,398 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:19:31,410 INFO spawned: 'fomo_workflow' with pid 58008
+2026-09-15 08:19:31,739 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:19:34,752 INFO spawned: 'fomo_workflow' with pid 58010
+2026-09-15 08:19:35,089 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:19:39,102 INFO spawned: 'fomo_workflow' with pid 58043
+2026-09-15 08:19:39,397 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:19:44,412 INFO spawned: 'fomo_workflow' with pid 58046
+2026-09-15 08:19:44,801 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:19:50,816 INFO spawned: 'fomo_workflow' with pid 58085
+2026-09-15 08:19:51,099 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:19:58,117 INFO spawned: 'fomo_workflow' with pid 58122
+2026-09-15 08:19:58,456 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:20:06,479 INFO spawned: 'fomo_workflow' with pid 58179
+2026-09-15 08:20:06,818 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:20:15,835 INFO spawned: 'fomo_workflow' with pid 58223
+2026-09-15 08:20:16,137 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:20:26,153 INFO spawned: 'fomo_workflow' with pid 58262
+2026-09-15 08:20:26,389 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:20:37,406 INFO spawned: 'fomo_workflow' with pid 58335
+2026-09-15 08:20:37,635 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:20:49,654 INFO spawned: 'fomo_workflow' with pid 58372
+2026-09-15 08:20:49,892 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:21:02,911 INFO spawned: 'fomo_workflow' with pid 58415
+2026-09-15 08:21:03,204 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:21:17,225 INFO spawned: 'fomo_workflow' with pid 58455
+2026-09-15 08:21:17,475 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:21:32,493 INFO spawned: 'fomo_workflow' with pid 58522
+2026-09-15 08:21:32,756 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:21:48,776 INFO spawned: 'fomo_workflow' with pid 58592
+2026-09-15 08:21:49,008 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:22:06,039 INFO spawned: 'fomo_workflow' with pid 58633
+2026-09-15 08:22:06,858 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:22:24,885 INFO spawned: 'fomo_workflow' with pid 58699
+2026-09-15 08:22:25,359 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:22:44,383 INFO spawned: 'fomo_workflow' with pid 58765
+2026-09-15 08:22:44,701 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:23:04,725 INFO spawned: 'fomo_workflow' with pid 58832
+2026-09-15 08:23:05,006 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:23:26,031 INFO spawned: 'fomo_workflow' with pid 58898
+2026-09-15 08:23:26,266 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:23:48,295 INFO spawned: 'fomo_workflow' with pid 58964
+2026-09-15 08:23:48,539 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:24:11,567 INFO spawned: 'fomo_workflow' with pid 59063
+2026-09-15 08:24:11,858 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:24:35,884 INFO spawned: 'fomo_workflow' with pid 59130
+2026-09-15 08:24:36,195 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:25:01,225 INFO spawned: 'fomo_workflow' with pid 59229
+2026-09-15 08:25:02,362 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:25:28,406 INFO spawned: 'fomo_workflow' with pid 59339
+2026-09-15 08:25:28,725 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:25:55,753 INFO spawned: 'fomo_workflow' with pid 59437
+2026-09-15 08:25:56,016 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:26:24,042 INFO spawned: 'fomo_workflow' with pid 59536
+2026-09-15 08:26:24,295 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:26:53,325 INFO spawned: 'fomo_workflow' with pid 59635
+2026-09-15 08:26:53,583 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:27:23,616 INFO spawned: 'fomo_workflow' with pid 59734
+2026-09-15 08:27:23,888 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:27:54,923 INFO spawned: 'fomo_workflow' with pid 59833
+2026-09-15 08:27:55,274 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:28:27,309 INFO spawned: 'fomo_workflow' with pid 59933
+2026-09-15 08:28:27,568 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:29:00,599 INFO spawned: 'fomo_workflow' with pid 60064
+2026-09-15 08:29:00,888 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:29:34,922 INFO spawned: 'fomo_workflow' with pid 60163
+2026-09-15 08:29:35,183 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:30:10,225 INFO spawned: 'fomo_workflow' with pid 60311
+2026-09-15 08:30:10,507 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:30:46,544 INFO spawned: 'fomo_workflow' with pid 60442
+2026-09-15 08:30:46,833 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:31:23,868 INFO spawned: 'fomo_workflow' with pid 60574
+2026-09-15 08:31:24,144 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:32:02,183 INFO spawned: 'fomo_workflow' with pid 60706
+2026-09-15 08:32:02,437 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:32:41,474 INFO spawned: 'fomo_workflow' with pid 60805
+2026-09-15 08:32:41,752 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:33:21,790 INFO spawned: 'fomo_workflow' with pid 60937
+2026-09-15 08:33:22,047 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:34:03,086 INFO spawned: 'fomo_workflow' with pid 61101
+2026-09-15 08:34:03,390 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:34:45,431 INFO spawned: 'fomo_workflow' with pid 61232
+2026-09-15 08:34:45,700 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:35:28,746 INFO spawned: 'fomo_workflow' with pid 61408
+2026-09-15 08:35:29,003 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:36:13,048 INFO spawned: 'fomo_workflow' with pid 61539
+2026-09-15 08:36:13,402 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:36:58,457 INFO spawned: 'fomo_workflow' with pid 61704
+2026-09-15 08:36:58,790 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:37:44,829 INFO spawned: 'fomo_workflow' with pid 61867
+2026-09-15 08:37:45,099 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:38:32,145 INFO spawned: 'fomo_workflow' with pid 62000
+2026-09-15 08:38:32,395 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:39:20,437 INFO spawned: 'fomo_workflow' with pid 62174
+2026-09-15 08:39:20,699 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:40:09,751 INFO spawned: 'fomo_workflow' with pid 62389
+2026-09-15 08:40:10,065 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:41:00,112 INFO spawned: 'fomo_workflow' with pid 62554
+2026-09-15 08:41:00,408 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:41:51,483 INFO spawned: 'fomo_workflow' with pid 62734
+2026-09-15 08:41:52,113 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:42:44,157 INFO spawned: 'fomo_workflow' with pid 62899
+2026-09-15 08:42:44,489 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:43:37,541 INFO spawned: 'fomo_workflow' with pid 63096
+2026-09-15 08:43:37,800 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:44:31,851 INFO spawned: 'fomo_workflow' with pid 63261
+2026-09-15 08:44:32,111 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:45:27,164 INFO spawned: 'fomo_workflow' with pid 63469
+2026-09-15 08:45:27,435 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:46:23,485 INFO spawned: 'fomo_workflow' with pid 63666
+2026-09-15 08:46:23,780 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:47:20,825 INFO spawned: 'fomo_workflow' with pid 63862
+2026-09-15 08:47:21,074 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:48:19,126 INFO spawned: 'fomo_workflow' with pid 64059
+2026-09-15 08:48:19,473 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:49:18,528 INFO spawned: 'fomo_workflow' with pid 64224
+2026-09-15 08:49:18,793 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:50:18,849 INFO spawned: 'fomo_workflow' with pid 64470
+2026-09-15 08:50:19,100 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:51:20,159 INFO spawned: 'fomo_workflow' with pid 64699
+2026-09-15 08:51:20,693 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:52:22,749 INFO spawned: 'fomo_workflow' with pid 64897
+2026-09-15 08:52:23,296 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:53:26,353 INFO spawned: 'fomo_workflow' with pid 65094
+2026-09-15 08:53:26,615 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:54:30,672 INFO spawned: 'fomo_workflow' with pid 65292
+2026-09-15 08:54:30,922 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:55:35,983 INFO spawned: 'fomo_workflow' with pid 63
+2026-09-15 08:55:36,264 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:56:42,320 INFO spawned: 'fomo_workflow' with pid 302
+2026-09-15 08:56:42,627 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:57:49,688 INFO spawned: 'fomo_workflow' with pid 499
+2026-09-15 08:57:49,956 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 08:58:58,032 INFO spawned: 'fomo_workflow' with pid 730
+2026-09-15 08:58:58,405 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:00:07,462 INFO spawned: 'fomo_workflow' with pid 1008
+2026-09-15 09:00:07,763 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:01:17,821 INFO spawned: 'fomo_workflow' with pid 1248
+2026-09-15 09:01:18,107 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:02:29,168 INFO spawned: 'fomo_workflow' with pid 1510
+2026-09-15 09:02:29,457 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:03:41,520 INFO spawned: 'fomo_workflow' with pid 1739
+2026-09-15 09:03:41,792 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:04:54,859 INFO spawned: 'fomo_workflow' with pid 1976
+2026-09-15 09:04:55,512 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:06:09,580 INFO spawned: 'fomo_workflow' with pid 2310
+2026-09-15 09:06:10,039 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:07:25,100 INFO spawned: 'fomo_workflow' with pid 2560
+2026-09-15 09:07:25,505 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:08:41,578 INFO spawned: 'fomo_workflow' with pid 2840
+2026-09-15 09:08:42,152 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:09:59,221 INFO spawned: 'fomo_workflow' with pid 3122
+2026-09-15 09:09:59,606 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:11:17,693 INFO spawned: 'fomo_workflow' with pid 3403
+2026-09-15 09:11:18,113 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:12:37,182 INFO spawned: 'fomo_workflow' with pid 3680
+2026-09-15 09:12:37,573 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:13:57,640 INFO spawned: 'fomo_workflow' with pid 3943
+2026-09-15 09:13:59,016 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:15:20,089 INFO spawned: 'fomo_workflow' with pid 4297
+2026-09-15 09:15:20,440 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:16:42,522 INFO spawned: 'fomo_workflow' with pid 4599
+2026-09-15 09:16:43,052 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:18:06,130 INFO spawned: 'fomo_workflow' with pid 4862
+2026-09-15 09:18:06,439 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:19:30,511 INFO spawned: 'fomo_workflow' with pid 5148
+2026-09-15 09:19:30,974 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:20:56,081 INFO spawned: 'fomo_workflow' with pid 5504
+2026-09-15 09:20:56,419 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:22:22,495 INFO spawned: 'fomo_workflow' with pid 5803
+2026-09-15 09:22:22,934 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:23:50,009 INFO spawned: 'fomo_workflow' with pid 6077
+2026-09-15 09:23:50,528 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:25:18,607 INFO spawned: 'fomo_workflow' with pid 6424
+2026-09-15 09:25:18,890 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:26:47,969 INFO spawned: 'fomo_workflow' with pid 6719
+2026-09-15 09:26:48,286 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:28:18,369 INFO spawned: 'fomo_workflow' with pid 7018
+2026-09-15 09:28:18,697 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:29:49,768 INFO spawned: 'fomo_workflow' with pid 7325
+2026-09-15 09:29:50,198 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:31:22,275 INFO spawned: 'fomo_workflow' with pid 7670
+2026-09-15 09:31:22,743 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:32:55,821 INFO spawned: 'fomo_workflow' with pid 7965
+2026-09-15 09:32:56,067 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:34:30,151 INFO spawned: 'fomo_workflow' with pid 8293
+2026-09-15 09:34:30,417 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:36:05,501 INFO spawned: 'fomo_workflow' with pid 8631
+2026-09-15 09:36:05,833 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:37:41,920 INFO spawned: 'fomo_workflow' with pid 8958
+2026-09-15 09:37:42,148 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:39:19,230 INFO spawned: 'fomo_workflow' with pid 9253
+2026-09-15 09:39:19,556 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:40:57,660 INFO spawned: 'fomo_workflow' with pid 9631
+2026-09-15 09:40:58,050 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:42:37,133 INFO spawned: 'fomo_workflow' with pid 9958
+2026-09-15 09:42:37,468 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:44:17,549 INFO spawned: 'fomo_workflow' with pid 10285
+2026-09-15 09:44:17,805 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:45:58,898 INFO spawned: 'fomo_workflow' with pid 10657
+2026-09-15 09:45:59,192 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:47:41,279 INFO spawned: 'fomo_workflow' with pid 10984
+2026-09-15 09:47:41,581 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:49:24,667 INFO spawned: 'fomo_workflow' with pid 11344
+2026-09-15 09:49:24,985 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:51:09,089 INFO spawned: 'fomo_workflow' with pid 11721
+2026-09-15 09:51:09,369 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:52:54,460 INFO spawned: 'fomo_workflow' with pid 12049
+2026-09-15 09:52:55,134 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:54:41,231 INFO spawned: 'fomo_workflow' with pid 12409
+2026-09-15 09:54:41,828 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:56:28,927 INFO spawned: 'fomo_workflow' with pid 12813
+2026-09-15 09:56:29,431 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 09:58:17,517 INFO spawned: 'fomo_workflow' with pid 13182
+2026-09-15 09:58:17,852 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:00:06,955 INFO spawned: 'fomo_workflow' with pid 13560
+2026-09-15 10:00:07,258 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:01:57,353 INFO spawned: 'fomo_workflow' with pid 13935
+2026-09-15 10:01:57,961 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:03:49,050 INFO spawned: 'fomo_workflow' with pid 14294
+2026-09-15 10:03:49,401 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:05:41,495 INFO spawned: 'fomo_workflow' with pid 14781
+2026-09-15 10:05:41,972 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:07:35,058 INFO spawned: 'fomo_workflow' with pid 15151
+2026-09-15 10:07:35,495 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:09:29,593 INFO spawned: 'fomo_workflow' with pid 15517
+2026-09-15 10:09:29,969 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:11:25,092 INFO spawned: 'fomo_workflow' with pid 15958
+2026-09-15 10:11:25,383 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:13:21,483 INFO spawned: 'fomo_workflow' with pid 16333
+2026-09-15 10:13:21,755 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:15:18,852 INFO spawned: 'fomo_workflow' with pid 16769
+2026-09-15 10:15:19,169 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:17:17,265 INFO spawned: 'fomo_workflow' with pid 17168
+2026-09-15 10:17:17,638 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:19:16,747 INFO spawned: 'fomo_workflow' with pid 17567
+2026-09-15 10:19:17,285 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:21:17,395 INFO spawned: 'fomo_workflow' with pid 18028
+2026-09-15 10:21:17,634 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:23:18,746 INFO spawned: 'fomo_workflow' with pid 18425
+2026-09-15 10:23:19,257 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:25:21,370 INFO spawned: 'fomo_workflow' with pid 18861
+2026-09-15 10:25:23,058 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:27:26,172 INFO spawned: 'fomo_workflow' with pid 19266
+2026-09-15 10:27:26,772 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:29:30,883 INFO spawned: 'fomo_workflow' with pid 19692
+2026-09-15 10:29:31,375 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:31:36,478 INFO spawned: 'fomo_workflow' with pid 20134
+2026-09-15 10:31:36,755 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:33:42,860 INFO spawned: 'fomo_workflow' with pid 20559
+2026-09-15 10:33:43,130 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:35:50,249 INFO spawned: 'fomo_workflow' with pid 20995
+2026-09-15 10:35:50,531 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:37:58,635 INFO spawned: 'fomo_workflow' with pid 21422
+2026-09-15 10:37:58,974 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:40:08,093 INFO spawned: 'fomo_workflow' with pid 21896
+2026-09-15 10:40:08,426 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:42:18,534 INFO spawned: 'fomo_workflow' with pid 22321
+2026-09-15 10:42:18,810 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:44:29,918 INFO spawned: 'fomo_workflow' with pid 22748
+2026-09-15 10:44:30,175 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:46:42,297 INFO spawned: 'fomo_workflow' with pid 23216
+2026-09-15 10:46:42,573 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:48:55,699 INFO spawned: 'fomo_workflow' with pid 23642
+2026-09-15 10:48:56,146 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:51:10,270 INFO spawned: 'fomo_workflow' with pid 24149
+2026-09-15 10:51:11,047 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:53:26,158 INFO spawned: 'fomo_workflow' with pid 24594
+2026-09-15 10:53:26,663 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:55:42,780 INFO spawned: 'fomo_workflow' with pid 25096
+2026-09-15 10:55:43,071 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 10:58:00,194 INFO spawned: 'fomo_workflow' with pid 25523
+2026-09-15 10:58:00,552 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:00:18,657 INFO spawned: 'fomo_workflow' with pid 26029
+2026-09-15 11:00:18,896 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:02:38,008 INFO spawned: 'fomo_workflow' with pid 26499
+2026-09-15 11:02:38,313 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:04:58,436 INFO spawned: 'fomo_workflow' with pid 26958
+2026-09-15 11:04:58,785 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:07:19,914 INFO spawned: 'fomo_workflow' with pid 27458
+2026-09-15 11:07:20,190 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:09:42,309 INFO spawned: 'fomo_workflow' with pid 27917
+2026-09-15 11:09:42,581 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:12:05,703 INFO spawned: 'fomo_workflow' with pid 28425
+2026-09-15 11:12:06,018 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:14:30,137 INFO spawned: 'fomo_workflow' with pid 28916
+2026-09-15 11:14:30,396 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:16:55,520 INFO spawned: 'fomo_workflow' with pid 29417
+2026-09-15 11:16:55,767 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:19:21,888 INFO spawned: 'fomo_workflow' with pid 29908
+2026-09-15 11:19:22,167 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:21:49,306 INFO spawned: 'fomo_workflow' with pid 30415
+2026-09-15 11:21:49,785 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:24:17,908 INFO spawned: 'fomo_workflow' with pid 30906
+2026-09-15 11:24:18,327 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:26:47,453 INFO spawned: 'fomo_workflow' with pid 31440
+2026-09-15 11:26:47,699 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:29:17,820 INFO spawned: 'fomo_workflow' with pid 31931
+2026-09-15 11:29:18,112 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:31:49,226 INFO spawned: 'fomo_workflow' with pid 32471
+2026-09-15 11:31:49,467 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:34:21,594 INFO spawned: 'fomo_workflow' with pid 32962
+2026-09-15 11:34:22,092 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:36:55,215 INFO spawned: 'fomo_workflow' with pid 33497
+2026-09-15 11:36:55,687 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:39:29,810 INFO spawned: 'fomo_workflow' with pid 34021
+2026-09-15 11:39:30,085 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:42:05,212 INFO spawned: 'fomo_workflow' with pid 34598
+2026-09-15 11:42:06,120 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:44:42,249 INFO spawned: 'fomo_workflow' with pid 35126
+2026-09-15 11:44:42,823 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:47:19,958 INFO spawned: 'fomo_workflow' with pid 35660
+2026-09-15 11:47:20,283 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:49:58,421 INFO spawned: 'fomo_workflow' with pid 36185
+2026-09-15 11:49:58,774 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:52:37,924 INFO spawned: 'fomo_workflow' with pid 36757
+2026-09-15 11:52:38,448 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:55:18,579 INFO spawned: 'fomo_workflow' with pid 37323
+2026-09-15 11:55:19,101 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 11:58:00,232 INFO spawned: 'fomo_workflow' with pid 37848
+2026-09-15 11:58:00,574 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:00:42,710 INFO spawned: 'fomo_workflow' with pid 38420
+2026-09-15 12:00:42,995 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:03:26,127 INFO spawned: 'fomo_workflow' with pid 38955
+2026-09-15 12:03:26,372 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:06:10,516 INFO spawned: 'fomo_workflow' with pid 39554
+2026-09-15 12:06:10,837 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:08:55,976 INFO spawned: 'fomo_workflow' with pid 40078
+2026-09-15 12:08:56,232 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:11:42,376 INFO spawned: 'fomo_workflow' with pid 40683
+2026-09-15 12:11:42,639 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:14:29,778 INFO spawned: 'fomo_workflow' with pid 41208
+2026-09-15 12:14:30,033 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:17:18,186 INFO spawned: 'fomo_workflow' with pid 41807
+2026-09-15 12:17:18,486 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:20:07,635 INFO spawned: 'fomo_workflow' with pid 42413
+2026-09-15 12:20:07,922 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:22:58,069 INFO spawned: 'fomo_workflow' with pid 42994
+2026-09-15 12:22:58,914 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:25:50,052 INFO spawned: 'fomo_workflow' with pid 43592
+2026-09-15 12:25:50,319 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:28:42,458 INFO spawned: 'fomo_workflow' with pid 44173
+2026-09-15 12:28:42,999 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:31:36,142 INFO spawned: 'fomo_workflow' with pid 44779
+2026-09-15 12:31:36,406 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:34:30,544 INFO spawned: 'fomo_workflow' with pid 45368
+2026-09-15 12:34:30,786 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:37:25,930 INFO spawned: 'fomo_workflow' with pid 45967
+2026-09-15 12:37:26,188 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:40:22,343 INFO spawned: 'fomo_workflow' with pid 46573
+2026-09-15 12:40:22,606 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:43:19,773 INFO spawned: 'fomo_workflow' with pid 47178
+2026-09-15 12:43:20,272 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:46:18,416 INFO spawned: 'fomo_workflow' with pid 47810
+2026-09-15 12:46:18,752 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:49:17,898 INFO spawned: 'fomo_workflow' with pid 48399
+2026-09-15 12:49:18,184 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:52:18,330 INFO spawned: 'fomo_workflow' with pid 49037
+2026-09-15 12:52:18,888 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:55:20,032 INFO spawned: 'fomo_workflow' with pid 49669
+2026-09-15 12:55:20,538 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 12:58:22,692 INFO spawned: 'fomo_workflow' with pid 50259
+2026-09-15 12:58:23,016 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:01:26,178 INFO spawned: 'fomo_workflow' with pid 50927
+2026-09-15 13:01:26,650 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:04:30,792 INFO spawned: 'fomo_workflow' with pid 51542
+2026-09-15 13:04:31,238 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:07:36,399 INFO spawned: 'fomo_workflow' with pid 52206
+2026-09-15 13:07:36,695 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:10:42,867 INFO spawned: 'fomo_workflow' with pid 52868
+2026-09-15 13:10:43,389 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:13:50,536 INFO spawned: 'fomo_workflow' with pid 53489
+2026-09-15 13:13:50,777 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:16:58,920 INFO spawned: 'fomo_workflow' with pid 54155
+2026-09-15 13:16:59,213 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:20:08,367 INFO spawned: 'fomo_workflow' with pid 54793
+2026-09-15 13:20:08,644 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:23:18,794 INFO spawned: 'fomo_workflow' with pid 55414
+2026-09-15 13:23:19,323 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:26:30,480 INFO spawned: 'fomo_workflow' with pid 56080
+2026-09-15 13:26:30,968 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:29:43,119 INFO spawned: 'fomo_workflow' with pid 56701
+2026-09-15 13:29:43,399 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:32:56,548 INFO spawned: 'fomo_workflow' with pid 57404
+2026-09-15 13:32:56,806 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:36:10,970 INFO spawned: 'fomo_workflow' with pid 58069
+2026-09-15 13:36:11,251 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:39:26,422 INFO spawned: 'fomo_workflow' with pid 58691
+2026-09-15 13:39:27,184 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:42:43,348 INFO spawned: 'fomo_workflow' with pid 59431
+2026-09-15 13:42:43,656 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:46:00,812 INFO spawned: 'fomo_workflow' with pid 60187
+2026-09-15 13:46:01,229 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:49:19,386 INFO spawned: 'fomo_workflow' with pid 60840
+2026-09-15 13:49:19,943 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:52:39,107 INFO spawned: 'fomo_workflow' with pid 61544
+2026-09-15 13:52:39,649 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:55:59,802 INFO spawned: 'fomo_workflow' with pid 62254
+2026-09-15 13:56:00,444 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 13:59:21,609 INFO spawned: 'fomo_workflow' with pid 62907
+2026-09-15 13:59:21,867 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:02:44,022 INFO spawned: 'fomo_workflow' with pid 63623
+2026-09-15 14:02:44,315 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:06:07,470 INFO spawned: 'fomo_workflow' with pid 64321
+2026-09-15 14:06:07,728 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:09:31,893 INFO spawned: 'fomo_workflow' with pid 65008
+2026-09-15 14:09:32,132 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:12:57,311 INFO spawned: 'fomo_workflow' with pid 227
+2026-09-15 14:12:58,140 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:16:24,305 INFO spawned: 'fomo_workflow' with pid 983
+2026-09-15 14:16:24,898 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:19:52,064 INFO spawned: 'fomo_workflow' with pid 1693
+2026-09-15 14:19:52,582 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:23:20,741 INFO spawned: 'fomo_workflow' with pid 2428
+2026-09-15 14:23:21,285 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:26:50,455 INFO spawned: 'fomo_workflow' with pid 3158
+2026-09-15 14:26:50,957 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:30:21,148 INFO spawned: 'fomo_workflow' with pid 3894
+2026-09-15 14:30:21,403 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:33:52,566 INFO spawned: 'fomo_workflow' with pid 4582
+2026-09-15 14:33:52,868 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:37:25,042 INFO spawned: 'fomo_workflow' with pid 5312
+2026-09-15 14:37:25,303 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:40:58,475 INFO spawned: 'fomo_workflow' with pid 6049
+2026-09-15 14:40:58,813 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:44:32,983 INFO spawned: 'fomo_workflow' with pid 6736
+2026-09-15 14:44:33,219 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:48:08,404 INFO spawned: 'fomo_workflow' with pid 7498
+2026-09-15 14:48:08,632 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:51:44,816 INFO spawned: 'fomo_workflow' with pid 8234
+2026-09-15 14:51:45,268 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:55:22,450 INFO spawned: 'fomo_workflow' with pid 8997
+2026-09-15 14:55:23,039 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 14:59:01,208 INFO spawned: 'fomo_workflow' with pid 9717
+2026-09-15 14:59:01,510 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:02:40,705 INFO spawned: 'fomo_workflow' with pid 10464
+2026-09-15 15:02:41,033 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:06:21,205 INFO spawned: 'fomo_workflow' with pid 11226
+2026-09-15 15:06:21,453 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:10:02,740 INFO spawned: 'fomo_workflow' with pid 11965
+2026-09-15 15:10:03,912 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:13:46,086 INFO spawned: 'fomo_workflow' with pid 12715
+2026-09-15 15:13:46,789 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:17:29,975 INFO spawned: 'fomo_workflow' with pid 13577
+2026-09-15 15:17:30,514 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:21:14,761 INFO spawned: 'fomo_workflow' with pid 14347
+2026-09-15 15:21:15,036 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:25:00,201 INFO spawned: 'fomo_workflow' with pid 15087
+2026-09-15 15:25:00,772 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:28:46,966 INFO spawned: 'fomo_workflow' with pid 15881
+2026-09-15 15:28:47,377 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:32:34,562 INFO spawned: 'fomo_workflow' with pid 16651
+2026-09-15 15:32:35,243 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:36:23,431 INFO spawned: 'fomo_workflow' with pid 17560
+2026-09-15 15:36:23,897 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:40:13,098 INFO spawned: 'fomo_workflow' with pid 18430
+2026-09-15 15:40:13,579 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:44:03,754 INFO spawned: 'fomo_workflow' with pid 19219
+2026-09-15 15:44:04,393 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:47:55,592 INFO spawned: 'fomo_workflow' with pid 20033
+2026-09-15 15:47:56,161 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:51:48,347 INFO spawned: 'fomo_workflow' with pid 20876
+2026-09-15 15:51:48,751 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:55:41,949 INFO spawned: 'fomo_workflow' with pid 21700
+2026-09-15 15:55:42,364 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 15:59:36,547 INFO spawned: 'fomo_workflow' with pid 22453
+2026-09-15 15:59:37,091 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 16:03:32,270 INFO spawned: 'fomo_workflow' with pid 23298
+2026-09-15 16:03:32,505 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 16:07:28,688 INFO spawned: 'fomo_workflow' with pid 24094
+2026-09-15 16:07:28,965 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 16:11:26,153 INFO spawned: 'fomo_workflow' with pid 24940
+2026-09-15 16:11:26,593 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 16:15:24,781 INFO spawned: 'fomo_workflow' with pid 25768
+2026-09-15 16:15:25,068 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 16:19:24,253 INFO spawned: 'fomo_workflow' with pid 26545
+2026-09-15 16:19:24,861 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 16:23:25,065 INFO spawned: 'fomo_workflow' with pid 27379
+2026-09-15 16:23:25,547 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 16:27:26,735 INFO spawned: 'fomo_workflow' with pid 28232
+2026-09-15 16:27:27,130 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 16:31:29,326 INFO spawned: 'fomo_workflow' with pid 29098
+2026-09-15 16:31:29,553 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 16:35:32,753 INFO spawned: 'fomo_workflow' with pid 29926
+2026-09-15 16:35:33,040 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 16:39:37,251 INFO spawned: 'fomo_workflow' with pid 30735
+2026-09-15 16:39:37,746 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 16:43:42,965 INFO spawned: 'fomo_workflow' with pid 31586
+2026-09-15 16:43:43,402 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 16:47:49,595 INFO spawned: 'fomo_workflow' with pid 32446
+2026-09-15 16:47:49,909 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 16:51:57,102 INFO spawned: 'fomo_workflow' with pid 33282
+2026-09-15 16:51:57,845 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 16:56:06,055 INFO spawned: 'fomo_workflow' with pid 34142
+2026-09-15 16:56:06,708 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 17:00:15,898 INFO spawned: 'fomo_workflow' with pid 35008
+2026-09-15 17:00:16,184 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 17:04:26,397 INFO spawned: 'fomo_workflow' with pid 35861
+2026-09-15 17:04:26,890 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 17:08:38,092 INFO spawned: 'fomo_workflow' with pid 36741
+2026-09-15 17:08:38,781 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 17:12:50,983 INFO spawned: 'fomo_workflow' with pid 37607
+2026-09-15 17:12:51,297 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 17:17:04,502 INFO spawned: 'fomo_workflow' with pid 38469
+2026-09-15 17:17:04,780 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 17:21:18,986 INFO spawned: 'fomo_workflow' with pid 39335
+2026-09-15 17:21:19,628 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 17:25:34,823 INFO spawned: 'fomo_workflow' with pid 40229
+2026-09-15 17:25:35,323 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 17:29:51,527 INFO spawned: 'fomo_workflow' with pid 41065
+2026-09-15 17:29:52,059 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 17:34:09,285 INFO spawned: 'fomo_workflow' with pid 41966
+2026-09-15 17:34:09,657 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 17:38:27,875 INFO spawned: 'fomo_workflow' with pid 42884
+2026-09-15 17:38:28,441 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 17:42:47,708 INFO spawned: 'fomo_workflow' with pid 43819
+2026-09-15 17:42:48,289 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 17:47:08,496 INFO spawned: 'fomo_workflow' with pid 44713
+2026-09-15 17:47:08,854 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 17:51:30,085 INFO spawned: 'fomo_workflow' with pid 45613
+2026-09-15 17:51:30,610 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 17:55:52,808 INFO spawned: 'fomo_workflow' with pid 46530
+2026-09-15 17:55:53,233 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 18:00:16,491 INFO spawned: 'fomo_workflow' with pid 47485
+2026-09-15 18:00:17,033 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 18:04:41,233 INFO spawned: 'fomo_workflow' with pid 48347
+2026-09-15 18:04:41,540 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 18:09:06,790 INFO spawned: 'fomo_workflow' with pid 49241
+2026-09-15 18:09:07,072 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 18:13:33,296 INFO spawned: 'fomo_workflow' with pid 50197
+2026-09-15 18:13:33,838 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 18:18:01,066 INFO spawned: 'fomo_workflow' with pid 51116
+2026-09-15 18:18:01,696 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 18:22:29,931 INFO spawned: 'fomo_workflow' with pid 52048
+2026-09-15 18:22:30,722 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 18:26:59,947 INFO spawned: 'fomo_workflow' with pid 52974
+2026-09-15 18:27:00,629 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 18:31:30,853 INFO spawned: 'fomo_workflow' with pid 53906
+2026-09-15 18:31:31,165 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 18:36:02,383 INFO spawned: 'fomo_workflow' with pid 54832
+2026-09-15 18:36:02,698 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 18:40:34,933 INFO spawned: 'fomo_workflow' with pid 55764
+2026-09-15 18:40:35,186 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 18:45:08,417 INFO spawned: 'fomo_workflow' with pid 56690
+2026-09-15 18:45:08,672 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 18:49:42,884 INFO spawned: 'fomo_workflow' with pid 57573
+2026-09-15 18:49:43,257 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 18:54:18,498 INFO spawned: 'fomo_workflow' with pid 58586
+2026-09-15 18:54:19,019 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 18:58:55,246 INFO spawned: 'fomo_workflow' with pid 59569
+2026-09-15 18:58:55,706 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 19:03:32,927 INFO spawned: 'fomo_workflow' with pid 60517
+2026-09-15 19:03:33,219 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 19:08:11,439 INFO spawned: 'fomo_workflow' with pid 61499
+2026-09-15 19:08:11,922 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 19:12:51,142 INFO spawned: 'fomo_workflow' with pid 62523
+2026-09-15 19:12:51,659 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 19:17:31,874 INFO spawned: 'fomo_workflow' with pid 63483
+2026-09-15 19:17:32,266 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 19:22:13,523 INFO spawned: 'fomo_workflow' with pid 64448
+2026-09-15 19:22:14,213 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 19:26:56,422 INFO spawned: 'fomo_workflow' with pid 65407
+2026-09-15 19:26:56,851 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-15 19:31:40,115 INFO spawned: 'fomo_workflow' with pid 883
+2026-09-15 19:31:40,365 WARN exited: fomo_workflow (exit status 1; not expected)
+2026-09-27 08:05:15,184 CRIT Supervisor is running as root.  Privileges were not dropped because no user is specified in the config file.  If you intend to run as root, you can set user=root in the config file to avoid this message.
+2026-09-27 08:05:15,190 INFO RPC interface 'supervisor' initialized
+2026-09-27 08:05:15,190 CRIT Server 'unix_http_server' running without any HTTP authentication checking
+2026-09-27 08:05:15,206 INFO daemonizing the supervisord process
+2026-09-27 08:05:15,208 INFO supervisord started with pid 53487
+2026-09-27 08:05:16,224 INFO spawned: 'fomo_workflow' with pid 53533
+2026-09-27 08:05:22,180 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-27 08:05:31,082 INFO waiting for fomo_workflow to stop
+2026-09-27 08:05:31,089 WARN stopped: fomo_workflow (terminated by SIGTERM)
+2026-09-27 08:05:31,108 INFO spawned: 'fomo_workflow' with pid 53607
+2026-09-27 08:05:36,480 INFO success: fomo_workflow entered RUNNING state, process has stayed up for > than 5 seconds (startsecs)
+2026-09-29 19:03:17,356 WARN received SIGTERM indicating exit request
+2026-09-29 19:03:17,357 INFO waiting for fomo_workflow to die
+2026-09-29 19:03:18,358 WARN stopped: fomo_workflow (terminated by SIGTERM)

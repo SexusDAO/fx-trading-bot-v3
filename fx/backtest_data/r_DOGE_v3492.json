@@ -1,0 +1,166 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-08-23 10:00",
+      "close_ts": "2026-08-24 01:35",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.09109,
+      "exit_price": 0.09139,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.1293,
+      "hold_min": 935.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-09-03 22:30",
+      "close_ts": "2026-09-04 06:50",
+      "symbol": "DOGEUSDT",
+      "direction": "short",
+      "mode": "reversal",
+      "entry_price": 0.08743,
+      "exit_price": 0.08704,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.2461,
+      "hold_min": 500.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-09-06 18:30",
+      "close_ts": "2026-09-07 03:20",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.08941,
+      "exit_price": 0.08951,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -0.0882,
+      "hold_min": 530.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-09-07 22:15",
+      "close_ts": "2026-09-08 06:15",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.09007,
+      "exit_price": 0.0897,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -0.6108,
+      "hold_min": 480.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-09-08 22:15",
+      "close_ts": "2026-09-09 06:15",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.08997,
+      "exit_price": 0.09036,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.2335,
+      "hold_min": 480.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-09-14 10:45",
+      "close_ts": "2026-09-14 18:20",
+      "symbol": "DOGEUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 0.08432,
+      "exit_price": 0.0850544,
+      "close_reason": "sl",
+      "pnl": -1.071,
+      "hold_min": 455.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-09-18 16:30",
+      "close_ts": "2026-09-19 00:30",
+      "symbol": "DOGEUSDT",
+      "direction": "short",
+      "mode": "reversal",
+      "entry_price": 0.08773,
+      "exit_price": 0.08779,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -0.2684,
+      "hold_min": 480.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-09-18 20:45",
+      "close_ts": "2026-09-19 11:05",
+      "symbol": "DOGEUSDT",
+      "direction": "short",
+      "mode": "reversal",
+      "entry_price": 0.08826,
+      "exit_price": 0.08807,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.0153,
+      "hold_min": 860.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-10-01 19:15",
+      "close_ts": "2026-10-02 03:15",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.09481,
+      "exit_price": 0.09425,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -0.7907,
+      "hold_min": 480.0,
+      "signal_score": 75
+    }
+  ],
+  "stats": {
+    "symbol": "DOGEUSDT",
+    "days": 60,
+    "total_trades": 9,
+    "win_trades": 4,
+    "loss_trades": 5,
+    "win_rate_pct": 44.4,
+    "total_pnl_u": -2.2,
+    "total_win_u": 0.62,
+    "total_loss_u": -2.83,
+    "profit_factor": 0.22,
+    "max_drawdown_u": 2.58,
+    "max_single_loss": -1.07,
+    "avg_hold_min": 577.8,
+    "by_mode": {
+      "pullback": {
+        "n": 5,
+        "win": 2,
+        "pnl": -1.13,
+        "win_rate": 40.0
+      },
+      "reversal": {
+        "n": 3,
+        "win": 2,
+        "pnl": -0.01,
+        "win_rate": 66.7
+      },
+      "stop_hunt": {
+        "n": 1,
+        "win": 0,
+        "pnl": -1.07,
+        "win_rate": 0.0
+      }
+    },
+    "funnel": {
+      "judge_pass": 71,
+      "filter_bear_reversal": 0,
+      "filter_settle_win": 8,
+      "filter_cooldown": 18,
+      "filter_same_dir": 0,
+      "filter_calc_sl": 0,
+      "filter_score": 36,
+      "opened": 9
+    }
+  }
+}

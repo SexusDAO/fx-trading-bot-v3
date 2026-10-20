@@ -1,0 +1,218 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-08-23 10:00",
+      "close_ts": "2026-08-24 01:35",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.09109,
+      "exit_price": 0.09139,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.1293,
+      "hold_min": 935.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-08-26 23:15",
+      "close_ts": "2026-08-26 23:20",
+      "symbol": "DOGEUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 0.08764,
+      "exit_price": 0.08720296,
+      "close_reason": "tp1_partial",
+      "pnl": 0.1493,
+      "hold_min": 5.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-08-26 23:15",
+      "close_ts": "2026-08-26 23:35",
+      "symbol": "DOGEUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 0.08764,
+      "exit_price": 0.08742148,
+      "close_reason": "sl",
+      "pnl": 0.0247,
+      "hold_min": 20.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-09-03 22:30",
+      "close_ts": "2026-09-04 06:50",
+      "symbol": "DOGEUSDT",
+      "direction": "short",
+      "mode": "reversal",
+      "entry_price": 0.08743,
+      "exit_price": 0.08704,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.2461,
+      "hold_min": 500.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-09-06 18:30",
+      "close_ts": "2026-09-07 03:20",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.08941,
+      "exit_price": 0.08951,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -0.0882,
+      "hold_min": 530.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-09-07 22:15",
+      "close_ts": "2026-09-08 06:15",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.09007,
+      "exit_price": 0.0897,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -0.6108,
+      "hold_min": 480.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-09-08 22:15",
+      "close_ts": "2026-09-09 06:15",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.08997,
+      "exit_price": 0.09036,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.2335,
+      "hold_min": 480.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-09-09 01:00",
+      "close_ts": "2026-09-09 08:50",
+      "symbol": "DOGEUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 0.09051,
+      "exit_price": 0.091273,
+      "close_reason": "sl",
+      "pnl": -1.043,
+      "hold_min": 470.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-09-14 10:45",
+      "close_ts": "2026-09-14 18:20",
+      "symbol": "DOGEUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 0.08432,
+      "exit_price": 0.0850544,
+      "close_reason": "sl",
+      "pnl": -1.071,
+      "hold_min": 455.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-09-18 16:30",
+      "close_ts": "2026-09-19 00:30",
+      "symbol": "DOGEUSDT",
+      "direction": "short",
+      "mode": "reversal",
+      "entry_price": 0.08773,
+      "exit_price": 0.08779,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -0.2684,
+      "hold_min": 480.0,
+      "signal_score": 70
+    },
+    {
+      "open_ts": "2026-09-18 20:45",
+      "close_ts": "2026-09-19 11:05",
+      "symbol": "DOGEUSDT",
+      "direction": "short",
+      "mode": "reversal",
+      "entry_price": 0.08826,
+      "exit_price": 0.08807,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.0153,
+      "hold_min": 860.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-09-25 10:30",
+      "close_ts": "2026-09-25 11:05",
+      "symbol": "DOGEUSDT",
+      "direction": "SHORT",
+      "mode": "stop_hunt",
+      "entry_price": 0.09685,
+      "exit_price": 0.09744145,
+      "close_reason": "sl",
+      "pnl": -0.8107,
+      "hold_min": 35.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-10-01 19:15",
+      "close_ts": "2026-10-02 03:15",
+      "symbol": "DOGEUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 0.09481,
+      "exit_price": 0.09425,
+      "close_reason": "time_stop_no_progress",
+      "pnl": -0.7907,
+      "hold_min": 480.0,
+      "signal_score": 75
+    }
+  ],
+  "stats": {
+    "symbol": "DOGEUSDT",
+    "days": 60,
+    "total_trades": 13,
+    "win_trades": 6,
+    "loss_trades": 7,
+    "win_rate_pct": 46.2,
+    "total_pnl_u": -3.88,
+    "total_win_u": 0.8,
+    "total_loss_u": -4.68,
+    "profit_factor": 0.17,
+    "max_drawdown_u": 4.43,
+    "max_single_loss": -1.07,
+    "avg_hold_min": 477.1,
+    "by_mode": {
+      "pullback": {
+        "n": 5,
+        "win": 2,
+        "pnl": -1.13,
+        "win_rate": 40.0
+      },
+      "stop_hunt": {
+        "n": 5,
+        "win": 2,
+        "pnl": -2.75,
+        "win_rate": 40.0
+      },
+      "reversal": {
+        "n": 3,
+        "win": 2,
+        "pnl": -0.01,
+        "win_rate": 66.7
+      }
+    },
+    "funnel": {
+      "judge_pass": 81,
+      "filter_bear_reversal": 0,
+      "filter_settle_win": 10,
+      "filter_cooldown": 23,
+      "filter_same_dir": 0,
+      "filter_calc_sl": 0,
+      "filter_score": 36,
+      "opened": 12
+    }
+  }
+}

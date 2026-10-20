@@ -1,0 +1,148 @@
+{
+  "timestamp": "2026-08-02T16:08:12.936500",
+  "comparison": {
+    "v2.2": {
+      "open": 9,
+      "observe": 0,
+      "skip": 1,
+      "avg_score": 90.39444444444445
+    },
+    "v2.3": {
+      "open": 1,
+      "observe": 0,
+      "skip": 9,
+      "avg_score": 47.888888888888886
+    }
+  },
+  "details_v22": [
+    {
+      "symbol": "BLESSUSDT",
+      "decision": "跳过",
+      "score": 0
+    },
+    {
+      "symbol": "HOMEUSDT",
+      "score": 99.75,
+      "decision": "开仓",
+      "rsi": 71.6927000318776
+    },
+    {
+      "symbol": "UAIUSDT",
+      "score": 100,
+      "decision": "开仓",
+      "rsi": 53.02939412117576
+    },
+    {
+      "symbol": "STARUSDT",
+      "score": 96.9,
+      "decision": "开仓",
+      "rsi": 76.96228338430174
+    },
+    {
+      "symbol": "ICNTUSDT",
+      "score": 96.9,
+      "decision": "开仓",
+      "rsi": 89.61937716262975
+    },
+    {
+      "symbol": "BTCUSDT",
+      "score": 80.0,
+      "decision": "开仓",
+      "rsi": 35.07053643633729
+    },
+    {
+      "symbol": "ETHUSDT",
+      "score": 75.0,
+      "decision": "开仓",
+      "rsi": 31.27322511245839
+    },
+    {
+      "symbol": "SOLUSDT",
+      "score": 85.0,
+      "decision": "开仓",
+      "rsi": 45.74468085106385
+    },
+    {
+      "symbol": "BNBUSDT",
+      "score": 85.0,
+      "decision": "开仓",
+      "rsi": 70.53571428571414
+    },
+    {
+      "symbol": "XRPUSDT",
+      "score": 95.0,
+      "decision": "开仓",
+      "rsi": 55.39033457249054
+    }
+  ],
+  "details_v23": [
+    {
+      "symbol": "BLESSUSDT",
+      "decision": "跳过",
+      "score": 0
+    },
+    {
+      "symbol": "HOMEUSDT",
+      "score": 61,
+      "decision": "跳过",
+      "rsi": 74.32041642567958,
+      "rsi_penalty": 0
+    },
+    {
+      "symbol": "UAIUSDT",
+      "score": 74,
+      "decision": "开仓",
+      "rsi": 60.243632336655565,
+      "rsi_penalty": 0
+    },
+    {
+      "symbol": "STARUSDT",
+      "score": 25,
+      "decision": "跳过",
+      "rsi": 77.95560144553434,
+      "rsi_penalty": 15
+    },
+    {
+      "symbol": "ICNTUSDT",
+      "score": 35,
+      "decision": "跳过",
+      "rsi": 89.3238434163701,
+      "rsi_penalty": 25
+    },
+    {
+      "symbol": "BTCUSDT",
+      "score": 58,
+      "decision": "跳过",
+      "rsi": 53.85696040868443,
+      "rsi_penalty": 0
+    },
+    {
+      "symbol": "ETHUSDT",
+      "score": 45,
+      "decision": "跳过",
+      "rsi": 51.05233219567692,
+      "rsi_penalty": 0
+    },
+    {
+      "symbol": "SOLUSDT",
+      "score": 51,
+      "decision": "跳过",
+      "rsi": 58.00865800865794,
+      "rsi_penalty": 0
+    },
+    {
+      "symbol": "BNBUSDT",
+      "score": 40,
+      "decision": "跳过",
+      "rsi": 76.44259369422949,
+      "rsi_penalty": 15
+    },
+    {
+      "symbol": "XRPUSDT",
+      "score": 42,
+      "decision": "跳过",
+      "rsi": 69.77401129943512,
+      "rsi_penalty": 0
+    }
+  ]
+}

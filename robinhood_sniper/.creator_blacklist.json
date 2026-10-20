@@ -1,0 +1,108 @@
+{
+  "0x679ee1789709afb505636d0679c151c516ce4933": [
+    {
+      "symbol": "WORTHLESS",
+      "reason": "🛑 硬止损 PnL=-38.0% PnL=-38.0%",
+      "ts": 1788348518
+    }
+  ],
+  "0x352940d7e344a1a1a9a94bfb4db87930ebc98404": [
+    {
+      "symbol": "SEND",
+      "reason": "🛑 硬止损 PnL=-55.6% PnL=-55.6%",
+      "ts": 1788354720
+    }
+  ],
+  "0x75d760323ab1d2b3557486db79e7588b012edd92": [
+    {
+      "symbol": "Buddy",
+      "reason": "🛑 待观察止损(峰值反弹不足+5%) PnL=-62.0% peak=0.0% PnL=-62.0%",
+      "ts": 1788407056
+    }
+  ],
+  "0xdedf453ea84f798790bace5bbb68b9ed92a805d3": [
+    {
+      "symbol": "NOVAULT",
+      "reason": "🛑 硬止损 PnL=-37.9% PnL=-37.9%",
+      "ts": 1788448391
+    },
+    {
+      "symbol": "NOVAULT",
+      "reason": "🛑 硬止损 PnL=-37.9% PnL=-37.9%",
+      "ts": 1788448415
+    }
+  ],
+  "0xdd601f28fe298f73f80bdf1a58ac4763b96f4e4e": [
+    {
+      "symbol": "WINKINGCAT",
+      "reason": "🛑 硬止损 PnL=-67.8% PnL=-67.8%",
+      "ts": 1788458071
+    },
+    {
+      "symbol": "WINKINGCAT",
+      "reason": "🛑 硬止损 PnL=-67.8% PnL=-67.8%",
+      "ts": 1788458100
+    },
+    {
+      "symbol": "WINKINGCAT",
+      "reason": "🚨 流动性紧急撤池 -53% PnL=-77.5%",
+      "ts": 1788458336
+    }
+  ],
+  "0x729b80a734301400640f34def5f4dcd4f77af026": [
+    {
+      "symbol": "ROYALTY",
+      "reason": "🛑 待观察止损(峰值反弹不足+5%) PnL=-66.3% peak=0.0% PnL=-66.3%",
+      "ts": 1788476180
+    }
+  ],
+  "0x0a4ae7bf551111cede3db1646d6c740bf5b4d437": [
+    {
+      "symbol": "BOGLE",
+      "reason": "🛑 硬止损 PnL=-70.9% PnL=-70.9%",
+      "ts": 1788486049
+    },
+    {
+      "symbol": "BOGLE",
+      "reason": "🛑 硬止损 PnL=-68.7% PnL=-68.7%",
+      "ts": 1788486169
+    },
+    {
+      "symbol": "BOGLE",
+      "reason": "🛑 硬止损 PnL=-58.6% PnL=-58.6%",
+      "ts": 1788486228
+    },
+    {
+      "symbol": "BOGLE",
+      "reason": "🛑 硬止损 PnL=-32.0% PnL=-32.0%",
+      "ts": 1788486456
+    }
+  ],
+  "0x20a6c77daa21c8ec16c42a02eade3362f0a42d6c": [
+    {
+      "symbol": "LANDWOLF",
+      "reason": "🛑 硬止损 PnL=-52.9% PnL=-52.9%",
+      "ts": 1788501045
+    },
+    {
+      "symbol": "LANDWOLF",
+      "reason": "🛑 硬止损 PnL=-51.1% PnL=-51.1%",
+      "ts": 1788501106
+    },
+    {
+      "symbol": "LANDWOLF",
+      "reason": "🛑 硬止损 PnL=-57.3% PnL=-57.3%",
+      "ts": 1788501170
+    },
+    {
+      "symbol": "LANDWOLF",
+      "reason": "🛑 硬止损 PnL=-56.7% PnL=-56.7%",
+      "ts": 1788501229
+    },
+    {
+      "symbol": "LANDWOLF",
+      "reason": "🛑 硬止损 PnL=-42.3% PnL=-42.3%",
+      "ts": 1788501288
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "trades": [
+    {
+      "open_ts": "2026-08-23 10:00",
+      "close_ts": "2026-08-24 03:20",
+      "symbol": "SOLUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 93.33,
+      "exit_price": 93.76,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.2607,
+      "hold_min": 1040.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-08-25 17:15",
+      "close_ts": "2026-08-25 21:05",
+      "symbol": "SOLUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 98.16,
+      "exit_price": 95.706,
+      "close_reason": "sl",
+      "pnl": -2.7,
+      "hold_min": 230.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-09-01 21:15",
+      "close_ts": "2026-09-01 21:20",
+      "symbol": "SOLUSDT",
+      "direction": "long",
+      "mode": "reversal",
+      "entry_price": 99.54,
+      "exit_price": 97.0515,
+      "close_reason": "sl",
+      "pnl": 2.3,
+      "hold_min": 5.0,
+      "signal_score": 50
+    },
+    {
+      "open_ts": "2026-09-04 21:15",
+      "close_ts": "2026-09-05 05:15",
+      "symbol": "SOLUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 101.51,
+      "exit_price": 101.77,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.0561,
+      "hold_min": 480.0,
+      "signal_score": 65
+    },
+    {
+      "open_ts": "2026-09-22 14:30",
+      "close_ts": "2026-09-23 08:50",
+      "symbol": "SOLUSDT",
+      "direction": "LONG",
+      "mode": "pullback",
+      "entry_price": 116.83,
+      "exit_price": 117.34,
+      "close_reason": "time_stop_no_progress",
+      "pnl": 0.2365,
+      "hold_min": 1100.0,
+      "signal_score": 55
+    }
+  ],
+  "stats": {
+    "symbol": "SOLUSDT",
+    "days": 60,
+    "total_trades": 5,
+    "win_trades": 4,
+    "loss_trades": 1,
+    "win_rate_pct": 80.0,
+    "total_pnl_u": 0.15,
+    "total_win_u": 2.85,
+    "total_loss_u": -2.7,
+    "profit_factor": 1.06,
+    "max_drawdown_u": 2.7,
+    "max_single_loss": -2.7,
+    "avg_hold_min": 571.0,
+    "by_mode": {
+      "pullback": {
+        "n": 4,
+        "win": 3,
+        "pnl": -2.15,
+        "win_rate": 75.0
+      },
+      "reversal": {
+        "n": 1,
+        "win": 1,
+        "pnl": 2.3,
+        "win_rate": 100.0
+      }
+    },
+    "funnel": {
+      "judge_pass": 32,
+      "filter_bear_reversal": 0,
+      "filter_settle_win": 4,
+      "filter_cooldown": 7,
+      "filter_same_dir": 0,
+      "filter_calc_sl": 0,
+      "filter_score": 16,
+      "opened": 5
+    }
+  }
+}
