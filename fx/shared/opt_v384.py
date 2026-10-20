@@ -6,6 +6,14 @@ shared/opt_v384.py — v3.84 第一轮优化的纯函数集合（无 I/O，便�
 """
 from __future__ import annotations
 
+import math as _math
+
+
+def _finite(x) -> bool:
+    """[v3.89 #73] 是有限实数（排除 NaN/Inf/bool/非数值）。"""
+    return (isinstance(x, (int, float)) and not isinstance(x, bool)
+            and _math.isfinite(x))
+
 
 def stagnation_loss_threshold(sl_dist_pct: float, enabled: bool = True,
                               frac: float = 0.6, floor: float = 0.02) -> float:
@@ -19,7 +27,8 @@ def stagnation_loss_threshold(sl_dist_pct: float, enabled: bool = True,
     【新逻辑】阈值 = max(floor, frac × 止损距离)。止损 3% → 2%（不变）；止损 5% → 3%。
     sl_dist_pct 取不到（<=0）时回退到 floor，行为与原逻辑一致。
     """
-    if not enabled or sl_dist_pct is None or sl_dist_pct <= 0:
+    # [v3.89 #73] 非有限数（NaN/Inf）与非数值按「取不到」处理，回退 floor；合法输入结果不变
+    if not enabled or not _finite(sl_dist_pct) or sl_dist_pct <= 0:
         return floor
     return max(floor, frac * sl_dist_pct)
 
@@ -36,6 +45,10 @@ def tp1_protect_action(direction: str, sl_now: float, entry: float,
             价格仍在入场价有利一侧时才保持原来的「移动止损到保本」。
     止损已在保本侧（多单 sl>=entry / 空单 sl<=entry）→ 'none'，交给交易所止损单处理。
     """
+    # [v3.89 #73] 价格/浮盈非有限数时无法判断，返回 'none'（交给交易所止损单），
+    #   而不是让 NaN 比较为 False 后落入 'move_sl'。合法输入结果不变。
+    if not (_finite(sl_now) and _finite(entry) and _finite(fav)):
+        return "none"
     d = (direction or "").upper()
     if d == "LONG":
         sl_on_loss_side = sl_now < entry
@@ -61,6 +74,11 @@ def pullback_entry_params(enabled: bool = True, deg_atr: float = 0.5,
     【新逻辑】两侧统一为 deg_atr=0.5、最小 min_atr=0.3、上限 max_atr=2.0：做多更深一点的回踩（价格更优），
             做空更容易成交（增加开仓次数）。需用回测/模拟盘评估成交率与胜率的变化。
     """
+    # [v3.89 #73] 参数需为有限正数且 min<=max、min<=deg<=max；否则视为非法，回退到原（未启用）参数组，
+    #   不把反向上下界或 NaN 当成新参数使用。合法输入结果不变。
+    if enabled and not (all(_finite(v) and v > 0 for v in (deg_atr, min_atr, max_atr))
+                        and min_atr <= deg_atr <= max_atr):
+        enabled = False
     if enabled:
         return {"long_deg": deg_atr, "long_min": min_atr, "long_max": max_atr,
                 "short_deg": deg_atr, "short_min": min_atr, "short_max": max_atr}
