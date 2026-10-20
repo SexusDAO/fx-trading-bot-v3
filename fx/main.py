@@ -112,6 +112,14 @@ async def _loop_scan(interval: int = 300, signal_watcher=None) -> None:
     周末价格几乎不动，5 分钟和 15 分钟的信号捕捉能力完全相同，但资源消耗减少 2/3。
     """
     await asyncio.sleep(5)
+    # ── 6小时心跳计数器 ────────────────────────────────────────────────
+    import time as _hb_time, datetime as _hb_dt
+    _hb_interval   = 6 * 3600          # 6 小时一次
+    _hb_last_ts    = _hb_time.time()   # 启动时对齐，第一次心跳在启动 6h 后
+    _hb_scans      = 0    # 计数：扫描轮次
+    _hb_raw        = 0    # 计数：原始信号
+    _hb_watched    = 0    # 计数：进入监控
+    _hb_placed     = 0    # 计数：成交开仓
     while True:
         try:
             from scanner import run_scan
@@ -130,6 +138,13 @@ async def _loop_scan(interval: int = 300, signal_watcher=None) -> None:
             try:
                 result = await asyncio.wait_for(future, timeout=300)
                 placed = (result or {}).get("placed", 0)
+                # ── 心跳计数器更新 ────────────────────────────────────────────
+                _r = result or {}
+                _hb_scans   += 1
+                _hb_raw     += _r.get("signals_raw", 0)
+                _hb_placed  += placed
+                # 计入监控的信号数（signals_final 是进入 watcher 的）
+                _hb_watched += _r.get("signals_final", 0)
                 if placed:
                     logger.info(f"[main] 扫描完成，注册信号/开仓 {placed} 笔")
                 else:
@@ -151,6 +166,33 @@ async def _loop_scan(interval: int = 300, signal_watcher=None) -> None:
         _eff_interval = 900 if _iwp(datetime.now(_tz.utc)) else interval
         if _eff_interval != interval:
             logger.debug(f"[main] 周末模式：扫描间隔降频 {interval}s → {_eff_interval}s")
+        # ── 6小时心跳推送 ────────────────────────────────────────────
+        _now_ts = _hb_time.time()
+        if _now_ts - _hb_last_ts >= _hb_interval:
+            try:
+                from shared.notifier import notify_async as _nb_ntf
+                import shared.ws_listener as _ws_mod
+                _ws_ref   = getattr(_ws_mod, "_ws_instance", None)
+                _ws_ok    = "✅ 全部连接"
+                if _ws_ref is not None:
+                    _disconn = getattr(_ws_ref, "disconnected_streams", None)
+                    if callable(_disconn):
+                        _bad = _disconn()
+                        _ws_ok = f"❌ {','.join(_bad)}断开" if _bad else "✅ 全部连接"
+                _pending_n = signal_watcher.pending_count() if signal_watcher else 0
+                _hb_utc    = _hb_dt.datetime.now(_hb_dt.timezone.utc).strftime("%H:%M UTC")
+                await _nb_ntf(
+                    f"💓 系统心跳 {_hb_utc}\n"
+                    f"扫描正常 | 监控中 {_pending_n} 个信号\n"
+                    f"过去6小时：扫描 {_hb_scans} 轮，原始信号 {_hb_raw} 个，"
+                    f"进入监控 {_hb_watched} 个，成交 {_hb_placed} 笔\n"
+                    f"WS状态：{_ws_ok}"
+                )
+            except Exception as _hb_e:
+                logger.debug(f"[main] 心跳推送失败: {_hb_e}")
+            # 重置计数器
+            _hb_last_ts = _now_ts
+            _hb_scans = _hb_raw = _hb_watched = _hb_placed = 0
         await asyncio.sleep(_eff_interval)
 
 

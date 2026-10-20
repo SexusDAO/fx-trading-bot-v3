@@ -517,6 +517,34 @@ class SignalWatcher:
                 f"触发区间=[{entry_low:.6g},{entry_high:.6g}] "
                 f"挂单价={entry_price:.6g} 有效期={expire_in/60:.1f}min"
             )
+            # ── 信号进入监控推送通知 ──────────────────────────────────────────
+            try:
+                from shared.notifier import notify as _ntf
+                import datetime as _dt
+                _sig   = entry.signal
+                _dir   = _sig.get("direction", "?").upper()
+                _mode  = entry.mode
+                _score = _sig.get("score", _sig.get("pending_score", pending_score))
+                _sl    = _sig.get("pre_sl_price", _sig.get("sl_price", ""))
+                _tp1   = _sig.get("pre_tp1_price", _sig.get("tp1_price", ""))
+                _ts    = _dt.datetime.now(_dt.timezone.utc).strftime("%H:%M UTC")
+                _dir_emoji = "📈" if _dir == "LONG" else "📉"
+                _sl_str  = f"{_sl:.6g}" if isinstance(_sl, (int, float)) and _sl else "—"
+                _tp1_str = f"{_tp1:.6g}" if isinstance(_tp1, (int, float)) and _tp1 else "—"
+                _score_str = f"{int(_score)}分" if _score else "—"
+                _ntf(
+                    f"{_dir_emoji} 信号进入监控\n"
+                    f"标的：{symbol}\n"
+                    f"方向：{_dir}\n"
+                    f"策略：{_mode}\n"
+                    f"评分：{_score_str}\n"
+                    f"挂单价：{entry_price:.6g}\n"
+                    f"止损：{_sl_str}\n"
+                    f"TP1：{_tp1_str}\n"
+                    f"时间：{_ts}"
+                )
+            except Exception as _ne:
+                logger.debug(f"[signal_watcher] 信号通知失败（非致命）: {_ne}")
 
     async def cancel_all(self, reason: str = "manual") -> int:
         """
