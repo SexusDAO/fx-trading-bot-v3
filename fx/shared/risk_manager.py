@@ -842,12 +842,32 @@ def record_api_call(success: bool) -> None:
     except Exception:
         pass
 
+# [v3.89 #65] 失败率统计契约：同时受「次数窗口」（最近 50 次）与「时间窗口」（最近 600 秒）约束，
+#   两者都满足的样本才计入。此前只取最近 50 次，低流量或恢复阶段的陈旧故障会被当成当前接口状态。
+_API_FAIL_TAIL = 50
+_API_FAIL_WINDOW_SEC = 600.0
+
+
+def _api_fail_stats(now: float = None) -> dict:
+    """
+    返回 {"rate": 失败率, "samples": 窗口内样本数, "newest_age_s": 最新样本年龄(秒)|None, "status": "ok"|"no_sample"}。
+    窗口内没有样本 → rate=0.0、status="no_sample"（沿用原行为：不触发风控，但标明是「没有样本」而非「确认零失败」）。
+    """
+    import time as _t
+    now = _t.time() if now is None else now
+    tail = list(_api_fail_log[-_API_FAIL_TAIL:])
+    fresh = [(t, f) for t, f in tail if now - t <= _API_FAIL_WINDOW_SEC]
+    newest = max((t for t, _ in tail), default=None)
+    newest_age = (now - newest) if newest is not None else None
+    if not fresh:
+        return {"rate": 0.0, "samples": 0, "newest_age_s": newest_age, "status": "no_sample"}
+    return {"rate": sum(1 for _, f in fresh if f) / len(fresh), "samples": len(fresh),
+            "newest_age_s": newest_age, "status": "ok"}
+
+
 def _api_fail_rate_recent() -> float:
-    """返回最近请求的失败率（0.0~1.0）。"""
-    if not _api_fail_log:
-        return 0.0
-    tail = _api_fail_log[-50:]  # 最近 50 次
-    return sum(1 for _, f in tail if f) / len(tail)
+    """返回时间窗口内最近请求的失败率（0.0~1.0）；窗口内无样本返回 0.0（见 _api_fail_stats 的 status）。"""
+    return _api_fail_stats()["rate"]
 
 
 LAST_USDT_PEG_STATUS: dict = {"status": "unknown", "rate": None, "ts": 0.0, "error": None}
@@ -913,9 +933,10 @@ def check_systemic_risk() -> tuple[bool, str]:
         return False, f"USDT 脱锚警告: USDC/USDT={_peg['rate']:.4f}"
 
     # ② API 响应异常
-    fail_rate = _api_fail_rate_recent()
+    _fs = _api_fail_stats()
+    fail_rate = _fs["rate"]
     if fail_rate > SYSTEMIC_API_FAIL_RATE_THRESH:
-        return False, f"API 异常：最近请求失败率 {fail_rate*100:.0f}%"
+        return False, f"API 异常：最近请求失败率 {fail_rate*100:.0f}%（{_fs['samples']} 个样本，最新 {_fs['newest_age_s'] or 0:.0f}s 前）"
 
     # ③ 极端资金费率（持仓中的标的，排除 funding_arb 专属仓位）
     # 注意：高费率是 funding_arb 的机会，不应阻断 funding_arb 扫描
