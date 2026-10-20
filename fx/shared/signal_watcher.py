@@ -25,9 +25,11 @@ shared/signal_watcher.py — 信号入场价格监控 + 限价挂单管理
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import sys
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, Optional
@@ -106,6 +108,11 @@ class WatchEntry:
     score_original_expire: float = 0.0   # 原始有效期（重挂不刷新）
     is_reorder:            bool  = False # 是否为重挂单（价格调整），受竞争保护
     reorder_count:         int   = 0     # 重挂次数
+    # ── [v3.89 #40] 撤单状态机 / 条目身份（均有默认值，不影响既有构造方式）──────────
+    # cancel_state: none（正常）/ cancelling（撤单进行中，禁止触发）/ cancel_unknown（撤单结果未知，待对账）
+    # 状态转换必须在 SignalWatcher._lock 内完成。
+    entry_id:     str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    cancel_state: str = "none"
 
     @property
     def symbol(self) -> str:
@@ -347,6 +354,8 @@ class SignalWatcher:
         # 外部注入
         self._ws_listener: Any  = None
         self._main_loop:   Any  = None
+        # [v3.89 #40] 撤单结果未知的订单对账表：(symbol, order_id) -> 记录；_gc_pass 定期重试，最多 5 次
+        self._orphan_orders: Dict[tuple, dict] = {}
         # v3.33 5分钟内同方向触发上限
         # {"LONG": last_trigger_ts, "SHORT": last_trigger_ts}
         self._dir_last_trigger: Dict[str, float] = {}
@@ -757,6 +766,8 @@ class SignalWatcher:
             e = self._watched.get(symbol)
             if e is None or e.triggered or e.is_expired():
                 return
+            if e.cancel_state != "none":   # [v3.89 #40] 撤单进行中/结果未知，不得触发
+                return
             if not e.price_in_range(price):
                 return
             e.triggered = True  # 先标记，防止后续重入
@@ -904,9 +915,124 @@ class SignalWatcher:
         loop = asyncio.get_running_loop()
         try:
             from shared import binance_api as _api
-            await loop.run_in_executor(None, lambda: _api.cancel_order(symbol, order_id))
+            # [v3.89 #40] 返回交易所响应：binance_api.cancel_order 失败时返回 {} 而不抛异常，
+            #   调用方必须看返回的 status，不能把「没抛异常」当成撤单成功。
+            return await loop.run_in_executor(None, lambda: _api.cancel_order(symbol, order_id))
         except Exception as e:
             raise RuntimeError(f"cancel_order({symbol},{order_id}): {e}")
+
+    async def _query_order(self, symbol: str, order_id: int) -> dict:
+        """[v3.89 #40] 查询订单状态（失败返回 {}）。"""
+        loop = asyncio.get_running_loop()
+        from shared import binance_api as _api
+        return await loop.run_in_executor(None, lambda: _api.get_order(symbol, order_id))
+
+    @staticmethod
+    def _classify_order(d: Any) -> Optional[str]:
+        """[v3.89 #40] 订单响应归类：'filled'（有成交，含部分成交）/ 'confirmed'（已撤销，无成交）/ None（未能确认）。"""
+        if not isinstance(d, dict) or not d:
+            return None
+        st = str(d.get("status", "")).upper()
+        try:
+            executed = float(d.get("executedQty") or 0)
+        except (TypeError, ValueError):
+            executed = 0.0
+        if st == "FILLED" or executed > 0:
+            return "filled"
+        if st in ("CANCELED", "CANCELLED", "EXPIRED", "EXPIRED_IN_MATCH", "REJECTED"):
+            return "confirmed"
+        return None
+
+    async def _cancel_exchange_order(self, symbol: str, order_id: int) -> str:
+        """
+        [v3.89 #40] 撤交易所订单并确认终态。返回：
+          'confirmed' 已撤销（无成交）；'filled' 订单已（部分）成交，不是撤销；'unknown' 无法确认。
+        先看撤单响应的 status；响应不明确（含失败返回 {}）再用 get_order 查终态。
+        """
+        res = None
+        try:
+            res = await self._cancel_order(symbol, order_id)
+        except Exception as e:
+            logger.warning(f"[signal_watcher] 撤单异常 {symbol} id={order_id}: {e}")
+        c = self._classify_order(res)
+        if c:
+            return c
+        try:
+            q = await self._query_order(symbol, order_id)
+        except Exception as e:
+            q = {}
+            logger.warning(f"[signal_watcher] 撤单后查询订单失败 {symbol} id={order_id}: {e}")
+        return self._classify_order(q) or "unknown"
+
+    @staticmethod
+    def _append_reconcile_log(rec: dict) -> None:
+        """[v3.89 #40] 追加写 logs/cancel_reconcile.jsonl（与 pos_state.json 隔离）。"""
+        try:
+            p = Path(__file__).parent.parent / "logs" / "cancel_reconcile.jsonl"
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with open(p, "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        except Exception as e:
+            logger.warning(f"[signal_watcher] 写对账记录失败: {e}")
+
+    def _register_orphan(self, symbol: str, order_id: int, reason: str,
+                         entry: WatchEntry, on_confirmed: str) -> None:
+        """
+        [v3.89 #40] 登记「撤单结果未知」订单，独立于监控条目跟踪到终态。
+        on_confirmed: 'remove'（对账确认已撤后移除条目）/ 'keep_watching'（清空 limit_order_id，继续等待触发）
+        """
+        key = (symbol, int(order_id))
+        if key in self._orphan_orders:
+            return
+        self._orphan_orders[key] = {"symbol": symbol, "order_id": int(order_id), "reason": reason,
+                                    "attempts": 0, "first_ts": time.time(),
+                                    "entry": entry, "on_confirmed": on_confirmed}
+        logger.error(f"[signal_watcher] 撤单结果未知，登记对账 {symbol} id={order_id} 原因={reason}")
+        self._append_reconcile_log({"ts": time.time(), "event": "registered", "symbol": symbol,
+                                    "order_id": int(order_id), "reason": reason,
+                                    "entry_id": entry.entry_id})
+
+    async def _reconcile_orphans(self) -> None:
+        """[v3.89 #40] 对账撤单结果未知的订单；每个最多重试 5 次，超限 logger.error 并移除。"""
+        if not self._orphan_orders:
+            return
+        for key, rec in list(self._orphan_orders.items()):
+            sym, oid, entry = rec["symbol"], rec["order_id"], rec["entry"]
+            try:
+                outcome = self._classify_order(await self._query_order(sym, oid))
+                if outcome is None:   # 仍在挂单或查询失败 → 再尝试撤一次
+                    outcome = await self._cancel_exchange_order(sym, oid)
+                    if outcome == "unknown":
+                        outcome = None
+            except Exception as e:
+                outcome = None
+                logger.warning(f"[signal_watcher] 对账异常 {sym} id={oid}: {e}")
+            rec["attempts"] += 1
+            if outcome is None:
+                if rec["attempts"] >= 5:
+                    logger.error(f"[signal_watcher] 对账 {sym} id={oid} 重试 {rec['attempts']} 次仍无法确认，"
+                                 f"放弃自动对账并移出对账表，请人工核查")
+                    self._append_reconcile_log({"ts": time.time(), "event": "gave_up", "symbol": sym,
+                                                "order_id": oid, "attempts": rec["attempts"]})
+                    self._orphan_orders.pop(key, None)
+                continue
+            async with self._lock:
+                if outcome == "confirmed":
+                    if self._watched.get(sym) is entry:
+                        if rec["on_confirmed"] == "remove":
+                            self._watched.pop(sym, None)
+                        else:
+                            entry.limit_order_id = None
+                            entry.cancel_state = "none"
+                else:   # filled
+                    if self._watched.get(sym) is entry:
+                        entry.cancel_state = "none"
+                    logger.error(f"[signal_watcher] 对账发现 {sym} id={oid} 已（部分）成交，请核对持仓")
+            self._append_reconcile_log({"ts": time.time(), "event": outcome, "symbol": sym,
+                                        "order_id": oid, "attempts": rec["attempts"]})
+            self._orphan_orders.pop(key, None)
+            if outcome == "confirmed" and rec["on_confirmed"] == "remove" and self._ws_listener:
+                self._ws_listener.unsubscribe(sym)
 
     # ─────────────────────────────────────────────────────────────────────────
     # REST 轮询模式（替代 WS，在 WS 不可用时使用）
@@ -1515,19 +1641,48 @@ class SignalWatcher:
                 logger.warning(f'[recheck] 价格位移重挂：旧单撤销失败 {sym} id={old_entry.limit_order_id}: {ce}')
 
     async def _cancel_and_remove(self, sym: str, entry: WatchEntry, reason: str) -> None:
-        """撤销 entry 的限价单并从监控队列移除。"""
+        """
+        撤销 entry 的限价单并从监控队列移除。
+        [v3.89 #40] 原写法先从队列删除再撤单，撤单失败时条目没了、交易所订单还活着且无人跟踪。
+        现改为：条目留在队列并置 cancelling（_trigger 见此状态不触发）→ 撤单并确认终态 →
+          confirmed：锁内复核后删除、取消订阅；
+          filled：订单已（部分）成交，保留条目，只记录，不新增交易逻辑；
+          unknown：保留条目（cancel_unknown），登记对账，由 _gc_pass 重试。
+        """
+        oid = entry.limit_order_id
         async with self._lock:
             if sym not in self._watched:
                 return
-            self._watched.pop(sym, None)
-        if entry.limit_order_id:
-            try:
-                await self._cancel_order(sym, entry.limit_order_id)
-            except Exception as ce:
-                logger.warning(f'[recheck] 撤单失败 {sym} id={entry.limit_order_id}: {ce}')
-        if self._ws_listener:
-            self._ws_listener.unsubscribe(sym)
-        logger.info(f'[signal_watcher] {sym} 已撤单并移除: {reason}')
+            if not oid:
+                self._watched.pop(sym, None)   # 没有交易所订单，无需确认
+            else:
+                entry.cancel_state = "cancelling"
+        if not oid:
+            if self._ws_listener:
+                self._ws_listener.unsubscribe(sym)
+            logger.info(f'[signal_watcher] {sym} 已移除（无挂单）: {reason}')
+            return
+        outcome = await self._cancel_exchange_order(sym, oid)
+        async with self._lock:
+            if outcome == "confirmed":
+                if self._watched.get(sym) is entry:
+                    self._watched.pop(sym, None)
+                entry.cancel_state = "none"
+            elif outcome == "filled":
+                entry.cancel_state = "none"
+            else:
+                entry.cancel_state = "cancel_unknown"
+                self._register_orphan(sym, oid, reason, entry, on_confirmed="remove")
+        if outcome == "confirmed":
+            if self._ws_listener:
+                self._ws_listener.unsubscribe(sym)
+            logger.info(f'[signal_watcher] {sym} 已撤单并移除: {reason}')
+        elif outcome == "filled":
+            logger.error(f'[signal_watcher] {sym} 撤单时发现订单 id={oid} 已（部分）成交，条目保留，请核对持仓: {reason}')
+            self._append_reconcile_log({"ts": time.time(), "event": "filled_on_cancel", "symbol": sym,
+                                        "order_id": oid, "reason": reason})
+        else:
+            logger.error(f'[signal_watcher] {sym} 撤单结果未知 id={oid}，条目保留待对账: {reason}')
 
     # ─────────────────────────────────────────────────────────────────────────
     # ② BTC 大跌护卫（独立 task，1H 跌幅触发）
@@ -1620,3 +1775,9 @@ class SignalWatcher:
 
         if expired_entries:
             logger.info(f"[signal_watcher] GC 清理过期信号: {[s for s,_ in expired_entries]}")
+
+        # [v3.89 #40] 对账撤单结果未知的订单
+        try:
+            await self._reconcile_orphans()
+        except Exception as _re:
+            logger.warning(f"[signal_watcher] 撤单对账异常: {_re}")
