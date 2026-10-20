@@ -75,7 +75,7 @@ def _remove_position_checked(pos_id: str, symbol: str = "") -> bool:
     只做日志，不改变任何业务行为。
     """
     try:
-        ok = _remove_position_checked(pos_id)
+        ok = remove_position(pos_id)
     except Exception as e:
         logger.error(f"[pm] _remove_position_checked({symbol or pos_id}) 抛异常，持仓文件可能损坏，请人工核查: {e}")
         return False
