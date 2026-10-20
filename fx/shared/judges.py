@@ -27,12 +27,28 @@ from __future__ import annotations
 import logging
 import math
 from shared.indicators import ema as _ema_raw, rsi as _rsi_raw, atr as _atr_raw
+
+
+def _cfg_fallback(group: str, exc: BaseException, effective: dict) -> None:
+    """
+    [v3.89 #31] 配置导入回退时的可见性：
+      ImportError（config 里没有这些可选项）→ 正常，info 记录实际生效值；
+      其他异常（config 模块本身加载损坏）→ error，并输出实际生效的内置默认值。
+    只增加日志，不改变任何取值。
+    """
+    lg = logging.getLogger("fx.judges")
+    if isinstance(exc, ImportError):
+        lg.info(f"[judges] 可选配置 {group} 未提供（{exc}），使用内置默认值: {effective}")
+    else:
+        lg.error(f"[judges] 配置模块加载异常 {group}（{type(exc).__name__}: {exc}），使用内置默认值: {effective}")
+
 try:
     import sys as _sys, pathlib as _pl
     _sys.path.insert(0, str(_pl.Path(__file__).parent.parent))
     from config import PULLBACK_LOWER_LIMIT_LOW as _PB_LOW, PULLBACK_LOWER_LIMIT_MID as _PB_MID
-except Exception:
+except Exception as _cfg_e:
     _PB_LOW, _PB_MID = 1.2, 2.0
+    _cfg_fallback("PULLBACK_LOWER_LIMIT", _cfg_e, {"_PB_LOW": _PB_LOW, "_PB_MID": _PB_MID})
 try:
     from config import (
         PULSE_CANDLE_VOL_RATIO_1H as _PC_VOL_1H,
@@ -43,19 +59,23 @@ try:
         PULSE_CANDLE_LOOKBACK_1H  as _PC_LB_1H,
         PULSE_CANDLE_LOOKBACK_4H  as _PC_LB_4H,
     )
-except Exception:
+except Exception as _cfg_e:
     _PC_VOL_1H, _PC_VOL_4H  = 3.0, 4.0
     _PC_BODY_1H, _PC_BODY_4H = 5.0, 8.0
     _PC_BODY_RATIO = 0.5
     _PC_LB_1H, _PC_LB_4H = 2, 3
+    _cfg_fallback("PULSE_CANDLE", _cfg_e, {"vol_1h": _PC_VOL_1H, "vol_4h": _PC_VOL_4H, "body_1h": _PC_BODY_1H,
+                                           "body_4h": _PC_BODY_4H, "body_ratio": _PC_BODY_RATIO,
+                                           "lb_1h": _PC_LB_1H, "lb_4h": _PC_LB_4H})
 try:
     from config import (
         PULLBACK_SHORT_CHG24_MIN    as _PB_SHORT_CHG24_MIN,
         PULLBACK_SHORT_VOL_RATIO_MIN as _PB_SHORT_VOL_RATIO_MIN,
     )
-except Exception:
+except Exception as _cfg_e:
     _PB_SHORT_CHG24_MIN    = 3.0
     _PB_SHORT_VOL_RATIO_MIN = 0.8
+    _cfg_fallback("PULLBACK_SHORT", _cfg_e, {"chg24_min": _PB_SHORT_CHG24_MIN, "vol_ratio_min": _PB_SHORT_VOL_RATIO_MIN})
 import time
 from typing import Any
 

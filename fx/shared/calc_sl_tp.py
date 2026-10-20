@@ -47,13 +47,31 @@ try:
     from config import SL_MAX_PCT_LOW as _CFG_SL_LOW, SL_MAX_PCT_MID as _CFG_SL_MID, SL_MAX_PCT_HIGH as _CFG_SL_HIGH
     from config import TP1_MAX_PCT_HIGH as _CFG_TP1_HIGH
     from config import RR_MIN_TP1 as _CFG_RR_MIN_TP1, RR_MIN_TP1_HIGH as _CFG_RR_MIN_TP1_HIGH
-except Exception:
+except Exception as _cfg_e:
     _CFG_LOW, _CFG_MID, _CFG_HIGH = 1.2, 1.5, 2.0
     _CFG_SL_LOW, _CFG_SL_MID, _CFG_SL_HIGH = 0.12, 0.15, 0.20
     _CFG_TP1_HIGH = 0.25
     _CFG_RR_MIN_TP1 = 1.5
+    _cfg_fb_exc = _cfg_e   # logger 在下面才创建，延后输出
 
 logger = logging.getLogger("fx.calc_sl_tp")
+
+
+def _cfg_fallback(group: str, exc: BaseException, effective: dict) -> None:
+    """
+    [v3.89 #31] 配置导入回退的可见性：ImportError（可选项缺失）→ info；其他异常（config 模块损坏）→ error，
+    并输出实际生效的内置默认值。只增加日志，不改变任何取值。
+    """
+    if isinstance(exc, ImportError):
+        logger.info(f"[calc_sl_tp] 可选配置 {group} 未提供（{exc}），使用内置默认值: {effective}")
+    else:
+        logger.error(f"[calc_sl_tp] 配置模块加载异常 {group}（{type(exc).__name__}: {exc}），使用内置默认值: {effective}")
+
+
+if "_cfg_fb_exc" in globals():
+    _cfg_fallback("SL/TP/RR", _cfg_fb_exc, {
+        "sl_mult": [_CFG_LOW, _CFG_MID, _CFG_HIGH], "sl_max_pct": [_CFG_SL_LOW, _CFG_SL_MID, _CFG_SL_HIGH],
+        "tp1_max_pct_high": _CFG_TP1_HIGH, "rr_min_tp1": _CFG_RR_MIN_TP1})
 
 # 动态 sl_mult 按波动层级（从 config.py 加载，与主配置同步）
 _SL_MULT = {"low": _CFG_LOW, "mid": _CFG_MID, "high": _CFG_HIGH}
@@ -282,8 +300,10 @@ def _entry_pullback(mark: float, atr: float, ema20: float,
     try:
         from config import (OPT_PULLBACK_ENTRY_SYMMETRIC as _OPT_PB, PULLBACK_DEGRADED_ATR as _PB_DEG,
                             PULLBACK_MIN_DIST_ATR as _PB_MIN, PULLBACK_MAX_DIST_ATR as _PB_MAX)
-    except Exception:
+    except Exception as _cfg_e:
         _OPT_PB, _PB_DEG, _PB_MIN, _PB_MAX = False, 0.5, 0.3, 2.0
+        _cfg_fallback("PULLBACK_ENTRY", _cfg_e, {"symmetric": _OPT_PB, "degraded_atr": _PB_DEG,
+                                                  "min_dist_atr": _PB_MIN, "max_dist_atr": _PB_MAX})
     from shared.opt_v384 import pullback_entry_params as _pb_params
     _pp = _pb_params(_OPT_PB, _PB_DEG, _PB_MIN, _PB_MAX)
 
@@ -293,8 +313,9 @@ def _entry_pullback(mark: float, atr: float, ema20: float,
     #   新：限价挂在 mark∓0.1ATR（只留一点 maker 空间），确认在哪里就在哪里入场。开关 OPT_PULLBACK_ENTRY_AT_CONFIRM。
     try:
         from config import OPT_PULLBACK_ENTRY_AT_CONFIRM as _OPT_PBC
-    except Exception:
+    except Exception as _cfg_e:
         _OPT_PBC = False
+        _cfg_fallback("OPT_PULLBACK_ENTRY_AT_CONFIRM", _cfg_e, {"enabled": _OPT_PBC})
     if _OPT_PBC and atr > 0:
         if direction == "LONG":
             return mark - atr * 0.1, "at_confirm"
