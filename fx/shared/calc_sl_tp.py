@@ -252,7 +252,8 @@ def _oid_reject_all_one_side() -> bool:
     try:
         import config as _c
         return bool(getattr(_c, "OPT_OID_REJECT_ALL_BULL", True))
-    except Exception:
+    except Exception as _cfg_e:
+        _cfg_fallback("OPT_OID_REJECT_ALL_BULL", _cfg_e, {"enabled": True})
         return True
 
 
@@ -269,7 +270,8 @@ def _liq_rel_cfg():
             "gate_cap": getattr(_c, "OPT_DIVERGENCE_GATE_WEIGHT_CAP", 2.0),
             "b_strong": _c.TP1_LIQ_BUFFER_STRONG, "b_mid": _c.TP1_LIQ_BUFFER_MID, "b_weak": _c.TP1_LIQ_BUFFER_WEAK,
         }
-    except Exception:
+    except Exception as _cfg_e:
+        _cfg_fallback("OPT_LIQ_RELATIVE_STRENGTH", _cfg_e, {"source": "existing_logic"})
         return None
 
 
@@ -279,8 +281,9 @@ def _liq_rel(z: dict, zones: list, ctx: dict | None) -> float | None:
     try:
         import config as _c
         denom = getattr(_c, "LIQ_REL_DENOM", "vol24")
-    except Exception:
+    except Exception as _cfg_e:
         denom = "vol24"
+        _cfg_fallback("LIQ_REL_DENOM", _cfg_e, {"denom": denom})
     ctx = ctx or {}
     return relative_by_denom(denom, _zone_size(z), zones,
                              ctx.get("vol24_usd", 0.0), ctx.get("oi_usd", 0.0))
@@ -1161,8 +1164,9 @@ def calc_sl_tp(
     #   注意：止损距离变化会通过 RISK_PER_TRADE 影响名义仓位（止损更近→仓位更大，仍受单仓上限约束）。
     try:
         from config import OPT_INVALIDATION_SL as _OPT_ISL
-    except Exception:
+    except Exception as _cfg_e:
         _OPT_ISL = False
+        _cfg_fallback("OPT_INVALIDATION_SL", _cfg_e, {"enabled": _OPT_ISL})
     if _OPT_ISL and mode in ("pullback", "ema_trend", "reversal") and k1h:
         from shared.opt_v387 import invalidation_sl as _inv_sl
         _k1h_closed = k1h[:-1] if len(k1h) > 1 else k1h
@@ -1238,8 +1242,9 @@ def calc_sl_tp(
             # 二探越深（entry 离 pivot 越远）→ TP1 距离越大 → RR 越高 → 自然过滤浅回踩
             try:
                 from config import RR_MIN_STOP_HUNT as _RR_SH
-            except Exception:
+            except Exception as _cfg_e:
                 _RR_SH = 0.8
+                _cfg_fallback("RR_MIN_STOP_HUNT", _cfg_e, {"value": _RR_SH})
             _sl_dist_sh = abs(entry - sl) + 1e-9
             _tp1_dist   = abs(tp1 - entry)
             _rr_sh      = _tp1_dist / _sl_dist_sh
@@ -1298,8 +1303,9 @@ def calc_sl_tp(
     if mode == "funding_arb":
         try:
             from config import FUNDING_ARB_SL_ATR_MULT as _FA_SL_MULT
-        except Exception:
+        except Exception as _cfg_e:
             _FA_SL_MULT = 1.5
+            _cfg_fallback("FUNDING_ARB_SL_ATR_MULT", _cfg_e, {"value": _FA_SL_MULT})
         if direction == "LONG":
             sl = entry - atr * _FA_SL_MULT
         else:
