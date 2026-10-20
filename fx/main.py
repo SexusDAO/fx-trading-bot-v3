@@ -506,6 +506,21 @@ async def _sync_positions_on_startup() -> None:
         logger.error(f"[startup_sync] 对齐失败: {e}", exc_info=True)
 
 
+def _handle_task_exception(loop, context):
+    """
+    事件循环未捕获异常处理器。
+    [v3.89 #106] 原写法 context.get("exception", context["message"]) 会提前求值 context["message"]，
+    自定义上下文缺少 message 时处理器自己抛 KeyError，掩盖原始故障。现安全读取两个可选字段并保留兜底。
+    """
+    try:
+        exc = context.get("exception")
+        msg = context.get("message")
+        detail = exc if exc is not None else (msg if msg is not None else f"<无 exception/message，上下文键: {sorted(context)}>")
+        logger.error(f"[main] 未捕获的协程异常: {detail}", exc_info=exc if isinstance(exc, BaseException) else None)
+    except Exception as _he:
+        logger.error(f"[main] 异常处理器自身出错: {_he!r}")
+
+
 async def _shutdown_components(steps, total_timeout: float = 30.0, per_timeout: float = 10.0) -> dict:
     """
     [v3.89 #105] 依次停止各组件：每项独立 try/except，单项最多 per_timeout 秒，整体最多 total_timeout 秒。
@@ -645,10 +660,6 @@ async def main() -> None:
             pass
 
     # 捕获所有未处理的协程异常，防止 loop 意外退出
-    def _handle_task_exception(loop, context):
-        msg = context.get("exception", context["message"])
-        logger.error(f"[main] 未捕获的协程异常: {msg}")
-
     loop.set_exception_handler(_handle_task_exception)
 
     logger.info("[main] 所有任务已启动，等待退出信号...")
