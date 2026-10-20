@@ -89,10 +89,24 @@ def reset_session():
     logger.info("[api] Session 已重建")
 
 # ── 内部重试装饰器 ────────────────────────────────────────────────────────────
-def _retry(fn, *args, retries=3, suppress_codes=None, **kwargs):
+class WriteTimeoutError(Exception):
+    """[v3.89 #83] 写请求超时/断连，交易所是否已受理未知，需调用方对账，禁止盲目重发。"""
+
+
+# 写请求「结果未知」的异常特征（请求可能已送达）。ConnectTimeout / NewConnectionError 表示
+# 连接未建立、请求必然未送达，不在此列，仍可安全重试。
+_UNKNOWN_RESULT_MARKERS = ("ReadTimeout", "Read timed out", "RemoteDisconnected",
+                           "timeout", "Timeout", "timed out", "Connection aborted")
+_NOT_SENT_MARKERS = ("ConnectTimeout", "NewConnectionError", "Connection refused",
+                     "Failed to establish a new connection")
+
+
+def _retry(fn, *args, retries=3, suppress_codes=None, is_write: bool = False, **kwargs):
     """
     suppress_codes: 包含这些 Binance 错误码时不打 ERROR，直接返回 None
     连接类错误（SOCKS/Timeout）自动重建 Session 后重试，最多降级一次。
+    is_write: [v3.89 #83] 写请求（下单）。遇到「结果未知」的超时/断连时不重试，
+              抛 WriteTimeoutError 由调用方对账；默认 False，读请求行为不变。
     """
     global _PROXY_HEALTHY
     last_err = None
@@ -108,6 +122,13 @@ def _retry(fn, *args, retries=3, suppress_codes=None, **kwargs):
                 for c in suppress_codes
             ):
                 return None
+            # [v3.89 #83] 写请求超时：请求可能已送达交易所，不重试，交给调用方对账
+            if (is_write
+                    and any(x in err_str for x in _UNKNOWN_RESULT_MARKERS)
+                    and not any(x in err_str for x in _NOT_SENT_MARKERS)):
+                logger.warning(f"[api] 写请求超时/断连，结果未知，不重试: {err_str[:120]}")
+                reset_session()
+                raise WriteTimeoutError(err_str[:200])
             # 连接类错误（代理故障/超时）→ 重建 Session 后继续重试
             is_conn_err = any(x in err_str for x in (
                 "SOCKS", "ConnectionError", "NewConnectionError",
@@ -340,6 +361,44 @@ def _validate_sl_order(
     return None  # 通过
 
 
+def _num_close(a, b, rel: float = 1e-4) -> bool:
+    """[v3.89 #83] 数值近似相等（相对误差），任一为 None 视为不相等。"""
+    fa, fb = _to_float(a), _to_float(b)
+    if fa is None or fb is None:
+        return False
+    return abs(fa - fb) <= max(abs(fb) * rel, 1e-12)
+
+
+def _find_unique_open_order(open_orders: list, spec: dict, since_ms: int, exclude_ids=None):
+    """
+    [v3.89 #83] 在挂单列表中按 symbol/side/type/数量/价格/触发价/positionSide 匹配本次提交的订单。
+    只认领「提交时间之后创建」的订单，且必须唯一；0 个或多个匹配均返回 None。
+    返回 (order_or_None, 匹配个数)。
+    """
+    exclude_ids = exclude_ids or set()
+    hits = []
+    for o in open_orders or []:
+        if o.get("orderId") in exclude_ids:
+            continue
+        if o.get("symbol") != spec.get("symbol") or o.get("side") != spec.get("side"):
+            continue
+        if o.get("type") != spec.get("type"):
+            continue
+        if not _num_close(o.get("origQty"), spec.get("quantity")):
+            continue
+        if spec.get("price") not in (None, "", 0, "0") and not _num_close(o.get("price"), spec.get("price")):
+            continue
+        if spec.get("stopPrice") not in (None, "", 0, "0") and not _num_close(o.get("stopPrice"), spec.get("stopPrice")):
+            continue
+        if spec.get("positionSide") and o.get("positionSide") not in (None, spec.get("positionSide")):
+            continue
+        t = _to_float(o.get("time") if o.get("time") is not None else o.get("updateTime"))
+        if t is not None and t < since_ms:
+            continue   # 提交之前就存在的同参数订单，不是本次的
+        hits.append(o)
+    return (hits[0] if len(hits) == 1 else None), len(hits)
+
+
 def place_order(symbol: str, side: str, order_type: str,
                 quantity: float, price: float = None,
                 stop_price: float = None, reduce_only: bool = False,
@@ -410,7 +469,24 @@ def place_order(symbol: str, side: str, order_type: str,
 
     def _call():
         return _signed_post("/fapi/v1/order", params)
-    result = _retry(_call)
+    # [v3.89 #83] 写请求超时不盲目重发：先查挂单对账，找到唯一匹配视为已提交
+    since_ms = int(time.time() * 1000) - 5000   # 留 5 秒本地时钟偏差余量
+    try:
+        result = _retry(_call, is_write=True)
+    except WriteTimeoutError as e:
+        try:
+            found, n = _find_unique_open_order(get_open_orders(symbol), params, since_ms)
+        except Exception as qe:
+            found, n = None, -1
+            logger.warning(f"[place_order] {symbol} 写超时后查询挂单失败: {qe}")
+        if found:
+            logger.warning(f"[place_order] {symbol} 写请求超时，对账找到已提交订单 orderId={found.get('orderId')}")
+            return found
+        logger.warning(
+            f"[place_order] {symbol} 写请求超时（{e}），挂单中未找到唯一匹配订单(匹配数={n})，"
+            f"结果未知，按未提交返回；MARKET/已成交单不会出现在挂单里，请调用方核对持仓"
+        )
+        return {}
     return result or {}
 
 def cancel_order(symbol: str, order_id: int) -> dict:
@@ -644,10 +720,37 @@ def place_batch_orders(orders: list) -> list:
     import json as _json
     if not orders:
         return []
-    params = {"batchOrders": _json.dumps(orders[:5])}
+    batch = orders[:5]
+    params = {"batchOrders": _json.dumps(batch)}
     def _call():
         return _signed_post("/fapi/v1/batchOrders", params)
-    result = _retry(_call)
+    # [v3.89 #83] 写超时：逐单按挂单对账，找到多少算多少，其余标记结果未知
+    since_ms = int(time.time() * 1000) - 5000
+    try:
+        result = _retry(_call, is_write=True)
+    except WriteTimeoutError as e:
+        out, used = [], set()
+        cache: dict = {}
+        for spec in batch:
+            sym = spec.get("symbol")
+            try:
+                if sym not in cache:
+                    cache[sym] = get_open_orders(sym)
+                found, n = _find_unique_open_order(cache[sym], spec, since_ms, used)
+            except Exception as qe:
+                found, n = None, -1
+                logger.warning(f"[place_batch_orders] {sym} 写超时后查询挂单失败: {qe}")
+            if found:
+                used.add(found.get("orderId"))
+                out.append(found)
+            else:
+                out.append({"error_code": "WRITE_TIMEOUT_UNKNOWN",
+                            "msg": f"写请求超时，挂单未找到唯一匹配(匹配数={n})，结果未知"})
+        logger.warning(
+            f"[place_batch_orders] 写请求超时（{e}），对账找到 "
+            f"{sum(1 for x in out if x.get('orderId'))}/{len(batch)} 单，其余结果未知"
+        )
+        return out
     return result if isinstance(result, list) else []
 
 
