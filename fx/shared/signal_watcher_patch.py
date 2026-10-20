@@ -20,7 +20,7 @@ async def test():
     for i in range(5):
         price = float(api.get_mark_price('STRKUSDT').get('markPrice', 0))
         print(f"  轮询 #{i+1}: price={price:.6g}")
-        await watcher.on_price_update('STRKUSDT', price, int(time.time()))
+        await watcher.on_price_update('STRKUSDT', price, int(time.time() * 1000))   # [v3.89 #101] 毫秒
         await asyncio.sleep(1)
     
     print(f"触发结果: {results}")

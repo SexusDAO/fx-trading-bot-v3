@@ -314,6 +314,57 @@ def _classify_text(text: str) -> str | None:
     return None
 
 
+# [v3.89 #77] 实体匹配：原写法 `ticker_base.lower() in text` 与宏观关键词都是裸子串，
+#   短 ticker 出现在普通单词里（如 ONE 在 money、ETH 在 method）也算命中。改为词边界匹配。
+_BTC_MACRO_KW = (
+    "bitcoin", "btc", "1000 btc", "ethereum", "eth",
+    "mara", "marathon digital", "microstrategy", "riot platform",
+    "bitcoin miner", "btc miner", "mining company",
+)
+_BTC_ETH_BASES = {"BTC", "ETH", "WBTC", "WETH", "BTCB"}
+# Binance 合约带 1000 前缀的 base，正文里通常写不带前缀的名字
+_TICKER_ALIASES = {
+    "1000PEPE": ("pepe",),
+    "1000SHIB": ("shib",),
+    "1000BONK": ("bonk",),
+    "1000FLOKI": ("floki",),
+}
+
+
+def _word_in(text_lower: str, word: str) -> bool:
+    """词边界匹配：前后不得紧贴字母/数字；允许复数 s（bitcoins / miners）。$TICKER 写法的 $ 属于边界字符，可命中。"""
+    w = word.strip().lower()
+    if not w:
+        return False
+    return re.search(r"(?<![a-z0-9])" + re.escape(w) + r"s?(?![a-z0-9])", text_lower) is not None
+
+
+def _ticker_mentioned(text_lower: str, ticker_base: str) -> bool:
+    names = [ticker_base.lower()] + list(_TICKER_ALIASES.get(ticker_base.upper(), ()))
+    return any(_word_in(text_lower, n) for n in names)
+
+
+def _is_btc_macro_irrelevant(text: str, ticker_base: str) -> bool:
+    """True = 文章是 BTC/ETH 宏观新闻且与本 ticker 无关，应跳过 bearish 标记。"""
+    if ticker_base.upper() in _BTC_ETH_BASES:
+        return False  # BTC/ETH 自身，不过滤
+    tl = text.lower()
+    if not any(_word_in(tl, kw) for kw in _BTC_MACRO_KW):
+        return False
+    return not _ticker_mentioned(tl, ticker_base)
+
+
+def _news_order_desc(resp_ts: float, bull_ts: float) -> str:
+    """[v3.89 #78] 描述「响应类利空」与「利好」最新发布时间的先后（仅用于日志证据）。"""
+    def _f(t: float) -> str:
+        return time.strftime("%m-%d %H:%M", time.localtime(t)) if t and t > 0 else "时间未知"
+    if resp_ts > 0 and bull_ts > 0:
+        order = "利好晚于响应类利空" if bull_ts > resp_ts else ("利好早于响应类利空" if bull_ts < resp_ts else "两者同时")
+    else:
+        order = "无法比较先后"
+    return f"响应类利空最新 {_f(resp_ts)}，利好最新 {_f(bull_ts)}，{order}"
+
+
 def get_news_bias(symbol: str) -> str | None:
     """
     主接口：返回 symbol 的新闻偏向。
@@ -352,27 +403,13 @@ def get_news_bias(symbol: str) -> str | None:
     #       但 Binance Square 把这篇文章打上了无关山寨币的 ticker 标签，导致误判。
     # 过滤逻辑：如果文章主体是 BTC/ETH 宏观转账事件，且被查询 ticker 本身不是 BTC/ETH，
     #           且 ticker 名称未出现在文章文本中 → 视为无关新闻，不触发 bearish。
-    _BTC_MACRO_KW = (
-        "bitcoin", "btc", "1000 btc", "ethereum", "eth",
-        "mara ", "marathon digital", "microstrategy", "riot platform",
-        "bitcoin miner", "btc miner", "mining company",
-    )
-    _BTC_ETH_BASES = {"BTC", "ETH", "WBTC", "WETH", "BTCB"}
-
-    def _is_btc_macro_irrelevant(text: str, ticker_base: str) -> bool:
-        """True = 文章是 BTC/ETH 宏观新闻且与本 ticker 无关，应跳过 bearish 标记"""
-        if ticker_base in _BTC_ETH_BASES:
-            return False  # BTC/ETH 自身，不过滤
-        tl = text.lower()
-        is_btc_macro = any(kw in tl for kw in _BTC_MACRO_KW)
-        if not is_btc_macro:
-            return False
-        # ticker 名称是否出现在文章里（出现则说明确实相关）
-        ticker_mentioned = ticker_base.lower() in tl
-        return not ticker_mentioned
+    # [v3.89 #77] BTC/ETH 宏观无关新闻判断已提到模块级 _is_btc_macro_irrelevant（词边界匹配 + 别名表）。
 
     bias_list = []
     oldest_ts = 0.0
+    # [v3.89 #78] 记录两类新闻各自最新的发布时间（秒），只用于日志证据，不参与聚合结果
+    _resp_latest = 0.0   # bearish_with_response 最新发布时间
+    _bull_latest = 0.0   # bullish 最新发布时间
     for item in news_items:
         text = (item.get("title") or "") + " " + (item.get("body") or "")
         b = _classify_text(text)
@@ -386,6 +423,14 @@ def get_news_bias(symbol: str) -> str | None:
             continue
         if b:
             bias_list.append(b)
+            try:
+                _its = float(item.get("date", 0) or 0) / 1000
+            except (TypeError, ValueError):
+                _its = 0.0
+            if b == "bearish_with_response":
+                _resp_latest = max(_resp_latest, _its)
+            elif b == "bullish":
+                _bull_latest = max(_bull_latest, _its)
             if b in ("bearish", "bearish_with_response"):
                 item_ts = item.get("date", 0) / 1000
                 if item_ts > 0 and (oldest_ts == 0.0 or item_ts < oldest_ts):
@@ -398,7 +443,10 @@ def get_news_bias(symbol: str) -> str | None:
         # 攻击事件但已快速响应 + 其他利好新闻（如融资/ETF流入）
         # → 利好在超越利空，整体偏向利好
         result = "bullish"
-        logger.info(f"[news_signal] {base}: bearish_with_response 被后续利好新闻覆盖，输出 bullish")
+        # [v3.89 #78] 聚合规则不变（同时存在即输出 bullish）。原文案「被后续利好覆盖」暗示利好晚于利空，
+        #   但代码并未比较发布时间；现在如实描述并附上两类新闻最新发布时间与先后关系。
+        logger.info(f"[news_signal] {base}: 同时存在 bearish_with_response 与 bullish 新闻，按现有规则输出 bullish "
+                    f"({_news_order_desc(_resp_latest, _bull_latest)})")
     elif "bearish_with_response" in bias_list:
         # 攻击+快速响应，但无其他利好新闻→ caution，不做一票否决
         result = "caution"

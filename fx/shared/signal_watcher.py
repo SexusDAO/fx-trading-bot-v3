@@ -369,6 +369,10 @@ class SignalWatcher:
         # 选择 5min 窗口 / 1% 门槛：捕获真实危险行情，不被日常波动触发
         self._btc_price_prev: float = 0.0   # 上一个 BTC 价格快照
         self._btc_prev_ts:    float = 0.0   # 快照时间戳
+        # [v3.89 #101] 事件新鲜度：每个标的最后一个有效事件时间（毫秒）+ 丢弃计数
+        self._last_event_ts: Dict[str, int] = {}
+        self._evt_drop: Dict[str, int] = {}
+        self._evt_drop_log_ts: Dict[tuple, float] = {}
         self._BTC_SNAP_INTERVAL = 300.0     # 每5分钟更新一次 BTC 基准价（对比5min变化）
         self._BTC_MOVE_THRESH   = 0.01      # BTC 5min涨跌 >= 1% 触发处置
         self._btc_cancel_cooldown: float = 0.0   # 上次触发撤单的时间，防抖 10 分钟
@@ -626,12 +630,55 @@ class SignalWatcher:
     # 价格回调（主 loop 内，ws_listener 直接调用）
     # ─────────────────────────────────────────────────────────────────────────
 
+    # [v3.89 #101] 价格事件新鲜度：事件年龄（接收时间 - 事件时间）超过上限、事件时间超前本地时钟超过容差，
+    #   或事件时间早于该标的已处理过的最后事件（乱序/重连后的旧帧）都不得触发信号或更新 BTC 冲击基准。
+    _EVT_MAX_AGE_MS = 10_000
+    _EVT_FUTURE_TOL_MS = 2_000
+
+    @staticmethod
+    def _normalize_event_ts(ts) -> Optional[int]:
+        """事件时间 → 毫秒；缺失/非法/<=0 返回 None（按本地接收时间处理，不做新鲜度与乱序校验）。
+        小于 1e11 的值按「秒」处理（兼容仍传秒的调用方）。"""
+        try:
+            v = float(ts)
+        except (TypeError, ValueError):
+            return None
+        if v != v or v in (float("inf"), float("-inf")) or v <= 0:
+            return None
+        return int(v * 1000) if v < 1e11 else int(v)
+
+    def _event_acceptable(self, symbol: str, ts) -> bool:
+        ev = self._normalize_event_ts(ts)
+        if ev is None:
+            return True
+        now_ms = int(time.time() * 1000)
+        age = now_ms - ev
+        reason = None
+        if age > self._EVT_MAX_AGE_MS:
+            reason = "stale"
+        elif age < -self._EVT_FUTURE_TOL_MS:
+            reason = "future"
+        elif ev < self._last_event_ts.get(symbol, 0):
+            reason = "out_of_order"
+        if reason:
+            self._evt_drop[reason] = self._evt_drop.get(reason, 0) + 1
+            _k = (symbol, reason)
+            if time.time() - self._evt_drop_log_ts.get(_k, 0) >= 60:
+                self._evt_drop_log_ts[_k] = time.time()
+                logger.warning(f"[signal_watcher] 丢弃价格事件 {symbol} 原因={reason} 事件年龄={age}ms "
+                               f"累计丢弃={dict(self._evt_drop)}")
+            return False
+        self._last_event_ts[symbol] = ev
+        return True
+
     async def on_price_update(self, symbol: str, price: float, ts: int) -> None:
         """
         WS 实时价格回调。此方法在主 loop 内被直接 await 调用（由 ws_listener 的
         _dispatch_mark_price 触发），无需 ensure_future，直接 await 即可。
         """
         if not self._watched:
+            return
+        if not self._event_acceptable(symbol, ts):
             return
 
         # ── v3.54 BTC 即时波动检测：BTC 1分钟内波动 >= 3% 立刻撤所有 pending 挂单 ──
@@ -1142,7 +1189,6 @@ class SignalWatcher:
                 if not syms:
                     continue
 
-                ts = int(time.time() * 1000)
                 sym_set = set(syms)
 
                 # 一次请求拉全量标记价格，再按待触发标的过滤（避免串行 N 次 HTTP）
@@ -1151,6 +1197,8 @@ class SignalWatcher:
                 except Exception as _bulk_e:
                     logger.debug(f"[signal_watcher] get_all_mark_prices 失败: {_bulk_e}")
                     all_mp = []
+                # [v3.89 #101] 事件时间取「拉取完成时」，而不是请求发出前：慢请求不应让刚拿到的价格被判为过期
+                ts = int(time.time() * 1000)
 
                 if all_mp:
                     mp_map = {
@@ -1171,6 +1219,7 @@ class SignalWatcher:
                         try:
                             mp    = await loop.run_in_executor(None, lambda s=sym: _api.get_mark_price(s))
                             price = float(mp.get("markPrice", 0))
+                            ts    = int(time.time() * 1000)   # [v3.89 #101] 每个标的拉取完成后重新取事件时间
                             if price > 0:
                                 await self.on_price_update(sym, price, ts)
                         except Exception as _e:

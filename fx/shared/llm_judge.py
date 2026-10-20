@@ -38,8 +38,51 @@ def _is_cooldown(key: str) -> bool:
     return time.time() - _llm_call_cache.get(key, 0) < _LLM_COOLDOWN_SEC
 
 
+def _cooldown_result(fallback: dict) -> dict:
+    """
+    [v3.89 #80] 冷却内没有调用模型：决策值仍是降级 skip（不改任何决策），
+    但带上 source="cooldown"、unavailable=True，调用方可据此区分「模型说 skip」与「没调用模型」。
+    返回副本，避免调用方改动污染降级常量。
+    """
+    r = dict(fallback)
+    r["source"] = "cooldown"
+    r["unavailable"] = True
+    r["reason"] = "冷却中未调用"
+    return r
+
+
 def _mark_called(key: str) -> None:
     _llm_call_cache[key] = time.time()
+
+
+# [v3.89 #79] LLM 返回的 JSON 能解析 ≠ 结果有效。系统提示要求 {"decision":"open"|"skip","confidence":0~1,"reason":...}。
+_VALID_DECISIONS = ("open", "skip")
+_invalid_result_count = 0   # 累计「结构无效」次数（与调用失败/降级分开统计）
+
+
+def _validate_llm_result(result, scene: str = "") -> Optional[dict]:
+    """
+    校验 LLM 返回：必须是 dict、decision ∈ {open, skip}、confidence 为 [0,1] 内的有限数（bool 不算）。
+    通过则原样返回；不通过返回 None 并记 warning（标明是「结构无效」，区别于调用失败）。
+    调用方在 None 时沿用原有降级决策，降级值不变。
+    """
+    global _invalid_result_count
+    import math as _m
+    why = None
+    if not isinstance(result, dict):
+        why = f"返回不是对象: {type(result).__name__}"
+    else:
+        d = result.get("decision")
+        c = result.get("confidence")
+        if d not in _VALID_DECISIONS:
+            why = f"decision 非法: {d!r}"
+        elif isinstance(c, bool) or not isinstance(c, (int, float)) or not _m.isfinite(c) or not (0.0 <= c <= 1.0):
+            why = f"confidence 非法: {c!r}"
+    if why:
+        _invalid_result_count += 1
+        logger.warning(f"[llm_judge] {scene} 结果结构无效（{why}），按降级处理 | 累计 {_invalid_result_count}")
+        return None
+    return result
 
 
 def _is_enabled(scene_flag: Optional[bool] = None) -> bool:
@@ -241,7 +284,7 @@ def judge_explosive_coin_llm(
         return _fallback
     if _is_cooldown(f"exp_{symbol}"):
         logger.debug(f"[llm_judge] {symbol} 妖币冷却中")
-        return _fallback
+        return _cooldown_result(_fallback)
 
     # 极简 prompt，< 60 tokens
     # 费率负值说明：负费率=空头付多头，市场空头拥挤，不代表利多
@@ -257,6 +300,8 @@ def judge_explosive_coin_llm(
 
     result = _call_llm(prompt, max_tokens=60)
     if result is None:
+        return _fallback
+    if _validate_llm_result(result, f"{symbol} 妖币") is None:
         return _fallback
 
     _mark_called(f"exp_{symbol}")
@@ -283,7 +328,7 @@ def judge_borderline_signal_llm(
     if not _is_enabled(LLM_JUDGE_BORDERLINE):
         return _fallback
     if _is_cooldown(f"bl_{symbol}"):
-        return _fallback
+        return _cooldown_result(_fallback)
 
     ema_bull = ind.get("ema_bull_1h") or (
         ind.get("ema20_1h", 0) > ind.get("ema50_1h", 0)
@@ -300,6 +345,8 @@ def judge_borderline_signal_llm(
 
     result = _call_llm(prompt, max_tokens=60)
     if result is None:
+        return _fallback
+    if _validate_llm_result(result, f"{symbol} 边界") is None:
         return _fallback
 
     _mark_called(f"bl_{symbol}")
@@ -344,6 +391,8 @@ def judge_news_sentiment_llm(
         _news_model = None
     result = _call_llm(prompt, max_tokens=60, model=_news_model)
     if result is None:
+        return "neutral"
+    if _validate_llm_result(result, f"{symbol} 新闻") is None:
         return "neutral"
 
     _mark_called(_key)
