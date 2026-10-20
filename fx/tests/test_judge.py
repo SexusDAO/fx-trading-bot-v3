@@ -4,6 +4,7 @@ tests/test_judge.py — 三个 judge 函数自动化测试
 """
 import sys
 import time
+import unittest
 from pathlib import Path
 from unittest.mock import patch
 import pytest
@@ -364,6 +365,7 @@ class TestJudgeReversal:
         assert out.get("reject_reason") is not None  # 方向判断先失败，任何拒绝理由均可
 
     # ── 单条件失败：资金费率不够极端 ──────────────────────────────────────────
+    @unittest.skip("待实现：测试体只有 pass，未做任何断言——不应计为通过（[v3.89 #51]）")
     def test_reversal_rejects_funding_not_extreme(self):
         """funding=+0.0005 时应拒绝做多反转——待 judge_reversal 资金费率判断路径修备后启用"""
         pass  # TODO: judge_reversal 资金费率判断顺序待优化
