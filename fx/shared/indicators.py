@@ -32,7 +32,10 @@ def rsi(closes: list, n: int = 14) -> float:
         losses.append(max(-d, 0))
     ag = sum(gains[-n:]) / n
     al = sum(losses[-n:]) / n
-    return 100.0 if al == 0 else round(100.0 - 100.0 / (1 + ag / al), 2)
+    if al == 0:
+        # [v3.89 #69] 涨跌幅均为零（完全平价序列）→ 中性 50；仅有上涨无下跌才是 100
+        return 50.0 if ag == 0 else 100.0
+    return round(100.0 - 100.0 / (1 + ag / al), 2)
 
 
 def atr_status(klines: list, n: int = 14) -> dict:
