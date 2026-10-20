@@ -12,7 +12,9 @@ from unittest.mock import patch, MagicMock
 
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT.parent))
+sys.path.append(str(ROOT.parent))   # [v3.89 TEST-2] 原为 insert(0)：仓库根目录排到 fx 前面，桩模块注册 shared.* 时
+                                     #   shared 被解析成命名空间包（unknown location），恢复后其他测试仍拿不到真实 shared
+import shared as _real_shared  # noqa: E402,F401  先导入真实 shared 包，桩只替换子模块
 
 # ─── 桩模块 ───────────────────────────────────────────────────────────────────
 # [v3.86 TEST-1] 原实现直接覆盖 sys.modules 中的 shared.* 且从不恢复，
@@ -59,6 +61,12 @@ shared_notifier._hhmm = MagicMock(return_value="00:00")
 shared_notifier._CLOSE_REASON_CN = {}
 shared_notifier.fmt_hold_time = MagicMock(return_value="0min")
 shared_notifier.make_card_header = MagicMock(return_value="")
+# [v3.89 TEST-2] position_manager / executor 新增导入的卡片格式化函数，桩里缺失会导致导入失败，
+#   且失败发生在 _restore_modules() 之前，空桩残留在 sys.modules，连带后续 4 个测试文件收集失败
+for _fn in ("fmt_node_tp1", "fmt_node_close", "fmt_node_sl_lost", "fmt_node_open",
+            "fmt_node_immediate_close", "fmt_node_monitor", "fmt_node_trigger",
+            "fmt_node_timeout", "fmt_node_evicted"):
+    setattr(shared_notifier, _fn, MagicMock(return_value=""))
 shared_risk = _make_stub("shared.risk_manager")
 shared_risk.record_pnl = MagicMock()
 shared_state = _make_stub("shared.state")
@@ -81,7 +89,11 @@ import config
 # Part 1：_check_exit_signal
 # ═══════════════════════════════════════════════════════════════════════════════
 
-from position_manager import PositionManager, _last_price
+try:
+    from position_manager import PositionManager, _last_price
+except Exception:
+    _restore_modules()   # [v3.89 TEST-2] 导入失败也要恢复真实模块，避免连带其他测试文件
+    raise
 _restore_modules()   # [v3.86 TEST-1] 收集阶段结束即恢复真实模块，其他测试文件导入时拿到真实实现
 
 

@@ -1310,6 +1310,12 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
     ok, reason = _precheck(signal)
     if not ok:
         logger.info(f"[executor] {symbol} 预检拒绝: {reason}")
+        # [v3.89 SHADOW] C 类：下单前检查被拒写入影子日志（只记录）
+        try:
+            from shared import shadow_trace as _st
+            _st.record_precheck_rejection(signal, str(reason))
+        except Exception:
+            pass
         return False
 
     # ── 步骤1.5：-2019 保证金暂停检查 ─────────────────────────────────────────
