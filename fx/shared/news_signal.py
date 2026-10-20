@@ -314,6 +314,46 @@ def _classify_text(text: str) -> str | None:
     return None
 
 
+# [v3.89 #77] 实体匹配：原写法 `ticker_base.lower() in text` 与宏观关键词都是裸子串，
+#   短 ticker 出现在普通单词里（如 ONE 在 money、ETH 在 method）也算命中。改为词边界匹配。
+_BTC_MACRO_KW = (
+    "bitcoin", "btc", "1000 btc", "ethereum", "eth",
+    "mara", "marathon digital", "microstrategy", "riot platform",
+    "bitcoin miner", "btc miner", "mining company",
+)
+_BTC_ETH_BASES = {"BTC", "ETH", "WBTC", "WETH", "BTCB"}
+# Binance 合约带 1000 前缀的 base，正文里通常写不带前缀的名字
+_TICKER_ALIASES = {
+    "1000PEPE": ("pepe",),
+    "1000SHIB": ("shib",),
+    "1000BONK": ("bonk",),
+    "1000FLOKI": ("floki",),
+}
+
+
+def _word_in(text_lower: str, word: str) -> bool:
+    """词边界匹配：前后不得紧贴字母/数字；允许复数 s（bitcoins / miners）。$TICKER 写法的 $ 属于边界字符，可命中。"""
+    w = word.strip().lower()
+    if not w:
+        return False
+    return re.search(r"(?<![a-z0-9])" + re.escape(w) + r"s?(?![a-z0-9])", text_lower) is not None
+
+
+def _ticker_mentioned(text_lower: str, ticker_base: str) -> bool:
+    names = [ticker_base.lower()] + list(_TICKER_ALIASES.get(ticker_base.upper(), ()))
+    return any(_word_in(text_lower, n) for n in names)
+
+
+def _is_btc_macro_irrelevant(text: str, ticker_base: str) -> bool:
+    """True = 文章是 BTC/ETH 宏观新闻且与本 ticker 无关，应跳过 bearish 标记。"""
+    if ticker_base.upper() in _BTC_ETH_BASES:
+        return False  # BTC/ETH 自身，不过滤
+    tl = text.lower()
+    if not any(_word_in(tl, kw) for kw in _BTC_MACRO_KW):
+        return False
+    return not _ticker_mentioned(tl, ticker_base)
+
+
 def _news_order_desc(resp_ts: float, bull_ts: float) -> str:
     """[v3.89 #78] 描述「响应类利空」与「利好」最新发布时间的先后（仅用于日志证据）。"""
     def _f(t: float) -> str:
@@ -363,24 +403,7 @@ def get_news_bias(symbol: str) -> str | None:
     #       但 Binance Square 把这篇文章打上了无关山寨币的 ticker 标签，导致误判。
     # 过滤逻辑：如果文章主体是 BTC/ETH 宏观转账事件，且被查询 ticker 本身不是 BTC/ETH，
     #           且 ticker 名称未出现在文章文本中 → 视为无关新闻，不触发 bearish。
-    _BTC_MACRO_KW = (
-        "bitcoin", "btc", "1000 btc", "ethereum", "eth",
-        "mara ", "marathon digital", "microstrategy", "riot platform",
-        "bitcoin miner", "btc miner", "mining company",
-    )
-    _BTC_ETH_BASES = {"BTC", "ETH", "WBTC", "WETH", "BTCB"}
-
-    def _is_btc_macro_irrelevant(text: str, ticker_base: str) -> bool:
-        """True = 文章是 BTC/ETH 宏观新闻且与本 ticker 无关，应跳过 bearish 标记"""
-        if ticker_base in _BTC_ETH_BASES:
-            return False  # BTC/ETH 自身，不过滤
-        tl = text.lower()
-        is_btc_macro = any(kw in tl for kw in _BTC_MACRO_KW)
-        if not is_btc_macro:
-            return False
-        # ticker 名称是否出现在文章里（出现则说明确实相关）
-        ticker_mentioned = ticker_base.lower() in tl
-        return not ticker_mentioned
+    # [v3.89 #77] BTC/ETH 宏观无关新闻判断已提到模块级 _is_btc_macro_irrelevant（词边界匹配 + 别名表）。
 
     bias_list = []
     oldest_ts = 0.0
