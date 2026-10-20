@@ -25,6 +25,7 @@ shared/judges.py — 所有策略的信号判断函数
 
 from __future__ import annotations
 import logging
+import math
 from shared.indicators import ema as _ema_raw, rsi as _rsi_raw, atr as _atr_raw
 try:
     import sys as _sys, pathlib as _pl
@@ -94,8 +95,20 @@ def _atr(klines: list) -> float:
     """统一用 1H ATR14(直接调用 shared/indicators)"""
     return _atr_raw(klines)
 
+def _is_finite_num(x) -> bool:
+    """[v3.89 #30] 是有限数值（非 NaN / Infinity / 非数字类型）。"""
+    try:
+        return math.isfinite(float(x))
+    except (TypeError, ValueError):
+        return False
+
 def _volatility_tier(atr: float, price: float) -> str:
-    """v3.14: mid/high 阈值从 8% 降到 6%，避免 7-8% ATR 标的被误判为 mid"""
+    """v3.14: mid/high 阈值从 8% 降到 6%，避免 7-8% ATR 标的被误判为 mid
+    [v3.89 #30] ATR 或价格不是有限数值时返回 "invalid"（数据错误标记），不再落入 low/mid/high 的正常分支。
+    分层数值不变。"""
+    if not (_is_finite_num(atr) and _is_finite_num(price)):
+        logger.warning(f"[judges] _volatility_tier 输入非有限数值 atr={atr!r} price={price!r}，返回 invalid")
+        return "invalid"
     if price <= 0: return "mid"
     r = atr / price * 100
     if r < 3:  return "low"
@@ -103,6 +116,10 @@ def _volatility_tier(atr: float, price: float) -> str:
     return "high"
 
 def _atr_ratio(atr: float, price: float) -> float:
+    # [v3.89 #30] 非有限输入返回 NaN（明确的无效值，不把 Infinity 伪装成大波动比例），并记录
+    if not (_is_finite_num(atr) and _is_finite_num(price)):
+        logger.warning(f"[judges] _atr_ratio 输入非有限数值 atr={atr!r} price={price!r}，返回 NaN")
+        return float("nan")
     return atr / price * 100 if price > 0 else 0.0
 
 
