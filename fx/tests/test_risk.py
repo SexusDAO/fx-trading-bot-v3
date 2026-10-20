@@ -181,8 +181,10 @@ class TestAccountMargin:
         return {"availableBalance": str(available), "totalWalletBalance": str(total)}
 
     def test_sufficient_margin(self):
-        with patch("shared.binance_api.get_account", return_value=self._mock_account(1000, 1000)):
-            assert rm.check_account_margin(500.0, 10) is True   # 500/10*1.1=55 < 1000
+        # nominal=300: 300/10*1.1=33U < available=1000U 通过余额检查
+        # 300 < total_bal(1000)*40%=400U 通过动态单仓上限
+        with patch("shared.binance_api.get_account", return_value=self._mock_account(1000, 1000)),              patch("shared.state.get_all_positions", return_value=[]):
+            assert rm.check_account_margin(300.0, 10) is True
 
     def test_insufficient_available_balance(self):
         with patch("shared.binance_api.get_account", return_value=self._mock_account(10.0, 1000.0)):
