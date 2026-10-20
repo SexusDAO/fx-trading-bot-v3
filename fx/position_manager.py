@@ -662,6 +662,12 @@ class PositionManager:
 
         # ── TP1 触发 ──────────────────────────────────────────────────────────
         if filled_oid == tp1_id and not tp1_filled:
+            single_tp = pos.get("tp_mode") == "single" or (pos.get("tp_mode") is None and pos.get("tp2_price") is None and not tp2_id)
+            if single_tp:
+                await _cancel(sl_id, is_algo=True)
+                update_position(pid, {"tp1_filled": True, "quantity_remaining": 0.0})
+                await self._close_position_post(pid, symbol, "tp1", event)
+                return
             logger.info(f"[pm] {symbol} TP1触发,更新剩余数量,补挂剩余40%仓位的SL单")
             update_position(pid, {
                 "tp1_filled":        True,
