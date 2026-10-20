@@ -67,6 +67,25 @@ from shared.notifier import (
 
 logger = logging.getLogger("fx.position_manager")
 
+
+def _remove_position_checked(pos_id: str, symbol: str = "") -> bool:
+    """
+    [v3.89 remove-pos 检查] remove_position 的调用包装：返回 False 说明 pos_state 结构性失败
+    （文件损坏 / 写入原子替换均失败），持仓记录很可能已丢失或残留，必须人工核查。
+    只做日志，不改变任何业务行为。
+    """
+    try:
+        ok = _remove_position_checked(pos_id)
+    except Exception as e:
+        logger.error(f"[pm] _remove_position_checked({symbol or pos_id}) 抛异常，持仓文件可能损坏，请人工核查: {e}")
+        return False
+    if ok is False:
+        logger.warning(
+            f"[pm] _remove_position_checked({symbol or pos_id}) 返回 False，pos_state 未写入成功，"
+            f"该持仓记录可能残留或丢失，请人工核查"
+        )
+    return ok is not False
+
 # ── 系统主动撤单锁 ────────────────────────────────────────────────────────────
 # 当系统自己在更新保护单(撤旧挂新)时,暂时豁免「手动平仓」误判
 # 避免:系统撤了旧TP → _check_manual_close 误判为用户手动平仓 → 错误市价平仓
@@ -885,7 +904,7 @@ class PositionManager:
 
         # 更新 pos_state
         update_position(pid, {"status": "closed", "close_reason": _inferred_close_reason})
-        remove_position(pid)
+        _remove_position_checked(pid)
         logger.info(f"[pm] {symbol} 仓位清理完成 close_reason={_inferred_close_reason}, pos_state 已删除")
 
         # v3.78 fix: 手动平仓补写 trade_log
@@ -1666,7 +1685,7 @@ async def _check_pending_expire_static(pos: dict, now_ms: int):
                 if od is not None:
                     status = od.get("status","")
                     if status in ("CANCELED","EXPIRED","REJECTED"):
-                        remove_position(pid)
+                        _remove_position_checked(pid)
                         logger.info(f"[pm] {symbol} pending订单 {order_id} 已{status},清除本地记录")
                         return
                     elif status == "FILLED":
@@ -1691,7 +1710,7 @@ async def _check_pending_expire_static(pos: dict, now_ms: int):
                 else:
                     # api.get_order 返回 None → 订单不存在或查询失败,超过24h再清除
                     if hold_min > 24 * 60:
-                        remove_position(pid)
+                        _remove_position_checked(pid)
                         logger.info(f"[pm] {symbol} pending订单 {order_id} 查询失败且超24h,清除本地记录")
                         return
         except Exception as e:
@@ -1703,7 +1722,7 @@ async def _check_pending_expire_static(pos: dict, now_ms: int):
         return
 
     if not order_id:
-        remove_position(pid)
+        _remove_position_checked(pid)
         return
 
     for attempt in range(2):
@@ -1722,7 +1741,7 @@ async def _check_pending_expire_static(pos: dict, now_ms: int):
                 await _notify_async(f"⚠️ {symbol} 挂单 {order_id} 超时撤单失败,请人工处理。\n错误:{e}")
                 return
 
-    remove_position(pid)
+    _remove_position_checked(pid)
     logger.info(f"[pm] {symbol} 挂单超时({hold_min:.0f}min)已撤销")
 
 
@@ -2016,7 +2035,7 @@ async def _close_position_post_static(
 
     # 步骤4:清除持仓状态
     try:
-        remove_position(pos_id)
+        _remove_position_checked(pos_id)
         _peak.pop(pos_id, None)
         _mfe.pop(pos_id, None)
         _mae.pop(pos_id, None)
@@ -2740,7 +2759,7 @@ async def _补挂保护单(pos: dict, fill_price: float, fill_qty: float, pid: s
             if real_qty <= 0:
                 logger.info(f"[pm] {symbol} 交易所实际持仓为0(已被平仓),跳过补挂")
                 update_position(pid, {"status": "closed", "close_reason": "already_closed"})
-                remove_position(pid)
+                _remove_position_checked(pid)
                 return
             # 使用交易所实际量覆盖本地记录(防止部分成交导致数量偏差)
             if abs(real_qty - fill_qty) / max(fill_qty, 1e-9) > 0.01:
@@ -2916,7 +2935,12 @@ async def _补挂保护单(pos: dict, fill_price: float, fill_qty: float, pid: s
                             )
                             # 清除 pos_state 里的 pending 记录
                             from shared.state import remove_position as _rm_pos
-                            _rm_pos(_pp.get("pos_id", _pp_sym))
+                            # [v3.89 remove-pos 检查] 检查返回值，失败只记日志
+                            try:
+                                if _rm_pos(_pp.get("pos_id", _pp_sym)) is False:
+                                    logger.warning(f"[pm] remove_position({_pp_sym}) 返回 False，pos_state 未写入成功，请人工核查")
+                            except Exception as _re:
+                                logger.error(f"[pm] remove_position({_pp_sym}) 抛异常，持仓文件可能损坏，请人工核查: {_re}")
                             logger.info(f"[pm] 已撤销 {_pp_sym} 的竞争挂单")
                         except Exception as _ce:
                             logger.warning(f"[pm] 撤销 {_pp_sym} 竞争挂单失败: {_ce}")
@@ -3670,7 +3694,7 @@ async def _patrol_funding_arb(pos: dict) -> None:
         fr_collected = notional * abs(fr_entry) * (hold_cnt + 1)
 
         _append_fa_trade_log(pos, exit_price, fr_exit, reason, hold_cnt, fr_collected, pnl)
-        remove_position(pid)
+        _remove_position_checked(pid)
 
         if is_sl:
             consec = inc_funding_arb_consec_sl()
@@ -3698,7 +3722,7 @@ async def _patrol_funding_arb(pos: dict) -> None:
                 logger.info(f"[arb_patrol] {symbol} 结算前5min未成交,已撤单 {order_id}")
             except Exception as _ce:
                 logger.warning(f"[arb_patrol] {symbol} 撤单失败: {_ce}")
-        remove_position(pid)
+        _remove_position_checked(pid)
         await _notify(f"⏱ {symbol} funding_arb 挂单在结算前5min未成交,已撤单,冷却30min后重新评估")
         return
 
@@ -4151,7 +4175,12 @@ async def _pending_cancel(pos: dict, reason: str, pid: str, symbol: str,
             _api.cancel_order(symbol, oid)
         except Exception as _ce:
             logger.warning(f"[pending_health] {symbol} 撤单失败(忽略): {_ce}")
-    remove_position(pid)
+    # [v3.89 remove-pos 检查] 检查返回值；失败只记日志，不影响撤单后的流程
+    try:
+        if remove_position(pid) is False:
+            logger.warning(f"[pm] remove_position({symbol}) 返回 False，pos_state 未写入成功，请人工核查")
+    except Exception as _re:
+        logger.error(f"[pm] remove_position({symbol}) 抛异常，持仓文件可能损坏，请人工核查: {_re}")
     await _notify(f"🗑️ {symbol} 挂单已撤销 原因: {reason}")
     logger.info(f"[pending_health] {symbol} 挂单撤销 reason={reason}")
 

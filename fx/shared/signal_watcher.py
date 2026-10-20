@@ -412,6 +412,7 @@ class SignalWatcher:
         if not symbol:
             return
 
+        _evict_cancel = []   # [v3.89 撤单检查] 被驱逐条目的待撤订单（锁内登记，锁外执行）
         async with self._lock:
             existing = self._watched.get(symbol)
             if existing and not replace and not existing.triggered and not existing.is_expired():
@@ -493,7 +494,6 @@ class SignalWatcher:
 
                     # 替换最低分挂单
                     old_sym = lowest.symbol
-                    _evict_cancel = []   # [v3.89 撤单检查] 被驱逐条目的待撤订单（锁外执行）
                     logger.info(
                         f"[signal_watcher] {symbol} 新分 {entry.pending_score:.0f} "
                         f"> {old_sym} {lowest.pending_score:.0f}+{PENDING_REPLACE_MARGIN}，"
@@ -509,7 +509,7 @@ class SignalWatcher:
                         logger.debug(f"[signal_watcher] 驱逐卡片追加失败: {_sw_e}")
                     if lowest.limit_order_id:
                         # [v3.89 撤单检查] 原写法 ensure_future 发出去不看结果；改为锁外统一走
-                        #   _cancel_exchange_order 并确认终态（现在仍在锁内，只登记待撤计划）
+                        #   _cancel_exchange_order 并确认终态（这里仍在锁内，只登记待撤计划）
                         _evict_cancel.append((old_sym, int(lowest.limit_order_id), lowest))
                     # ── 清理 pos_state 残留（否则 get_pending_count 会虚高）──
                     try:
@@ -517,7 +517,12 @@ class SignalWatcher:
                         _old_recs = [p for p in _gap()
                                      if p.get("symbol") == old_sym and p.get("status") == "pending"]
                         if _old_recs:
-                            _rmp(_old_recs[0]["pos_id"])
+                            # [v3.89 remove-pos 检查] 检查返回值，失败只记日志
+                            try:
+                                if _rmp(_old_recs[0]["pos_id"]) is False:
+                                    logger.warning("[signal_watcher] remove_position(%s) 返回 False，pos_state 未写入成功，请人工核查" % _old_sym)
+                            except Exception as _re:
+                                logger.error("[signal_watcher] remove_position(%s) 抛异常，持仓文件可能损坏，请人工核查: %s" % (_old_sym, _re))
                             logger.info(f"[signal_watcher] {old_sym} pos_state pending 记录已清理")
                     except Exception as _rpe:
                         logger.warning(f"[signal_watcher] {old_sym} pos_state 清理失败: {_rpe}")
@@ -554,7 +559,7 @@ class SignalWatcher:
                 logger.debug(f"[signal_watcher] 信号卡片创建失败（非致命）: {_ne}")
 
         # [v3.89 撤单检查] 锁外撤被驱逐条目的交易所挂单：确认终态，结果未知登记对账
-        for _esy, _eoid, _eentry in locals().get("_evict_cancel", []) or []:
+        for _esy, _eoid, _eentry in _evict_cancel:
             try:
                 _oc = await self._cancel_exchange_order(_esy, _eoid)
             except Exception as _ce:
@@ -587,9 +592,10 @@ class SignalWatcher:
             try:
                 # [v3.89 撤单检查] 统一走 _cancel_and_remove：撤单确认终态，结果未知登记 _orphan_orders。
                 #   单个条目失败只记录，不影响其他条目的撤单。
-                await self._cancel_and_remove(sym, entry, reason)
+                _st = await self._cancel_and_remove(sym, entry, reason)
                 if self._watched.get(sym) is entry:
-                    cancelled += 1   # 未确认撤单（filled/unknown）的条目不计数，条目仍在队列
+                    # filled / cancel_unknown：条目保留待对账，不计入已撤销
+                    logger.warning(f"[signal_watcher] {sym} 撤单未确认（{_st}），条目保留待对账")
                 else:
                     cancelled += 1
             except Exception as e:
