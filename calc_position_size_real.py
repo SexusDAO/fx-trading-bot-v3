@@ -171,6 +171,13 @@ def real_size(sig_type: str, score: float, direction: str = "LONG", details: dic
     max_pos      = details.get("max_positions")  # 外部可传入，否则自动读取配置
     dyn_cap      = _dynamic_cap(net_value, hard_cap, max_pos)
 
+    # [v3.89 #81] 最小仓位与动态上限冲突（dyn_cap < POS_MIN_U）时，旧写法的外层 max 会静默突破动态上限。
+    #   现在返回 0.0 表示「不可执行」并记录原因，不修改任何上限数值；dyn_cap >= POS_MIN_U 时结果与之前一致。
+    if dyn_cap < POS_MIN_U:
+        import logging as _lg
+        _lg.getLogger("fx.calc_position_size").warning(
+            f"[real_size] {symbol or sig_type} 动态上限 {dyn_cap:.1f}U < 最小仓位 {POS_MIN_U}U，不可执行，返回 0")
+        return 0.0
     return round(max(POS_MIN_U, min(dyn_cap, base)), 1)
 
 
