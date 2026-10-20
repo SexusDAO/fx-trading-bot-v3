@@ -24,9 +24,9 @@ def get_api_key() -> str:
 PANEL_MODELS = [
     {"name": "claude-opus-5",   "max_tokens": 3000},
     {"name": "gpt-6.1-sol",     "max_tokens": 3000, "token_param": "max_completion_tokens"},
-    {"name": "o4-mini",         "max_tokens": 4000, "token_param": "max_completion_tokens"},
     {"name": "glm-5.2",         "max_tokens": 4000},
     {"name": "claude-sonnet-4-6", "max_tokens": 3000},
+    # o4-mini 已移除：13题里 9 次被标注回答偏简略/论证薄弱/质量偏低，参考价値不高
 ]
 
 # 汇总分析使用的模型（analyzer 会调用一次）
