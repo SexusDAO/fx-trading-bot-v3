@@ -350,7 +350,7 @@ cd /root/.openclaw/workspace/fx
 | 4 | LLM Key 注入 | `python3 -c "lines=open('watchdog.sh').readlines(); print([i+1 for i,l in enumerate(lines) if 'OPENAI_API_KEY' in l])"` | 至少有 1 行（key 已注入 watchdog） |
 | 5 | 系统日志 | `tail -20 logs/scanner.log \| grep -E "\[scan\]\|ERROR\|CRITICAL" \| tail -6` | 无 ERROR/CRITICAL；[scan] 时间戳在 10 分钟内 |
 | 6 | 持仓状态 | `python3 -c "import json; p=json.load(open('logs/pos_state.json')); print(len(p),'个持仓'); [print(x['symbol'],x['direction']) for x in p]"` | 持仓数合理，无异常残留 |
-| 7 | 候选池 | `python3 -c "import json,datetime; d=json.load(open('logs/candidate_pool.json')); ts=d.get('ts',0); age=(datetime.datetime.now(datetime.timezone.utc).timestamp()-ts/1000)/60; print(len(d.get('pool',[])),f'标的，更新于{age:.0f}分钟前')"` | 标的数 80~130，更新时间 < 15 分钟 |
+| 7 | 候选池 | `python3 -c "import json,datetime; d=json.load(open('logs/candidate_pool.json')); ts=d.get('ts',0); age=(datetime.datetime.now(datetime.timezone.utc).timestamp()-ts)/60; print(len(d.get('pool',[])),f'标的，更新于{age:.0f}分钟前')"` | 标的数 80~130，更新时间 < 15 分钟 |
 | 8 | 市场模式 | `python3 -c "import json; print(json.load(open('logs/market_mode.json')))"` | 有 mode 字段，非 None |
 | 9 | Binance API | `python3 -c "import sys; sys.path.insert(0,'.'); from shared.binance_api import get_mark_price; print('OK', get_mark_price('BTCUSDT').get('markPrice','?'))"` | 返回 BTC 实时价格 |
 | 10 | Coinglass 连通 | `python3 -c "import sys; sys.path.insert(0,'.'); from shared.clawby_adapter import get_liq_summary_1h; r=get_liq_summary_1h('BTCUSDT'); print('OK' if r else 'FAIL', r)"` | 返回有效 liq 数据 |
