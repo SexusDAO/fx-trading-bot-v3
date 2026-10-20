@@ -173,10 +173,6 @@ class TestVerify(unittest.TestCase):
         self.assertEqual(r["label"], "先止盈")       # 第 80 分钟成交仍在 90 分钟成交窗口内
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestPremerge(unittest.TestCase):
     """[v3.89 PREMERGE] 关闭零请求、名额前置、三态和轮转。"""
     def setUp(self):
@@ -225,3 +221,7 @@ class TestPremerge(unittest.TestCase):
         self.assertTrue(st.record_precheck_rejection(self.sig,"相关性过滤"))
         self.mocks[2].assert_called_once()
         self.assertEqual(st._round["C"],1)
+
+
+if __name__ == "__main__":
+    unittest.main()

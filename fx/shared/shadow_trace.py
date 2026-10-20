@@ -159,7 +159,6 @@ def record(*, symbol: str, signal_type: str, direction: str, first_rejected_at: 
         "first_rejected_at": first_rejected_at,
         "reason": (reason or "")[:160],
         "would_also_fail": waf,
-        "would_pass_all": would_pass_all(waf),
         "price_kind": price_kind,
         "entry_candidate": _num(entry_candidate),
         "sl": _num(sl),
