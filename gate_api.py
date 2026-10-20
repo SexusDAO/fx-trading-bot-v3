@@ -11,10 +11,12 @@ from typing import Optional
 GATE_KEY    = "31fa24489c3c7d862575696fa7daf2fa"
 GATE_SECRET = os.environ.get("GATE_API_GATE_SECRET", "")
 BASE_URL    = "https://api.gateio.ws/api/v4"
-PROXY_HOST  = "64.105.162.230"
-PROXY_PORT  = 6688
-PROXY_USER  = "sG4jNMrhURhe"
-PROXY_PASS  = "UjdV95PtwdgE"
+# 代理凭证从环境变量读取
+_proxy_raw2 = os.environ.get("BINANCE_PROXY", "")
+def _parse_proxy2(url):
+    import urllib.parse; p = urllib.parse.urlparse(url)
+    return p.hostname or "", p.port or 6688, p.username or "", p.password or ""
+PROXY_HOST, PROXY_PORT, PROXY_USER, PROXY_PASS = _parse_proxy2(_proxy_raw2)
 
 def _proxy_opener():
     """创建走 SOCKS5 代理的 opener"""

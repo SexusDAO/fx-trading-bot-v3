@@ -85,11 +85,14 @@ while [ $restarts -lt $MAX_RESTARTS ]; do
     export OPENAI_BASE_URL="https://novaapi.ai"
     export OPENAI_MODEL="claude-opus-4-8-medium"  # 默认（妖币+边界），新闻语义见 LLM_API_MODEL_FAST
 
-    # Binance API Key + 代理（硬编码兜底，.env 同步保留双重保险）
-    export BINANCE_API_KEY="E621Obw9P1hFy90HhgrXVDwOwqcbKIPCw22tGDQ73r7j3tezSXu6OhrGpQhdDZhG"
-    export BINANCE_API_SECRET="ACLFzjjYD67Q2RTjmZn1PcG6wBeVqWQvXc0VFAmofKaYy5t4Whdvek7zJwSdTloX"
-    export BINANCE_PROXY="socks5://sG4jNMrhURhe:UjdV95PtwdgE@64.105.162.230:6688"
-    export PROXY_URL="socks5://sG4jNMrhURhe:UjdV95PtwdgE@64.105.162.230:6688"
+    # Binance API Key + 代理 — 必须在环境变量中提前设置，不在脚本里硬编码
+    # export BINANCE_API_KEY="your_key"
+    # export BINANCE_API_SECRET="your_secret"
+    # export BINANCE_PROXY="socks5://user:pass@host:port"
+    : "${BINANCE_API_KEY:?请设置 BINANCE_API_KEY 环境变量}"
+    : "${BINANCE_API_SECRET:?请设置 BINANCE_API_SECRET 环境变量}"
+    : "${BINANCE_PROXY:?请设置 BINANCE_PROXY 环境变量}"
+    export PROXY_URL="${BINANCE_PROXY}"
 
     python3 main.py >> "$LOG" 2>&1
     EXIT_CODE=$?

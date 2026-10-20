@@ -12,8 +12,16 @@ _FX_ROOT = Path(__file__).parent  # fx/ 目录绝对路径
 # 第一组：系统基础配置
 # ═══════════════════════════════════════════════════════════════════════════════
 # ── API Key ─────────────────────────────────────────────────────────────────────────────────────────────
-BINANCE_API_KEY    = "E621Obw9P1hFy90HhgrXVDwOwqcbKIPCw22tGDQ73r7j3tezSXu6OhrGpQhdDZhG"
-BINANCE_API_SECRET = "ACLFzjjYD67Q2RTjmZn1PcG6wBeVqWQvXc0VFAmofKaYy5t4Whdvek7zJwSdTloX"
+# API Key 必须通过环境变量注入，禁止硬编码。
+# export BINANCE_API_KEY="your_key"
+# export BINANCE_API_SECRET="your_secret"
+BINANCE_API_KEY    = os.environ.get("BINANCE_API_KEY") or ""
+BINANCE_API_SECRET = os.environ.get("BINANCE_API_SECRET") or ""
+if not BINANCE_API_KEY or not BINANCE_API_SECRET:
+    raise EnvironmentError(
+        "[fx] BINANCE_API_KEY / BINANCE_API_SECRET 未设置。"
+        " 请先 export 再启动。"
+    )
 
 # ── SOCKS5 代理 ────────────────────────────────────────────────────────────────
 PROXY_URL = os.environ.get("PROXY_URL", "")  # socks5://user:pass@host:port

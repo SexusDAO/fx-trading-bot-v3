@@ -102,3 +102,52 @@ watchlist.json
 watchlist.json.bak
 **/watchlist.json
 v3/config/pos_state*.json
+
+# ── 运行时 state / log json（每轮变动，含持仓/余额信息）────────────────────
+*_state.json
+*state*.json
+cw_state.json
+sol_cw_state.json
+bank_short_state.json
+daily-state.json
+on_long_state.json
+on_monitor_state.json
+paper_fx_state.json
+pos_state.json
+position_state.json
+multi_coin_hunter_state.json
+arb/state.json
+fomo_workflow/state.json
+.rh_whale_state.json
+.whale_alert_state.json
+robinhood_sniper/.position_state.json
+fx_major/logs/
+.openclaw/workspace-state.json
+
+# ── 交易日志 ──────────────────────────────────────────────────────────────────
+trade_log.json
+cw_log.json
+sol_cw_log.json
+daily_task_log.json
+position-monitor-log.json
+logs/webchat_log.json
+
+# ── 跟踪钱包 / KOL 列表（运营数据）──────────────────────────────────────────
+hoodwatch_whales.json
+stalkchain_kols.json
+robinhood_sniper/.smart_wallets.json
+bsc_monitor/smart_watchlist_backup.json
+fomo_workflow/kol_watchlist.json
+fomo_workflow/evm_watchlist.json
+fomo_workflow/whale_blacklist.json
+fomo_workflow/.first_seen.json
+fomo_workflow/.shadow_tracker.json
+fomo_workflow/buy_failures.json
+fomo_workflow/deployer_blacklist.json
+arc_sniper/.first_seen.json
+arc_sniper/.processed_signals.json
+bsc_monitor/.binance_dedup.json
+bsc_monitor/.seen_pairs.json
+
+# ── gmgn-api-test（测试脚本，含会话凭证）────────────────────────────────────
+gmgn-api-test/

@@ -38,10 +38,12 @@ WORKSPACE   = pathlib.Path("/root/.openclaw/workspace")
 CACHE_DIR   = WORKSPACE / "ws_cache"
 LOG_FILE    = CACHE_DIR / "ws_errors.log"
 
-PROXY_HOST  = "64.105.162.230"
-PROXY_PORT  = 6688
-PROXY_USER  = "sG4jNMrhURhe"
-PROXY_PASS  = "UjdV95PtwdgE"
+# 代理凭证从环境变量读取，格式：socks5://user:pass@host:port
+_proxy_raw = os.environ.get("BINANCE_PROXY", "")
+def _parse_proxy(url):
+    import urllib.parse; p = urllib.parse.urlparse(url)
+    return p.hostname or "", p.port or 6688, p.username or "", p.password or ""
+PROXY_HOST, PROXY_PORT, PROXY_USER, PROXY_PASS = _parse_proxy(_proxy_raw)
 
 RECONNECT_INIT  = 5    # 初始重连间隔（秒）
 RECONNECT_MAX   = 60   # 最长重连间隔（秒）
