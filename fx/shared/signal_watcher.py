@@ -1637,18 +1637,40 @@ class SignalWatcher:
 
     async def _reorder_replace(self, sym: str, old_entry: WatchEntry, new_sig: dict, **add_kwargs) -> None:
         """
-        [v3.87 STEP5-8] 价格位移重挂：先注册新单（覆盖同标的旧条目），成功后再撤旧单的交易所限价单。
-        原写法先 _cancel_and_remove 再 add_signal，且 add_signal 调用参数有误（多了不存在的 loop、缺必需的 on_trigger）
-        会抛 TypeError，被外层吞掉后旧单已撤，信号静默丢失，日志却写「保留原挂单」。
-        本方法在 add_signal 抛异常时不触碰旧单（异常向上抛，由调用方记 warning 并保留原挂单）。
-        注意：新条目已覆盖 _watched[sym]，因此不能再调用 _cancel_and_remove（会误删新条目），只撤旧的交易所订单。
+        价格位移重挂。
+        [v3.89 #42] 顺序改为「先撤旧单并确认，再注册新单」：
+          原写法（v3.87）先注册新单再撤旧单，旧单撤失败只记 warning，交易所上会同时存在新旧两张挂单。
+          现在：旧条目置 cancelling（留在队列，_trigger 不触发）→ 撤交易所订单并确认终态 →
+            confirmed：清空旧条目 limit_order_id，再 add_signal(replace=True) 注册新单；
+            filled / unknown：不注册新单，抛异常由调用方记 warning（unknown 登记对账，确认已撤后旧条目继续等待）。
+          确认已撤后 add_signal 抛异常：旧条目留在队列、limit_order_id 已置空，记 error，不静默丢信号。
         """
-        await self.add_signal(new_sig, replace=True, **add_kwargs)
-        if old_entry.limit_order_id:
-            try:
-                await self._cancel_order(sym, old_entry.limit_order_id)
-            except Exception as ce:
-                logger.warning(f'[recheck] 价格位移重挂：旧单撤销失败 {sym} id={old_entry.limit_order_id}: {ce}')
+        oid = old_entry.limit_order_id
+        async with self._lock:
+            if self._watched.get(sym) is not old_entry or old_entry.triggered or old_entry.cancel_state != "none":
+                raise RuntimeError(f"{sym} 旧条目已变化（触发/替换/撤单中），放弃重挂 entry_id={old_entry.entry_id}")
+            if oid:
+                old_entry.cancel_state = "cancelling"
+        if oid:
+            outcome = await self._cancel_exchange_order(sym, oid)
+            async with self._lock:
+                if outcome == "confirmed":
+                    old_entry.limit_order_id = None
+                    old_entry.cancel_state = "none"
+                elif outcome == "filled":
+                    old_entry.cancel_state = "none"
+                else:
+                    old_entry.cancel_state = "cancel_unknown"
+                    self._register_orphan(sym, oid, "价格位移重挂", old_entry, on_confirmed="keep_watching")
+            if outcome != "confirmed":
+                if outcome == "filled":
+                    logger.error(f'[recheck] 价格位移重挂：旧单 {sym} id={oid} 已（部分）成交，不注册新单，请核对持仓')
+                raise RuntimeError(f"{sym} 旧单 id={oid} 撤销未确认({outcome})，不注册新单")
+        try:
+            await self.add_signal(new_sig, replace=True, **add_kwargs)
+        except Exception as e:
+            logger.error(f'[recheck] 价格位移重挂：旧单已撤但新单注册失败 {sym}，旧条目保留继续监控（limit_order_id 已置空）: {e}')
+            raise
 
     async def _cancel_and_remove(self, sym: str, entry: WatchEntry, reason: str) -> None:
         """
