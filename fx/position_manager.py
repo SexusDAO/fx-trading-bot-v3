@@ -552,12 +552,22 @@ class PositionManager:
                     _status = _event.get("X", "")
                     if _status != "FILLED":
                         continue
-                    _fill_price = float(_event.get("L") or _event.get("ap") or 0)
+                    # [v3.89 #2] 成交均价必须用累计均价 ap（与累计成交量 z 配套）；L 是最后一笔成交价，
+                    #   分批成交时与均价不同，用它补挂止损会算错。ap 缺失或为 0 时不回退到 L：
+                    #   记 warning 并跳过，由 patrol 的 REST 确认路径补挂（最长延迟 5 分钟，已知 KI-001）。
+                    _symbol = pos["symbol"]
+                    try:
+                        _fill_price = float(_event.get("ap") or 0)
+                    except (TypeError, ValueError):
+                        _fill_price = 0.0
                     _fill_qty   = float(_event.get("z", 0))
-                    if _fill_price <= 0 or _fill_qty <= 0:
+                    if _fill_price <= 0:
+                        logger.warning(f"[pm] {_symbol} pending入场单 {_oid} 成交事件缺少有效均价 ap="
+                                       f"{_event.get('ap')!r}，不回退到最后成交价 L，交给 patrol 补挂")
+                        continue
+                    if _fill_qty <= 0:
                         continue
                     _pid    = pos.get("pos_id", pos.get("symbol", "unknown"))
-                    _symbol = pos["symbol"]
                     logger.info(
                         f"[pm] ⚡ {_symbol} pending入场单 {_oid} WS实时感知成交 "
                         f"price={_fill_price:.6g} qty={_fill_qty},立即补挂SL/TP"
@@ -1945,7 +1955,12 @@ async def _close_position_post_static(
     close_ms   = int(time.time() * 1000)
     mode       = pos.get("mode", "pullback")
 
-    exit_price = fill_price or float(event.get("L", entry))
+    # [v3.89 #2] 平仓成交价同样优先用累计均价 ap；仅在 ap 缺失时才退回最后成交价 L（只用于盈亏记录，不用于下单）
+    try:
+        _ap = float(event.get("ap") or 0)
+    except (TypeError, ValueError):
+        _ap = 0.0
+    exit_price = fill_price or _ap or float(event.get("L", entry))
     if fill_qty <= 0:
         fill_qty = quantity
 
