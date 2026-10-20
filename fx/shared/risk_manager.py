@@ -13,6 +13,8 @@ shared/risk_manager.py — 风控守门人（V3.0 完整版）
 
 import json
 import logging
+import os
+import threading
 from pathlib import Path
 from shared.indicators import ema as _calc_ema
 import time
@@ -392,31 +394,70 @@ def _clean_old_backups(archive: "Path", stem: str, keep_days: int) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 _DRAWDOWN_STATE_FILE = str(Path(__file__).parent.parent / "logs" / "drawdown_state.json")
 
-def _load_drawdown_state() -> dict:
-    try:
-        p = Path(_DRAWDOWN_STATE_FILE)
-        if p.exists():
-            return json.loads(p.read_text())
-    except Exception:
-        pass
+_DRAWDOWN_LOCK = threading.RLock()        # [v3.89 #67] 读-改-写串行化
+_DRAWDOWN_STATE_CORRUPTED = False         # [v3.89 #67] 状态文件曾损坏（进程内标志，重启清除；备份文件保留）
+
+
+def _default_drawdown_state() -> dict:
     return {"high_water": 0.0, "hw_updated_at": 0.0, "halt_until": 0.0}
 
+
+def _load_drawdown_state() -> dict:
+    """
+    [v3.89 #67] 文件不存在 → 默认值（首次初始化，正常）；
+    文件存在但读取/解析失败 → 保留损坏文件备份（.corrupted_<ms>），logger.error，置 _DRAWDOWN_STATE_CORRUPTED，
+    再返回默认值——不再静默返回零高水位。注意：默认值下高水位会从当前权益重新累计，
+    历史高水位只在备份文件里，需人工核对。
+    """
+    global _DRAWDOWN_STATE_CORRUPTED
+    p = Path(_DRAWDOWN_STATE_FILE)
+    if not p.exists():
+        return _default_drawdown_state()
+    try:
+        data = json.loads(p.read_text())
+        if not isinstance(data, dict):
+            raise ValueError(f"状态不是对象: {type(data).__name__}")
+        return data
+    except Exception as e:
+        _DRAWDOWN_STATE_CORRUPTED = True
+        backup = p.with_name(f"{p.name}.corrupted_{int(time.time() * 1000)}")
+        try:
+            p.replace(backup)
+            logger.error(f"[risk] 回撤状态文件损坏，已备份为 {backup.name}，高水位/暂停状态已丢失，请人工核对: {e}")
+        except Exception as be:
+            logger.error(f"[risk] 回撤状态文件损坏且备份失败（原文件保留）: {e} / 备份错误: {be}")
+        return _default_drawdown_state()
+
+
 def _save_drawdown_state(state: dict) -> None:
+    """[v3.89 #67] 原子写入：唯一临时文件 + replace，避免中断留下半截文件。"""
+    import uuid
     p = Path(_DRAWDOWN_STATE_FILE)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(state, ensure_ascii=False, indent=2))
+    tmp = p.with_name(f"{p.name}.tmp_{os.getpid()}_{uuid.uuid4().hex[:8]}")
+    try:
+        tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2))
+        tmp.replace(p)
+    except Exception:
+        try:
+            tmp.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
+
 
 def update_drawdown_high_water(current_equity: float) -> None:
     """
     每次账户状态更新后调用，维护高水位。
     current_equity: 账户总权益（totalMarginBalance）
     """
-    state = _load_drawdown_state()
-    if current_equity > state.get("high_water", 0):
-        state["high_water"]    = current_equity
-        state["hw_updated_at"] = time.time()
-        _save_drawdown_state(state)
-        logger.debug(f"[risk] 高水位更新: {current_equity:.2f}U")
+    with _DRAWDOWN_LOCK:
+        state = _load_drawdown_state()
+        if current_equity > state.get("high_water", 0):
+            state["high_water"]    = current_equity
+            state["hw_updated_at"] = time.time()
+            _save_drawdown_state(state)
+            logger.debug(f"[risk] 高水位更新: {current_equity:.2f}U")
 
 def check_max_drawdown(current_equity: float, notifier_fn=None) -> tuple[bool, str]:
     """

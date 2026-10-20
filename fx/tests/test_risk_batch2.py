@@ -66,5 +66,50 @@ class TestUsdtPeg(unittest.TestCase):
         self.assertIn("脱锚", reason)
 
 
+class TestDrawdownState(unittest.TestCase):
+    def setUp(self):
+        self.d = Path(tempfile.mkdtemp())
+        self._f = R._DRAWDOWN_STATE_FILE
+        R._DRAWDOWN_STATE_FILE = str(self.d / "drawdown_state.json")
+        R._DRAWDOWN_STATE_CORRUPTED = False
+
+    def tearDown(self):
+        R._DRAWDOWN_STATE_FILE = self._f
+        R._DRAWDOWN_STATE_CORRUPTED = False
+
+    def test_first_init_is_default_and_not_corrupted(self):
+        self.assertEqual(R._load_drawdown_state()["high_water"], 0.0)
+        self.assertFalse(R._DRAWDOWN_STATE_CORRUPTED)
+
+    def test_corrupt_file_backed_up_logged_and_flagged(self):
+        p = Path(R._DRAWDOWN_STATE_FILE); p.write_text("{bad")
+        with mock.patch.object(R.logger, "error") as e:
+            st = R._load_drawdown_state()
+        self.assertTrue(R._DRAWDOWN_STATE_CORRUPTED)
+        self.assertTrue(e.called)
+        bk = list(self.d.glob("drawdown_state.json.corrupted_*"))
+        self.assertEqual(len(bk), 1)
+        self.assertEqual(bk[0].read_text(), "{bad")           # 损坏文件原样保留
+        self.assertEqual(st["high_water"], 0.0)
+
+    def test_non_object_json_is_corrupt(self):
+        Path(R._DRAWDOWN_STATE_FILE).write_text("[1,2]")
+        R._load_drawdown_state()
+        self.assertTrue(R._DRAWDOWN_STATE_CORRUPTED)
+
+    def test_atomic_write_and_update(self):
+        R.update_drawdown_high_water(1000.0)
+        self.assertEqual(json.loads(Path(R._DRAWDOWN_STATE_FILE).read_text())["high_water"], 1000.0)
+        self.assertEqual(list(self.d.glob("*.tmp_*")), [])
+        R.update_drawdown_high_water(900.0)                   # 低于高水位不更新
+        self.assertEqual(R._load_drawdown_state()["high_water"], 1000.0)
+
+    def test_concurrent_updates_keep_max(self):
+        import threading
+        ts = [threading.Thread(target=R.update_drawdown_high_water, args=(float(v),)) for v in range(100, 140)]
+        [t.start() for t in ts]; [t.join() for t in ts]
+        self.assertEqual(R._load_drawdown_state()["high_water"], 139.0)
+
+
 if __name__ == "__main__":
     unittest.main()
