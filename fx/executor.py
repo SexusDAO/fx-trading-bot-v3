@@ -363,14 +363,16 @@ def _check_liquidity_gate(
                 if float(b[0]) >= low
             )
 
-        # 阈值相对化：OI 的 0.1% 为动态底线，对小币友好；硬底 3000U 防止极端值
-        oi_based = oi_now * 0.001 if oi_now > 0 else 0.0
+        # 阈值相对化：OI×0.1% 为动态底线
+        # fix: oi_now 是币安返回的合约张数（非 USDT），必须乘以 mark_price 换算后再取 0.1%
+        oi_usdt   = oi_now * mark_p if (oi_now > 0 and mark_p > 0) else 0.0
+        oi_based  = oi_usdt * 0.001 if oi_usdt > 0 else 0.0
         threshold = max(LIQUIDITY_GATE_MIN_U, oi_based, notional * LIQUIDITY_GATE_DEPTH_MULT)
         center_label = f"entry={center:.6g}" if (entry_price and entry_price > 0) else f"mark={center:.6g}"
         if depth_u < threshold:
             return False, (
                 f"流动性不足: {direction} 侧±0.5%深度={depth_u:.0f}U "
-                f"< 阈值{threshold:.0f}U（{center_label} OI={oi_now:.0f}U notional={notional:.0f}U×{LIQUIDITY_GATE_DEPTH_MULT}）"
+                f"< 阈值{threshold:.0f}U（{center_label} OI={oi_usdt:.0f}U notional={notional:.0f}U×{LIQUIDITY_GATE_DEPTH_MULT}）"
             )
         return True, ""
     except Exception as _lge:
@@ -1033,8 +1035,9 @@ async def _on_position_closed(pos_id: str, symbol: str,
         _hold_min  = (int(time.time() * 1000) - int(pos.get("open_time", int(time.time() * 1000)))) / 60000 if pos else 0
         _tp1_ok    = pos.get("tp1_filled", False) if pos else False
         _tp2_ok    = pos.get("tp2_filled", False) if pos else False
-        # exit_price 从 pos 取实际出场价（WS 路径）
-        _exit_p    = float(pos.get("exit_price", close_price)) if pos else float(close_price)
+        # exit_price 从函数顶部算好的 exit_price 取（WS event ap/L 字段）
+        # fix: 原代码误用了未定义的 close_price，改为已定义的 exit_price
+        _exit_p    = exit_price if exit_price > 0 else float(pos.get("exit_price", 0) if pos else 0)
         _pnl_pct   = (pnl / float(pos.get("notional", 1))) * 100 if pos and pos.get("notional") else 0.0
         _close_line = fmt_node_close(
             close_reason = close_reason,
@@ -1047,8 +1050,11 @@ async def _on_position_closed(pos_id: str, symbol: str,
         )
         if _sig_id_ws:
             import asyncio as _aio_ws
-            _aio_ws.ensure_future(card_append_async(_sig_id_ws, _close_line))
-            card_remove(_sig_id_ws)
+            # fix: card_remove 必须在 card_append_async 完成后执行，否则缓存已空追加失败
+            async def _append_then_remove(_sid=_sig_id_ws, _line=_close_line):
+                await card_append_async(_sid, _line)
+                card_remove(_sid)
+            _aio_ws.ensure_future(_append_then_remove())
         else:
             import asyncio as _aio_ws
             _aio_ws.ensure_future(notify_async(_close_line))
