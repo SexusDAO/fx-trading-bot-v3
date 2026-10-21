@@ -14,6 +14,9 @@ from shared import signal_watcher as sw
 ATR = 10.0
 ENTRY = 1000.0
 
+import config
+HALF = config.SIGNAL_WATCH_ENTRY_BUFFER_ATR_REVERSAL      # reversal 触发半宽（ATR 倍数），随配置变化
+
 
 async def _noop(*a, **k):
     return None
@@ -36,15 +39,15 @@ def _entry(direction, trigger_price=ENTRY, atr_at_trigger=ATR):
 def test_reversal_range_is_half_atr(direction):
     low, high, ep = sw.compute_entry_range(_sig(direction), mark_price=ENTRY)
     assert ep == ENTRY
-    assert low == pytest.approx(ENTRY - 0.5 * ATR)
-    assert high == pytest.approx(ENTRY + 0.5 * ATR)
+    assert low == pytest.approx(ENTRY - HALF * ATR)
+    assert high == pytest.approx(ENTRY + HALF * ATR)
 
 
 def test_reversal_range_fallback_when_atr_missing():
     s = _sig("SHORT"); s["ind"] = {}
-    low, high, _ = sw.compute_entry_range(s, mark_price=2000.0)   # atr = mark*0.02 = 40 → 半宽 20
-    assert low == pytest.approx(ENTRY - 20.0)
-    assert high == pytest.approx(ENTRY + 20.0)
+    low, high, _ = sw.compute_entry_range(s, mark_price=2000.0)   # atr = mark*0.02 = 40 → 半宽 = 40*HALF
+    assert low == pytest.approx(ENTRY - 40.0 * HALF)
+    assert high == pytest.approx(ENTRY + 40.0 * HALF)
 
 
 def test_pullback_range_unchanged_pct():
@@ -74,11 +77,11 @@ def test_long_mark_2atr_above_entry_not_instant_trigger():
 @pytest.mark.parametrize("direction", ["SHORT", "LONG"])
 def test_trigger_only_inside_half_atr(direction):
     e = _entry(direction)
-    assert not e.price_in_range(ENTRY - 0.5 * ATR - 0.01)
-    assert e.price_in_range(ENTRY - 0.5 * ATR + 0.01)
+    assert not e.price_in_range(ENTRY - HALF * ATR - 0.01)
+    assert e.price_in_range(ENTRY - HALF * ATR + 0.01)
     assert e.price_in_range(ENTRY)
-    assert e.price_in_range(ENTRY + 0.5 * ATR - 0.01)
-    assert not e.price_in_range(ENTRY + 0.5 * ATR + 0.01)
+    assert e.price_in_range(ENTRY + HALF * ATR - 0.01)
+    assert not e.price_in_range(ENTRY + HALF * ATR + 0.01)
 
 
 def test_old_pct_range_would_have_instant_triggered():
@@ -117,3 +120,51 @@ def test_survival_uses_trigger_atr_not_current():
     e = _entry("SHORT", atr_at_trigger=20.0)       # 触发时 ATR=20 → 阈值 ENTRY-20
     assert _surv(e, ENTRY - 15, rsi=70)[0] is False
     assert _surv(e, ENTRY - 21, rsi=70)[0] is True
+
+
+def test_default_half_width_below_degraded_offset():
+    """降级偏移为 0.5ATR，触发半宽必须严格小于它，否则降级后 mark 落在区间边界上。"""
+    assert HALF == 0.3 and HALF < 0.5
+
+
+def test_degraded_entry_no_instant_trigger():
+    """挂单价过远 / recheck 重挂降级时 entry = mark + 0.5ATR，
+    触发半宽 0.3ATR，mark 价应在区间外，不会秒触发。"""
+    mark = 1000.0
+    atr = 10.0
+    entry = mark + 0.5 * atr  # = 1005，降级后的入场价
+    sig = {"symbol": "XUSDT", "mode": "reversal", "direction": "SHORT",
+           "pre_entry_price": entry, "ind": {"atr_1h": atr}}
+    low, high, ep = sw.compute_entry_range(sig, mark_price=mark)
+    # 触发区间 = [1005-3, 1005+3] = [1002, 1008]
+    # mark=1000 应在区间外
+    e = sw.WatchEntry(
+        signal=sig, entry_low=low, entry_high=high, entry_price=ep,
+        expire_ts=time.time() + 600, on_trigger=_noop
+    )
+    assert not e.price_in_range(mark), \
+        f"mark={mark} 不应在触发区间 [{low}, {high}] 内"
+    # 同时验证正好在触发区间内的价格能触发
+    assert e.price_in_range(entry)
+
+
+def test_degraded_entry_long_mirror_no_instant_trigger():
+    mark, atr = 1000.0, 10.0
+    entry = mark - 0.5 * atr
+    sig = {"symbol": "XUSDT", "mode": "reversal", "direction": "LONG",
+           "pre_entry_price": entry, "ind": {"atr_1h": atr}}
+    low, high, ep = sw.compute_entry_range(sig, mark_price=mark)
+    e = sw.WatchEntry(signal=sig, entry_low=low, entry_high=high, entry_price=ep,
+                      expire_ts=time.time() + 600, on_trigger=_noop)
+    assert not e.price_in_range(mark) and e.price_in_range(entry)
+
+
+def test_old_half_width_0_5_would_instant_trigger_on_degraded_entry(monkeypatch):
+    """回归：半宽 0.5ATR 时 mark 恰在区间下沿（闭区间），会秒触发；这是要避免的。"""
+    monkeypatch.setattr(config, "SIGNAL_WATCH_ENTRY_BUFFER_ATR_REVERSAL", 0.5, raising=False)
+    sig = {"symbol": "XUSDT", "mode": "reversal", "direction": "SHORT",
+           "pre_entry_price": 1005.0, "ind": {"atr_1h": 10.0}}
+    low, high, ep = sw.compute_entry_range(sig, mark_price=1000.0)
+    e = sw.WatchEntry(signal=sig, entry_low=low, entry_high=high, entry_price=ep,
+                      expire_ts=time.time() + 600, on_trigger=_noop)
+    assert e.price_in_range(1000.0)
