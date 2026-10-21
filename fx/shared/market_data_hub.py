@@ -34,7 +34,7 @@ except Exception:
 RECONNECT_BASE = getattr(config, "WS_RECONNECT_BASE", 3)
 RECONNECT_MAX = getattr(config, "WS_RECONNECT_MAX", 60)
 PING_INTERVAL = 20          # 秒：每 20 秒发 ping
-NO_MSG_TIMEOUT = 30         # 秒：30 秒无任何消息 → 断开重连
+NO_MSG_TIMEOUT = 60         # 秒：60 秒无任何消息 → 断开重连（冷启动历史拉取需时间）
 SINGLE_MAX_AGE_SEC = 5.0    # 单标的读取：超过则返回 None
 ALL_MAX_AGE_SEC = 10.0      # 全量快照：超过的条目被过滤
 STATS_LOG_INTERVAL = 300    # 秒：5 分钟一条 info

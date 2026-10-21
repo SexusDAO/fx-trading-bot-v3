@@ -322,18 +322,10 @@ async def _loop_funding_arb(interval_sec: int = 1800, signal_watcher=None) -> No
 
 # ── 临时诊断（定位后删除）────────────────────────────────────────────────
 async def _loop_mem_snapshot(interval_sec: int = 1200) -> None:
-    """每 20 分钟输出一次内存快照：tracemalloc Top 15 + RSS + asyncio 任务数。"""
+    """每 20 分钟检查内存，仅在 RSS > 1500MB 或 asyncio 任务数 > 50 时输出诊断信息。"""
     await asyncio.sleep(300)  # 启动后 5 分钟开始第一次采样
     while True:
         try:
-            # tracemalloc Top 15
-            snapshot = tracemalloc.take_snapshot()
-            top_stats = snapshot.statistics('lineno')
-            lines = ["[mem] TOP15 内存分配:"]
-            for stat in top_stats[:15]:
-                size_mib = stat.size / 1024 / 1024
-                lines.append(f"[mem]   {size_mib:.1f} MiB  {stat}")
-            
             # 当前 RSS
             try:
                 pid = os.getpid()
@@ -345,8 +337,16 @@ async def _loop_mem_snapshot(interval_sec: int = 1200) -> None:
             # asyncio 活跃任务数
             task_count = len(asyncio.all_tasks())
             
-            lines.append(f"[mem] RSS={rss_mb}MB asyncio任务数={task_count}")
-            logger.warning("\n".join(lines))
+            # 仅在异常时输出详细诊断
+            if rss_mb > 1500 or task_count > 50:
+                snapshot = tracemalloc.take_snapshot()
+                top_stats = snapshot.statistics('lineno')
+                lines = ["[mem] TOP15 内存分配:"]
+                for stat in top_stats[:15]:
+                    size_mib = stat.size / 1024 / 1024
+                    lines.append(f"[mem]   {size_mib:.1f} MiB  {stat}")
+                lines.append(f"[mem] RSS={rss_mb}MB asyncio任务数={task_count}")
+                logger.warning("\n".join(lines))
         except Exception as e:
             logger.error(f"[mem] 内存快照异常: {e}", exc_info=True)
         
