@@ -203,6 +203,25 @@ def _get_all_mark_prices_list() -> list:
     return api.get_all_mark_prices()
 
 
+def _get_ticker_24h_cached(max_age_sec: float) -> dict:
+    """全市场 24h 行情 {symbol: ticker}：hub 开启、就绪且覆盖率足够时读 hub，否则回落 REST 缓存（开关关闭时与原来完全一致）。
+    miniTicker@arr 只推有变化的标的，所以新鲜条目数低于「已见过条目数」的 TICKER_MIN_COVERAGE 时不采用 hub，避免市场情绪等全量统计的口径变化。"""
+    if _hub_enabled():
+        try:
+            from shared import market_data_hub as _hub
+            if _hub.is_ticker_ready():
+                snap = _hub.get_all_tickers()
+                fresh, seen = _hub.ticker_coverage()
+                if snap and seen and fresh / seen >= _hub.TICKER_MIN_COVERAGE:
+                    logger.debug(f"[hub] 24h ticker {len(snap)} 个标的（来自 WS 缓存，覆盖率 {fresh}/{seen}）")
+                    return snap
+                logger.debug(f"[hub] 24h ticker 覆盖率不足({fresh}/{seen})，回落 REST")
+        except Exception as e:
+            logger.debug(f"[hub] 24h ticker 读取失败，回落 REST: {e}")
+    from shared.binance_api import get_ticker_24h_cached
+    return get_ticker_24h_cached(max_age_sec=max_age_sec)
+
+
 def _get_klines_cached(symbol: str, interval: str, limit: int) -> list:
     """优先读缓存（命中时只额外请求 1 根未收盘 K 线）；未命中/失效/未启用/模块不可用时走 REST 并写回。
     返回值与 api.get_klines 格式一致。"""
@@ -1938,8 +1957,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     # 使用已有的 ticker 缓存（不重新拉取），限时3秒，注入本轮不写回缓存
     try:
         inject_start = time.time()
-        from shared.binance_api import get_ticker_24h_cached
-        ticker_all = get_ticker_24h_cached(max_age_sec=300) or {}   # 5分钟内的缓存
+        ticker_all = _get_ticker_24h_cached(300) or {}   # 5分钟内的缓存
         pool_set = set(pool)
         injected = []
         for sym2, tk in ticker_all.items():
@@ -2025,8 +2043,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     _mark_price_map_ts = time.monotonic()   # 批量数据的取数时间；注册入场价时用它判断是否仍足够新
     # 拉取一次 ticker 数据供所有并行任务复用（修复 vol24_usd 永远为 0 的 bug）
     try:
-        from shared.binance_api import get_ticker_24h_cached
-        _ticker_all = get_ticker_24h_cached(max_age_sec=120) or {}
+        _ticker_all = _get_ticker_24h_cached(120) or {}
     except Exception as _te:
         logger.warning(f"[scanner] ticker 缓存获取失败，vol24 将退化为 0: {_te}")
         _ticker_all = {}

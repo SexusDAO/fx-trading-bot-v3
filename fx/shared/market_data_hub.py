@@ -39,16 +39,29 @@ SINGLE_MAX_AGE_SEC = 5.0    # 单标的读取：超过则返回 None
 ALL_MAX_AGE_SEC = 10.0      # 全量快照：超过的条目被过滤
 STATS_LOG_INTERVAL = 300    # 秒：5 分钟一条 info
 STREAM_PATH = "/market/ws/!markPrice@arr@1s"   # 币安合约行情新路径（旧路径 /ws/ 已不推送行情）
+MARKET_STREAM_PATH = "/market/stream"          # 组合流：!miniTicker@arr（后续还有 K 线），连上后用 SUBSCRIBE 订阅
+TICKER_STREAM = "!miniTicker@arr"
+TICKER_MAX_AGE_SEC = 10.0
+TICKER_MIN_COVERAGE = 0.9                      # 新鲜条目数 / 已见过的条目数 低于此值时，scanner 不采用 hub 的全量 ticker
 
 
 class MarketDataHub:
-    def __init__(self, url: Optional[str] = None, clock: Callable[[], float] = time.monotonic):
+    def __init__(self, url: Optional[str] = None, clock: Callable[[], float] = time.monotonic,
+                 market_url: Optional[str] = None):
         self._url = url or (config.BINANCE_WS_URL + STREAM_PATH)
+        self._market_url = market_url or (config.BINANCE_WS_URL + MARKET_STREAM_PATH)
         self._clock = clock
         self._lock = threading.Lock()            # 仅保护写入与计数器
         self._prices: dict = {}                  # {symbol: (entry_dict, recv_ts)}，整体替换，不原地改
         self._ready = False
         self._connected = False
+        # miniTicker 缓存：{symbol: (entry, recv_ts)}，整体替换；_ticker_seen 记录连接以来见过的标的
+        self._tickers: dict = {}
+        self._ticker_seen: set = set()
+        self._ticker_ready = False
+        self._market_connected = False
+        self.market_reconnect_count: int = 0
+        self.ticker_frame_count: int = 0
         # 可观测字段
         self.last_msg_ts: float = 0.0            # 最近一次收到消息的 monotonic 时间
         self.reconnect_count: int = 0
@@ -94,12 +107,55 @@ class MarketDataHub:
                 out[sym] = d
         return out
 
+    # ── miniTicker 读取接口 ────────────────────────────────────────────────
+    def is_ticker_ready(self) -> bool:
+        return self._ticker_ready
+
+    def get_ticker(self, symbol: str) -> Optional[dict]:
+        """返回与 REST /fapi/v1/ticker/24hr 同字段名的 dict（含 age_sec）；未就绪/缺失/超过 10 秒返回 None。"""
+        if not self._ticker_ready:
+            return None
+        item = self._tickers.get(symbol)
+        if item is None:
+            return None
+        entry, recv = item
+        age = self._clock() - recv
+        if age > TICKER_MAX_AGE_SEC:
+            return None
+        out = dict(entry)
+        out["age_sec"] = round(age, 3)
+        return out
+
+    def get_all_tickers(self) -> dict:
+        """全量快照 {symbol: dict}；age_sec 超过 10 秒的条目被过滤；未就绪返回 {}。"""
+        if not self._ticker_ready:
+            return {}
+        now = self._clock()
+        out = {}
+        for sym, (entry, recv) in self._tickers.items():
+            age = now - recv
+            if age <= TICKER_MAX_AGE_SEC:
+                d = dict(entry)
+                d["age_sec"] = round(age, 3)
+                out[sym] = d
+        return out
+
+    def ticker_coverage(self) -> tuple:
+        """(新鲜条目数, 本次连接以来见过的条目数)。miniTicker@arr 只推有变化的标的，冷门标的可能长时间不更新。"""
+        if not self._ticker_ready:
+            return (0, 0)
+        now = self._clock()
+        fresh = sum(1 for _, r in self._tickers.values() if now - r <= TICKER_MAX_AGE_SEC)
+        return (fresh, len(self._ticker_seen))
+
     def stats(self) -> dict:
         snap = self._prices
         now = self._clock()
         ages = [now - r for _, r in snap.values()]
         return {
             "ready": self._ready, "connected": self._connected,
+            "ticker_ready": self._ticker_ready, "ticker_symbols": len(self._tickers),
+            "ticker_frame_count": self.ticker_frame_count, "market_reconnect_count": self.market_reconnect_count,
             "frame_count": self.frame_count, "reconnect_count": self.reconnect_count,
             "symbols": len(snap),
             "last_msg_age_sec": (now - self.last_msg_ts) if self.last_msg_ts else None,
@@ -143,6 +199,69 @@ class MarketDataHub:
                 self._prices = new
                 self._ready = True
         return len(updates)
+
+    def _handle_market_frame(self, raw) -> None:
+        """处理 /market/stream 组合流的帧：{"stream": name, "data": ...}；订阅确认/错误帧单独处理。"""
+        try:
+            msg = json.loads(raw) if isinstance(raw, (str, bytes, bytearray)) else raw
+        except Exception:
+            return
+        if not isinstance(msg, dict):
+            return
+        if "error" in msg:
+            logger.warning(f"[hub] 组合流返回错误: {msg.get('error')}")
+            return
+        stream, data = msg.get("stream"), msg.get("data")
+        if stream is None or data is None:
+            return                                   # {"result":null,"id":..} 订阅确认
+        if stream == TICKER_STREAM:
+            self._handle_tickers(data)
+
+    def _handle_tickers(self, data) -> int:
+        """解析 !miniTicker@arr（list[dict]）并合并进缓存。字段：s,c,o,h,l,v,q。返回更新的标的数。"""
+        if not isinstance(data, list):
+            return 0
+        now = self._clock()
+        updates = {}
+        for it in data:
+            if not isinstance(it, dict):
+                continue
+            sym = it.get("s")
+            if not sym or it.get("c") is None or it.get("o") is None:
+                continue
+            try:
+                last, opn = float(it["c"]), float(it["o"])
+            except (TypeError, ValueError):
+                continue
+            chg = (last - opn) / opn * 100 if opn else 0.0
+            updates[sym] = ({
+                "symbol": sym,
+                "lastPrice": it.get("c"),
+                "openPrice": it.get("o"),
+                "highPrice": it.get("h"),
+                "lowPrice": it.get("l"),
+                "volume": it.get("v"),
+                "quoteVolume": it.get("q"),
+                "priceChange": f"{last - opn:.8f}",
+                "priceChangePercent": f"{chg:.3f}",
+            }, now)
+        with self._lock:
+            self.ticker_frame_count += 1
+            if updates:
+                new = dict(self._tickers)
+                new.update(updates)
+                self._tickers = new
+                self._ticker_seen.update(updates)
+                self._ticker_ready = True
+        return len(updates)
+
+    def _on_market_disconnect(self) -> None:
+        """组合流断线：清空 ticker 缓存并置未就绪，重连期间读取返回 None/{}。"""
+        with self._lock:
+            self._market_connected = False
+            self._ticker_ready = False
+            self._tickers = {}
+            self._ticker_seen = set()
 
     def _on_disconnect(self) -> None:
         """断线：清空缓存并置未就绪，重连期间读取一律返回 None/{}（不返回旧数据）。"""
@@ -197,10 +316,12 @@ class MarketDataHub:
     async def _run(self) -> None:
         self._stop_event = asyncio.Event()
         stats_task = asyncio.ensure_future(self._stats_loop())
+        market_task = asyncio.ensure_future(self._market_loop())
         try:
             await self._connect_loop()
         finally:
             stats_task.cancel()
+            market_task.cancel()
 
     async def _stats_loop(self) -> None:
         while True:
@@ -209,7 +330,8 @@ class MarketDataHub:
             logger.info(
                 f"[hub] 5min统计: frame_count={s['frame_count']} 覆盖标的={s['symbols']} "
                 f"age_median={_fmt(s['age_median_sec'])}s age_max={_fmt(s['age_max_sec'])}s "
-                f"reconnect_count={s['reconnect_count']} ready={s['ready']}"
+                f"reconnect_count={s['reconnect_count']} ready={s['ready']} "
+                f"ticker_ready={s['ticker_ready']} ticker覆盖={s['ticker_symbols']} ticker帧={s['ticker_frame_count']}"
             )
 
     async def _connect_loop(self) -> None:
@@ -248,6 +370,50 @@ class MarketDataHub:
                 self._on_disconnect()
 
 
+    async def _market_loop(self) -> None:
+        """/market/stream 组合流连接（miniTicker；后续 K 线共用）：连上后 SUBSCRIBE；断线清缓存并退避重连。"""
+        import websockets
+        delay = RECONNECT_BASE
+        first = True
+        while not self._stopping:
+            if not first:
+                self.market_reconnect_count += 1
+                logger.warning(f"[hub] 组合流重连第 {self.market_reconnect_count} 次（等待 {delay}s 后连接）")
+                try:
+                    await asyncio.wait_for(self._stop_event.wait(), timeout=delay)
+                    return
+                except asyncio.TimeoutError:
+                    pass
+                delay = min(delay * 2, RECONNECT_MAX)
+            first = False
+            try:
+                async with websockets.connect(
+                    self._market_url, ping_interval=PING_INTERVAL, ping_timeout=10, proxy=_PROXY, max_queue=256,
+                ) as ws:
+                    self._market_connected = True
+                    delay = RECONNECT_BASE
+                    logger.info("[hub] 组合流已连接")
+                    await self._on_market_connected(ws)
+                    while not self._stopping:
+                        raw = await asyncio.wait_for(ws.recv(), timeout=NO_MSG_TIMEOUT)
+                        self._handle_market_frame(raw)
+            except asyncio.CancelledError:
+                raise
+            except asyncio.TimeoutError:
+                logger.warning(f"[hub] 组合流 {NO_MSG_TIMEOUT}s 无消息，断开重连")
+            except Exception as e:
+                logger.warning(f"[hub] 组合流断线: {e}")
+            finally:
+                self._on_market_disconnect()
+
+    async def _send_subscribe(self, ws, params: list, method: str = "SUBSCRIBE") -> None:
+        self._sub_id = getattr(self, "_sub_id", 0) + 1
+        await ws.send(json.dumps({"method": method, "params": params, "id": self._sub_id}))
+
+    async def _on_market_connected(self, ws) -> None:
+        await self._send_subscribe(ws, [TICKER_STREAM])
+
+
 def _fmt(v) -> str:
     return "n/a" if v is None else f"{v:.1f}"
 
@@ -282,3 +448,19 @@ def get_mark_price(symbol: str) -> Optional[dict]:
 
 def get_all_mark_prices() -> dict:
     return _default.get_all_mark_prices() if _default is not None else {}
+
+
+def is_ticker_ready() -> bool:
+    return _default is not None and _default.is_ticker_ready()
+
+
+def get_ticker(symbol: str) -> Optional[dict]:
+    return _default.get_ticker(symbol) if _default is not None else None
+
+
+def get_all_tickers() -> dict:
+    return _default.get_all_tickers() if _default is not None else {}
+
+
+def ticker_coverage() -> tuple:
+    return _default.ticker_coverage() if _default is not None else (0, 0)
