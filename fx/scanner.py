@@ -214,6 +214,21 @@ def _hub_subscribe_klines(symbols) -> None:
         logger.debug(f"[hub] K线订阅注入失败（忽略）: {e}")
 
 
+def _get_klines_hub_or_rest(symbol: str, interval: str, limit: int) -> list:
+    """K 线（直接 REST 语义）：hub 开启且该序列就绪时读 hub，None 则回落 api.get_klines（开关关闭时与原来完全一致）。
+    与 _get_klines_cached 的区别：不经过 kline_cache，回落时就是原来的单次 REST 调用。"""
+    if _hub_enabled():
+        try:
+            from shared import market_data_hub as _hub
+            _hd = _hub.get_klines(symbol, interval, limit)
+            if _hd:
+                logger.debug(f"[hub] {symbol} {interval} klines n={len(_hd)}（来自 WS 缓存）")
+                return _hd
+        except Exception as e:
+            logger.debug(f"[hub] K线读取失败，回落 REST: {e}")
+    return api.get_klines(symbol, interval, limit)
+
+
 def _get_ticker_24h_cached(max_age_sec: float) -> dict:
     """全市场 24h 行情 {symbol: ticker}：hub 开启、就绪且覆盖率足够时读 hub，否则回落 REST 缓存（开关关闭时与原来完全一致）。
     miniTicker@arr 只推有变化的标的，所以新鲜条目数低于「已见过条目数」的 TICKER_MIN_COVERAGE 时不采用 hub，避免市场情绪等全量统计的口径变化。"""
@@ -1509,17 +1524,17 @@ def maintain_pending_order(pos: dict, ticker: dict) -> str:
         return "cancel"
 
     try:
-        k1h = api.get_klines(symbol, "1h", 30)
-        k15 = api.get_klines(symbol, "15m", 20)
+        k1h = _get_klines_hub_or_rest(symbol, "1h", 30)
+        k15 = _get_klines_hub_or_rest(symbol, "15m", 20)
         if not k1h:
             return "keep"
 
-        mp      = api.get_mark_price(symbol)
+        mp      = _get_mark_price(symbol)
         funding = float(mp.get("lastFundingRate", 0))
 
         # 情况三：异常触发条件
         # 1. BTC 15分钟涨跌超过3%
-        btc_15 = api.get_klines("BTCUSDT", "15m", 3)
+        btc_15 = _get_klines_hub_or_rest("BTCUSDT", "15m", 3)
         if btc_15 and len(btc_15) >= 2:
             btc_move = abs(float(btc_15[-1][4]) - float(btc_15[-2][4])) / float(btc_15[-2][4]) * 100
             if btc_move > ORDER_CANCEL_BTC_MOVE_PCT:
