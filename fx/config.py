@@ -190,6 +190,10 @@ MIN_SIGNAL_SCORE_WEEKEND       = 70    # 周末最低信号分（已有逻辑，
 SCORE_BASE_STRONG              = 70
 SCORE_BASE_MEDIUM              = 50
 SCORE_BASE_WEAK                = 30    # weak 信号已在 judge 层过滤，不会到达 score 计算
+# 评分附加加分项（读 hub 的 K线/miniTicker；hub 未就绪时该项跳过，不加不减）
+SCORE_TAKER_BONUS              = True   # 近6根1h主动买入占比：顺向 +10 / 逆向 -5
+SCORE_RANGE_BONUS              = True   # 24h区间位置：顺向 +8 / 逆向 -5
+SCORE_VOLPRICE_BONUS           = True   # 放量(近4h/前20h>=1.6)且24h涨跌幅方向上有限：+8
 
 # CLASSIFY_BREAKOUT_VOL_RATIO = 1.5  # 已废弃：分类层不再校验量比，移至 judge_breakout
 

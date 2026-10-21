@@ -2695,6 +2695,8 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
             logger.debug(f"[scanner] {sig['symbol']} taker_buy_ratio={_tbr:.3f} taker_adj={taker_adj:+d}")
 
         new_score = min(100, max(0, base_score + btc_adj + cg_bonus + strategy_adj + post_shock_adj + atr_tier_adj + _pulse_penalty + taker_adj))
+        # 新增三个加分项（hub 数据；在现有评分之后叠加，总分上限 100）
+        new_score, _bonus_info = _apply_score_bonuses(sig["symbol"], direction, _sig_type, new_score)
         if new_score != base_score:
             logger.info(f"[scanner] {sig['symbol']} score {base_score}→{new_score} "
                         f"(btc={btc_adj:+d} cg={cg_bonus:+d} strat={strategy_adj:+d} shock={post_shock_adj:+d} tier={atr_tier_adj:+d} pulse={_pulse_penalty:+d} taker={taker_adj:+d})")
@@ -2706,6 +2708,9 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
         ind["post_shock_adj"] = post_shock_adj
         ind["atr_tier_adj"]   = atr_tier_adj
         ind["taker_adj"]      = taker_adj
+        ind["score_taker_bonus"]    = _bonus_info["taker"]
+        ind["score_range_bonus"]    = _bonus_info["range"]
+        ind["score_volprice_bonus"] = _bonus_info["volprice"]
 
     # ── 宏观保守模式：过滤 reversal/breakout，其余信号评分门槛+10 ────────────
     if _macro_conservative:
@@ -3182,6 +3187,123 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     except Exception as _st_e:
         logger.debug(f"[shadow] 扫描后处理记录失败: {_st_e}")
     return result
+
+# ── 评分附加加分项（hub 数据；hub 未就绪/数据不足时该项跳过，不加不减）──────────────
+# 在现有 score 全部算完之后叠加，每项独立 try，开关见 config.SCORE_TAKER_BONUS / SCORE_RANGE_BONUS / SCORE_VOLPRICE_BONUS
+_BONUS_TAKER_BARS = 6
+_BONUS_VOL_RECENT = 4
+_BONUS_VOL_BASE = 20
+_BONUS_VOL_RATIO_MIN = 1.6
+_BONUS_VOL_CHG_LIMIT = 3.0
+
+
+def _bonus_hub_klines(symbol: str, interval: str, limit: int):
+    """只读 hub（不回落 REST）：hub 关闭/未就绪/数据不足返回 None。"""
+    if not _hub_enabled():
+        return None
+    try:
+        from shared import market_data_hub as _hub
+        return _hub.get_klines(symbol, interval, limit) or None
+    except Exception:
+        return None
+
+
+def _bonus_hub_ticker(symbol: str):
+    if not _hub_enabled():
+        return None
+    try:
+        from shared import market_data_hub as _hub
+        return _hub.get_ticker(symbol) or None
+    except Exception:
+        return None
+
+
+def _calc_taker_bonus(direction: str, rows):
+    """近 6 根 1h：Σ主动买入量(V,idx9) / Σ总量(v,idx5)。返回 (加分|None, 占比|None)。"""
+    if not rows or len(rows) < _BONUS_TAKER_BARS:
+        return None, None
+    rows = rows[-_BONUS_TAKER_BARS:]
+    tot = sum(float(r[5]) for r in rows)
+    if tot <= 0:
+        return None, None
+    ratio = sum(float(r[9]) for r in rows) / tot
+    if direction == "LONG":
+        return (10 if ratio > 0.55 else -5 if ratio < 0.45 else 0), ratio
+    return (10 if ratio < 0.45 else -5 if ratio > 0.55 else 0), ratio
+
+
+def _calc_range_bonus(direction: str, tk):
+    """position=(last-low)/(high-low)，来自 miniTicker。返回 (加分|None, position|None)。"""
+    if not tk:
+        return None, None
+    h, l, c = float(tk["highPrice"]), float(tk["lowPrice"]), float(tk["lastPrice"])
+    if h <= l:
+        return None, None
+    pos = (c - l) / (h - l)
+    if direction == "LONG":
+        return (8 if pos >= 0.8 else -5 if pos <= 0.2 else 0), pos
+    return (8 if pos <= 0.2 else -5 if pos >= 0.8 else 0), pos
+
+
+def _calc_volprice_bonus(direction: str, rows, tk):
+    """近 4 根 1h 成交额(q,idx7)均值 / 前 20 根均值 = vol_ratio；放量且 24h 涨跌幅方向上有限 → +8。返回 (加分|None, vol_ratio|None)。"""
+    need = _BONUS_VOL_RECENT + _BONUS_VOL_BASE
+    if not rows or len(rows) < need or not tk:
+        return None, None
+    rows = rows[-need:]
+    base = sum(float(r[7]) for r in rows[:_BONUS_VOL_BASE]) / _BONUS_VOL_BASE
+    if base <= 0:
+        return None, None
+    ratio = (sum(float(r[7]) for r in rows[_BONUS_VOL_BASE:]) / _BONUS_VOL_RECENT) / base
+    chg = float(tk["priceChangePercent"])
+    if ratio >= _BONUS_VOL_RATIO_MIN:
+        if direction == "LONG" and chg < _BONUS_VOL_CHG_LIMIT:
+            return 8, ratio
+        if direction == "SHORT" and chg > -_BONUS_VOL_CHG_LIMIT:
+            return 8, ratio
+    return 0, ratio
+
+
+def _apply_score_bonuses(symbol: str, direction: str, sig_type: str, score: int):
+    """在现有 score 之上叠加三个加分项，总分截断到 [0,100]。返回 (new_score, info)；info 各项为 None 表示跳过。"""
+    info = {"taker": None, "taker_ratio": None, "range": None, "range_pos": None,
+            "volprice": None, "vol_ratio": None}
+    if sig_type == "funding_arb" or direction not in ("LONG", "SHORT"):
+        return score, info
+    try:
+        import config as _c
+    except Exception:
+        return score, info
+    if getattr(_c, "SCORE_TAKER_BONUS", False):
+        try:
+            info["taker"], info["taker_ratio"] = _calc_taker_bonus(
+                direction, _bonus_hub_klines(symbol, "1h", _BONUS_TAKER_BARS))
+        except Exception as e:
+            logger.debug(f"[score] {symbol} taker 加分失败（跳过）: {e}")
+    tk = None
+    if getattr(_c, "SCORE_RANGE_BONUS", False) or getattr(_c, "SCORE_VOLPRICE_BONUS", False):
+        tk = _bonus_hub_ticker(symbol)
+    if getattr(_c, "SCORE_RANGE_BONUS", False):
+        try:
+            info["range"], info["range_pos"] = _calc_range_bonus(direction, tk)
+        except Exception as e:
+            logger.debug(f"[score] {symbol} range 加分失败（跳过）: {e}")
+    if getattr(_c, "SCORE_VOLPRICE_BONUS", False):
+        try:
+            info["volprice"], info["vol_ratio"] = _calc_volprice_bonus(
+                direction, _bonus_hub_klines(symbol, "1h", _BONUS_VOL_RECENT + _BONUS_VOL_BASE), tk)
+        except Exception as e:
+            logger.debug(f"[score] {symbol} volprice 加分失败（跳过）: {e}")
+    adds = [info[k] for k in ("taker", "range", "volprice") if info[k] is not None]
+    new_score = min(100, max(0, score + sum(adds)))
+    if any(v is not None for v in (info["taker"], info["range"], info["volprice"])):
+        def f(v):
+            return "NA" if v is None else f"{v:+d}"
+        vr = "NA" if info["vol_ratio"] is None else f"{info['vol_ratio']:.1f}"
+        logger.info(f"[score] {symbol} taker={f(info['taker'])} range={f(info['range'])} "
+                    f"vol_ratio={vr}({f(info['volprice'])}) total={new_score}")
+    return new_score, info
+
 
 # ── OI 历史（1h 周期）进程内缓存 ───────────────────────────────────────────────
 # key=symbol，value=(data, fetch_ts)。OI 历史 1 小时一根，TTL 55 分钟内复用；重启清空，不持久化。
