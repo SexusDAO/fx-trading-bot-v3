@@ -105,26 +105,92 @@ def _kline_fetch(symbol: str, interval: str, limit: int) -> list:
             acc[1] += (time.perf_counter() - t0) * 1000.0
 
 
-def _kline_round_reset() -> dict | None:
-    """每轮扫描开始时清零汇总，并返回缓存统计快照（用于算本轮增量）。"""
+_KL_CACHE_STATS0: dict = {"hit": 0, "miss": 0, "expired": 0}
+
+
+def _kline_round_reset() -> None:
+    """每轮扫描开始时清零汇总，并记录缓存统计快照（用于算本轮增量）。"""
+    global _KL_CACHE_STATS0
     with _KL_ROUND_LOCK:
         _KL_ROUND["calls"] = 0
         _KL_ROUND["ms"] = 0.0
         _KL_ROUND["per_sym"] = {}
-    return None
+    cache = _KLINE_CACHE
+    _KL_CACHE_STATS0 = cache.stats() if cache is not None else {"hit": 0, "miss": 0, "expired": 0}
 
 
 def _kline_round_summary() -> list:
     """生成本轮 K 线请求汇总日志行（无请求时返回空列表）。"""
     with _KL_ROUND_LOCK:
         calls, ms, per = _KL_ROUND["calls"], _KL_ROUND["ms"], dict(_KL_ROUND["per_sym"])
-    if not calls:
-        return []
-    slow_sym, slow_ms = max(((k, v[1]) for k, v in per.items()), key=lambda x: x[1])
-    return [
-        f"[scanner] 本轮K线请求: 总次数={calls} 总耗时={ms / 1000:.1f}s "
-        f"平均每标的={ms / max(len(per), 1):.0f}ms 最慢标的={slow_sym}({slow_ms:.0f}ms)"
-    ]
+    lines = []
+    if calls:
+        slow_sym, slow_ms = max(((k, v[1]) for k, v in per.items()), key=lambda x: x[1])
+        lines.append(
+            f"[scanner] 本轮K线请求: 总次数={calls} 总耗时={ms / 1000:.1f}s "
+            f"平均每标的={ms / max(len(per), 1):.0f}ms 最慢标的={slow_sym}({slow_ms:.0f}ms)"
+        )
+    cache = _KLINE_CACHE
+    if cache is not None:
+        st = cache.stats()
+        d = {k: st[k] - _KL_CACHE_STATS0.get(k, 0) for k in ("hit", "miss", "expired")}
+        tot = d["hit"] + d["miss"] + d["expired"]
+        if tot:
+            lines.append(
+                f"[scanner] K线缓存: 命中={d['hit']} 未命中={d['miss']} 过期={d['expired']} "
+                f"命中率={d['hit'] / tot:.0%}"
+            )
+    return lines
+
+
+# ── [P1 阶段1+2] K 线 REST 缓存（按收盘时间失效）────────────────────────────────
+_KLINE_CACHE = None
+_KLINE_CACHE_FAILED = False
+
+
+def _get_kline_cache():
+    """惰性加载缓存模块；import/构造失败则记录一次 warning 并永久降级为直接 REST。"""
+    global _KLINE_CACHE, _KLINE_CACHE_FAILED
+    if _KLINE_CACHE is not None:
+        return _KLINE_CACHE
+    if _KLINE_CACHE_FAILED:
+        return None
+    try:
+        from shared.kline_cache import KlineCache
+        _KLINE_CACHE = KlineCache()
+    except Exception as e:
+        _KLINE_CACHE_FAILED = True
+        logger.warning(f"[scanner] K线缓存模块加载失败，降级为直接 REST: {e}")
+        return None
+    return _KLINE_CACHE
+
+
+def _get_klines_cached(symbol: str, interval: str, limit: int) -> list:
+    """优先读缓存（命中时只额外请求 1 根未收盘 K 线）；未命中/失效/未启用/模块不可用时走 REST 并写回。
+    返回值与 api.get_klines 格式一致。"""
+    try:
+        import config as _c
+        enabled = bool(getattr(_c, "KLINE_CACHE_ENABLED", True)) and \
+            interval in tuple(getattr(_c, "KLINE_CACHE_INTERVALS", ("1h", "4h", "15m")))
+    except Exception:
+        enabled = False
+    cache = _get_kline_cache() if enabled else None
+    if cache is None:
+        return _kline_fetch(symbol, interval, limit)
+    try:
+        data = cache.get(symbol, interval, limit, fetch_live=lambda: _kline_fetch(symbol, interval, 1))
+    except Exception as e:
+        logger.debug(f"[scanner] K线缓存读取异常（降级 REST）: {e}")
+        data = None
+    if data:
+        return data
+    data = _kline_fetch(symbol, interval, limit)
+    if data:
+        try:
+            cache.set(symbol, interval, data)
+        except Exception as e:
+            logger.debug(f"[scanner] K线缓存写入异常（忽略）: {e}")
+    return data
 
 
 def _calc_route_quality(route: str, reason: dict, ind: dict, direction: str) -> int:
@@ -872,8 +938,8 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
 
     try:
         # ── A. 拉取数据（4H 懒加载：pullback 不拉 4H，减少约 1/3 HTTP 请求）──
-        k15 = _kline_fetch(symbol, "15m", 100)
-        k1h = _kline_fetch(symbol, "1h",  100)
+        k15 = _get_klines_cached(symbol, "15m", 100)
+        k1h = _get_klines_cached(symbol, "1h",  100)
         if not k1h or len(k1h) < 25:
             return None
 
@@ -996,7 +1062,7 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
         for _route in _candidate_routes:
             # 按需补拉 4H（只拉一次，后续路径复用）
             if _route in _NEED_4H and not _4h_loaded:
-                k4h = _kline_fetch(symbol, "4h", 100)
+                k4h = _get_klines_cached(symbol, "4h", 100)
                 _4h_loaded = True
                 if k4h:
                     ind_4h = calc_indicators(k15, k1h, k4h)

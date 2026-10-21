@@ -297,6 +297,8 @@ SCAN_SYMBOL_TIMEOUT_SEC   = 10    # 单标的分析超时（秒），超时跳�
 SCAN_TOTAL_TIMEOUT_SEC    = 120   # 整轮扫描总超时（秒）；v3.26: 240→120，并发25线程理论8~12s
 SCAN_MAX_WORKERS          = 10    # 并行分析线程数；v3.82: 25→10，控制并发内存峰值（25线程×11MB=275MB峰值，pymalloc不归还导致水位积累至3.5GB）
 SCAN_KLINE_TIMING       = True  # 是否统计 K 线请求耗时（每轮 info 一条汇总），生产环境建议开启
+KLINE_CACHE_ENABLED     = True  # 是否启用 K 线 REST 缓存（按收盘时间失效；False 时每轮直接 REST）
+KLINE_CACHE_INTERVALS   = ["1h", "4h", "15m"]  # 缓存哪些周期
 ORDER_TIMEOUT_BREAKOUT    = 1800  # 秒  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 ORDER_TIMEOUT_NORMAL      = 14400 # 秒  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 
