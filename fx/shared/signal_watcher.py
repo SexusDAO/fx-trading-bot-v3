@@ -281,7 +281,7 @@ def compute_entry_range(
             try:
                 from config import SIGNAL_WATCH_ENTRY_BUFFER_ATR_REVERSAL as _BUF_REVERSAL_ATR
             except ImportError:
-                _BUF_REVERSAL_ATR = 0.5
+                _BUF_REVERSAL_ATR = 0.3   # 与 config.SIGNAL_WATCH_ENTRY_BUFFER_ATR_REVERSAL 保持一致
             atr_sig    = (signal.get("ind") or {}).get("atr_1h") or mark_price * 0.02
             half       = atr_sig * _BUF_REVERSAL_ATR
             low        = entry_price - half
