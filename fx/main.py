@@ -124,6 +124,7 @@ async def _loop_scan(interval: int = 300, signal_watcher=None, ws_listener=None)
     _hb_raw        = 0    # 计数：原始信号
     _hb_watched    = 0    # 计数：进入监控
     _hb_placed     = 0    # 计数：成交开仓
+    _scan_future   = None # 上一轮 run_in_executor 返回的 asyncio future（用于防重叠/防排队堆积）
     while True:
         try:
             from scanner import run_scan
@@ -134,13 +135,24 @@ async def _loop_scan(interval: int = 300, signal_watcher=None, ws_listener=None)
                 _hb_f.write_text(_hb_j.dumps({"ts": _hb_t.time()}))
             except Exception:
                 pass
+            # [fix] 上一轮线程还没结束（wait_for 超时只放弃等待，线程取消不了）→ 直接跳过本轮，
+            #   不再往只有 1 个 worker 的 _SCAN_POOL 里排队，避免僵尸线程结束后连续补跑过期的扫描
+            if _scan_future is not None and not _scan_future.done():
+                logger.warning("[scanner] 上一轮仍在运行，跳过本轮")
+                await asyncio.sleep(interval)
+                continue
             loop = asyncio.get_event_loop()
             # v3.33 复用共享线程池（替代每轮 with ThreadPoolExecutor）
             import functools
             _scan_fn = functools.partial(run_scan, signal_watcher=signal_watcher)
             future = loop.run_in_executor(_SCAN_POOL, _scan_fn)
+            _scan_future = future
+            # 取走（可能晚到的）异常，避免 "exception was never retrieved"
+            future.add_done_callback(lambda f: f.cancelled() or f.exception())
             try:
-                result = await asyncio.wait_for(future, timeout=300)
+                # shield：wait_for 超时会取消传入的 future，取消后 done() 为 True，会让上面的防重叠检查误判；
+                # 用 shield 保证超时只放弃等待，_scan_future 在线程真正结束前一直是未完成状态
+                result = await asyncio.wait_for(asyncio.shield(future), timeout=300)
                 placed = (result or {}).get("placed", 0)
                 # ── 心跳计数器更新 ────────────────────────────────────────────
                 _r = result or {}
@@ -159,7 +171,7 @@ async def _loop_scan(interval: int = 300, signal_watcher=None, ws_listener=None)
                     if pending:
                         logger.info(f"[main] SignalWatcher 监控中: {pending} 个信号 {signal_watcher.pending_symbols()}")
             except asyncio.TimeoutError:
-                logger.error("[main] task_scan 超时（300s），跳过本轮")
+                logger.error("[main] task_scan 超时（300s），跳过本轮（扫描线程仍在后台，结束前后续轮次会被跳过）")
             except Exception as e:
                 logger.error(f"[main] task_scan 子线程异常: {e}", exc_info=True)
         except Exception as e:
@@ -198,6 +210,31 @@ async def _loop_scan(interval: int = 300, signal_watcher=None, ws_listener=None)
             _hb_last_ts = _now_ts
             _hb_scans = _hb_raw = _hb_watched = _hb_placed = 0
         await asyncio.sleep(_eff_interval)
+
+
+def _classify_loop_latency(actual: float, warn: float = 0.5, err: float = 2.0):
+    """事件循环延迟分级：返回 None / "warn" / "error"。"""
+    if actual > err:
+        return "error"
+    if actual > warn:
+        return "warn"
+    return None
+
+
+async def _loop_event_latency_monitor(interval: float = 5.0, probe: float = 0.1) -> None:
+    """事件循环延迟监控：每 interval 秒 sleep(probe)，实际耗时远大于 probe 说明循环被阻塞
+    （GIL 竞争 / 同步调用占用事件循环线程），用来判断是否需要把扫描移到进程池。"""
+    import time as _t
+    while True:
+        await asyncio.sleep(interval)
+        t0 = _t.monotonic()
+        await asyncio.sleep(probe)
+        actual = _t.monotonic() - t0
+        lvl = _classify_loop_latency(actual)
+        if lvl == "error":
+            logger.error(f"[loop] 事件循环严重阻塞 {actual:.2f}s")
+        elif lvl == "warn":
+            logger.warning(f"[loop] 事件循环延迟 {actual:.2f}s")
 
 
 async def _loop_patrol(interval: int = 300, offset: int = 30) -> None:
@@ -640,9 +677,8 @@ async def main() -> None:
         # ── 基础支撑 ─────────────────────────────────────────────────────────────
         asyncio.create_task(_loop_refresh_pool(1800),                          name="refresh_pool"),
         asyncio.create_task(_loop_reset_circuit(),                             name="reset_circuit"),
+        asyncio.create_task(_loop_event_latency_monitor(),                     name="loop_latency"),
         asyncio.create_task(_loop_track_outcomes(3600),                        name="track_outcomes"),
-        # ── 临时诊断：内存追踪（30分钟一次） ─────────────────────────────────────
-        asyncio.create_task(_loop_mem_trace(1800),                             name="mem_trace"),
     ]
 
     # ── 5. 优雅退出 ─────────────────────────────────────────────────────────
