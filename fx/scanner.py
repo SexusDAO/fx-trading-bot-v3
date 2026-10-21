@@ -1104,7 +1104,7 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
         try:
             if _over_budget("OI 历史(6)"):
                 return None
-            _oi_hist = api.get_oi_history(symbol, period="1h", limit=6)
+            _oi_hist = _get_oi_history_cached(symbol, period="1h", limit=6)
             if _oi_hist and len(_oi_hist) >= 3:
                 _oi_vals = [float(h["sumOpenInterest"]) for h in _oi_hist]
                 _oi_first = _oi_vals[0]
@@ -1125,7 +1125,7 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
         try:
             if _over_budget("OI 历史(3)"):
                 return None
-            _oi_hist_3 = api.get_oi_history(symbol, period="1h", limit=3)
+            _oi_hist_3 = _get_oi_history_cached(symbol, period="1h", limit=3)
             if _oi_hist_3 and len(_oi_hist_3) >= 2:
                 _oi_1h_ago = float(_oi_hist_3[0].get("sumOpenInterest", 0))
         except Exception:
@@ -3183,7 +3183,47 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
         logger.debug(f"[shadow] 扫描后处理记录失败: {_st_e}")
     return result
 
+# ── OI 历史（1h 周期）进程内缓存 ───────────────────────────────────────────────
+# key=symbol，value=(data, fetch_ts)。OI 历史 1 小时一根，TTL 55 分钟内复用；重启清空，不持久化。
+# 只缓存非空结果（请求失败返回 [] 不写入，下次仍会重试）。limit=6 与 limit=3 共用同一份数据：
+# 未命中时统一拉 _OI_HIST_FETCH_LIMIT 根，limit=3 取最后 3 根（接口返回按时间升序，等价于直接请求 limit=3）。
+_OI_HIST_TTL_SEC = 55 * 60
+_OI_HIST_FETCH_LIMIT = 6
+_OI_HIST_CACHE_MAX = 2000
+_oi_history_cache: dict = {}
+_oi_history_lock = _threading.Lock()
+
+
+def _oi_hist_clock() -> float:
+    return time.time()
+
+
+def _get_oi_history_cached(symbol: str, period: str = "1h", limit: int = 6) -> list:
+    """api.get_oi_history 的缓存封装：命中直接返回，未命中才发 REST 并写入缓存。仅缓存 period=1h 且 limit<=6 的请求。"""
+    if period != "1h" or limit > _OI_HIST_FETCH_LIMIT:
+        return api.get_oi_history(symbol, period=period, limit=limit)
+    now = _oi_hist_clock()
+    with _oi_history_lock:
+        hit = _oi_history_cache.get(symbol)
+    if hit is not None and now - hit[1] < _OI_HIST_TTL_SEC and len(hit[0]) >= limit:
+        return hit[0][-limit:]
+    data = api.get_oi_history(symbol, period=period, limit=_OI_HIST_FETCH_LIMIT)
+    if data:
+        with _oi_history_lock:
+            if len(_oi_history_cache) >= _OI_HIST_CACHE_MAX:          # 防止无限增长：先清过期，仍满则清空
+                for k in [k for k, v in _oi_history_cache.items() if now - v[1] >= _OI_HIST_TTL_SEC]:
+                    del _oi_history_cache[k]
+                if len(_oi_history_cache) >= _OI_HIST_CACHE_MAX:
+                    _oi_history_cache.clear()
+            _oi_history_cache[symbol] = (data, now)
+        return data[-limit:]
+    return data
+
+
 # ── OI 缓存写入 ──────────────────────────────────────────────────────────────
+_OI_FLUSH_WORKERS = 10
+
+
 def _flush_oi_cache(symbols: list) -> None:
     """
     并发拉取 symbols 中每个标的的当前 OI，写入缓存。
@@ -3202,7 +3242,7 @@ def _flush_oi_cache(symbols: list) -> None:
         except Exception:
             pass
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as _oi_exe:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_OI_FLUSH_WORKERS) as _oi_exe:
         list(_oi_exe.map(_fetch_one, symbols))
 
     if oi_map:
