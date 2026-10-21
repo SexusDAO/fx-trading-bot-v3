@@ -26,6 +26,27 @@ import io
 import tracemalloc
 from pathlib import Path
 
+# ── 启动依赖检查 ─────────────────────────────────────────────────────────────
+def _check_dependencies():
+    """验证关键依赖包是否可用，缺失时立即报错退出。"""
+    required = [
+        ("python_socks", "python-socks[asyncio]"),
+        ("aiohttp", "aiohttp"),
+        ("websockets", "websockets"),
+    ]
+    missing = []
+    for module, pkg in required:
+        try:
+            __import__(module)
+        except ImportError:
+            missing.append(pkg)
+    if missing:
+        print(f"[FATAL] 缺少依赖包: {missing}")
+        print(f"请运行: pip install {' '.join(missing)}")
+        sys.exit(1)
+
+_check_dependencies()
+
 # ── 临时诊断（定位后删除）────────────────────────────────────────────────
 # 内存分配追踪：保留 10 帧调用栈，用于定位内存泄漏源头
 tracemalloc.start(10)
