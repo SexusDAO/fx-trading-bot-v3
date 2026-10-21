@@ -935,9 +935,8 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
     # v3.83 修复：原「方向粗筛」会在只允许单边时丢弃大涨/大跌标的，
     # 但大涨恰是 reversal SHORT、大跌恰是 reversal LONG 的触发条件，属于方向判断反了。
     # 方向约束已在 judge 通过后统一检查（见下方「方向约束检查」），此处不再预筛。
-    # v3.83 修复：原「熊市禁多」预筛直接 return None，会连带屏蔽该标的的
-    # oi_divergence / stop_hunt / range_bounce 等所有路径。改为只在 reversal LONG 判定后拒绝。
-    _bear_block_rev_long = (btc_trend == "down" and chg24_rough <= -8)
+    # [放宽] 已删除 reversal LONG 的熊市硬拒绝（BTC 下跌且 24H 跌幅>=8% 时直接判失败）：
+    #   逆势信号不再一刀切，交给评分系统与杠杆预算决定。
 
     # [fix] 单标的总时限：以 monotonic 计时，发起每个 HTTP 请求前检查
     #   （原先靠 as_completed 里对「已完成 future」调 result(timeout) 判断，永远不会触发）
@@ -1124,12 +1123,6 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
             else:  # pullback
                 _ok, _reason = judge_pullback(k1h, k4h, k15, ind, chg24, funding)
                 _dir = "LONG" if ind["ema_bull_1h"] else "SHORT"
-
-            # v3.83：熊市禁止 reversal LONG（由原预筛下沉到此，仅影响该路径）
-            if _ok and _route == "reversal" and _dir == "LONG" and _bear_block_rev_long:
-                _ok = False
-                _reason = dict(_reason) if isinstance(_reason, dict) else {}
-                _reason["reject_reason"] = "熊市禁止 reversal LONG（BTC 下跌且 24H 跌幅>=8%）"
 
             if not _ok:
                 # 写每条失败路径的拒绝记录（对照组分析用）
@@ -1770,8 +1763,12 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     # 问题一修复：_dyn_max_long/_dyn_max_short 先用静态默认值，
     # 等 BTC 趋势计算完成后再动态更新。避免 BTC 拉取失败时 NameError。
     import config as _cfg_early
-    _dyn_max_long  = _cfg_early.RISK_MAX_LONG
-    _dyn_max_short = _cfg_early.RISK_MAX_SHORT
+    # 「多空都满则跳过整轮」发生在市场模式确定之前：取各模式上限的最大值，只有在任何模式下都已满才跳过，
+    # 避免用牛市上限误判（模式确定后的精确上限见下方 _effective_max_long/_effective_max_short）
+    _dyn_max_long  = max(_cfg_early.MAX_POSITIONS_LONG_BULL, _cfg_early.MAX_POSITIONS_LONG_BEAR,
+                         _cfg_early.MAX_POSITIONS_LONG_RANGE)
+    _dyn_max_short = max(_cfg_early.MAX_POSITIONS_SHORT_BULL, _cfg_early.MAX_POSITIONS_SHORT_BEAR,
+                         _cfg_early.MAX_POSITIONS_SHORT_RANGE)
 
     positions = get_all_positions()
     # v3.53: 槽位只计 open（已成交持仓），pending 挂单不占槽位
