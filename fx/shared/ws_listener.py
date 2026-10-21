@@ -188,6 +188,14 @@ class WsOrderListener:
         """
         self._disconnect_callbacks.append(callback)
 
+    def get_channel_status(self) -> dict:
+        """返回三个 WS 通道的连接状态（供诊断快照使用）。"""
+        return {
+            "userData":   self._user_connected,
+            "forceOrder": self._force_order_task is not None and not self._force_order_task.done(),
+            "markPrice":  self._mark_price_task is not None and not self._mark_price_task.done(),
+        }
+
     def _mark_user_stream_down(self) -> None:
         """[v3.89 #3] userData 流不可用：置断线状态并启动（唯一的）补偿任务。"""
         self._user_connected = False

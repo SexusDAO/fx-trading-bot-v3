@@ -47,6 +47,7 @@ from config import (
     BREAKOUT_ORDER_EXPIRE_MIN,
     MIN_NOTIONAL_GUARD,
     DEFAULT_LEVERAGE,
+    ENABLE_USDC_PAIRS,
     FUNDING_ARB_MAX_HOLD_HOURS,
 )
 from shared import binance_api as api
@@ -399,8 +400,9 @@ def _validate_order_params(symbol: str, side: str, position_side: str,
 
     errors = []
 
-    # ① symbol 格式：必须以 USDT 或 USDC 结尾，且为大写
-    if not symbol or not (symbol.endswith("USDT") or symbol.endswith("USDC")) or symbol != symbol.upper():
+    # ① symbol 格式：必须以 USDT（或 USDC，取决于开关）结尾，且为大写
+    _suffixes = ("USDT", "USDC") if ENABLE_USDC_PAIRS else ("USDT",)
+    if not symbol or not symbol.endswith(_suffixes) or symbol != symbol.upper():
         errors.append(f"symbol 格式异常: {symbol!r}")
 
     # ② side 和 positionSide 方向一致性

@@ -1,336 +1,547 @@
 """
-archiver.py — 每日仓位数据归档到 Git
-触发点：position_manager._generate_daily_report() 末尾调用 archive_daily()
+archiver.py — 每日诊断快照生成
+触发点：
+  1. position_manager._generate_daily_report() 末尾调用 archive_daily()（每天 00:00 UTC）
+  2. main.py 收到 SIGUSR1 信号时调用 archive_daily(trigger="manual")
+  
+输出：精简版诊断快照 JSON（2-5KB），用于快速定位问题
 """
 from __future__ import annotations
 
+import gc
 import json
 import logging
+import re
 import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger("archiver")
 
-_REPO_ROOT = Path(__file__).parent.parent   # trading-bot-backup/
-_FX_ROOT   = Path(__file__).parent         # fx/
+_FX_ROOT = Path(__file__).parent
 
 
-def _bj_yesterday() -> str:
-    """返回北京时间昨天的日期字符串，格式 YYYY-MM-DD"""
-    now_bj = datetime.now(timezone.utc) + timedelta(hours=8)
-    return (now_bj - timedelta(days=1)).strftime("%Y-%m-%d")
-
-
-def _day_range_ms(date_str: str) -> tuple[int, int]:
-    """返回北京时间某天 00:00 ~ 23:59:59.999 对应的 UTC 毫秒时间戳"""
-    bj_tz   = timezone(timedelta(hours=8))
-    day     = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=bj_tz)
-    start   = int(day.timestamp() * 1000)
-    end     = start + 86400_000 - 1
-    return start, end
-
-
-def archive_daily(date_str: str | None = None) -> bool:
-    """
-    读 trade_log.jsonl + pos_state.json，生成日归档 JSON 并 git commit。
-    date_str: 指定日期（YYYY-MM-DD），默认为北京时间昨天。
-    返回 True 表示成功，False 表示失败（不抛异常）。
-    """
+def _get_bot_version() -> str:
+    """从 main.py 头部注释提取版本号"""
     try:
-        from config import ARCHIVE_ENABLED, ARCHIVE_GIT_PUSH, ARCHIVE_DIR
+        main_py = _FX_ROOT / "main.py"
+        if main_py.exists():
+            text = main_py.read_text(encoding="utf-8")
+            m = re.search(r"V(\d+\.\d+)", text)
+            if m:
+                return f"V{m.group(1)}"
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _get_git_commit() -> str:
+    """获取当前 HEAD commit 前 8 位"""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short=8", "HEAD"],
+            cwd=str(_FX_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _get_uptime_hours() -> float:
+    """从 /proc 计算 main.py 进程运行时长（小时）"""
+    try:
+        import os
+        pid_file = _FX_ROOT / "logs" / "main.pid"
+        if not pid_file.exists():
+            return 0.0
+        pid = int(pid_file.read_text().strip())
+        
+        # 读进程启动时间（clock ticks since boot）
+        stat_file = f"/proc/{pid}/stat"
+        with open(stat_file) as f:
+            fields = f.read().split(")")[-1].split()
+            starttime_ticks = int(fields[19])  # 22nd field
+        
+        # 读系统 uptime
+        with open("/proc/uptime") as f:
+            uptime_sec = float(f.read().split()[0])
+        
+        clk_tck = os.sysconf("SC_CLK_TCK")
+        proc_start_sec = starttime_ticks / clk_tck
+        proc_uptime_sec = uptime_sec - proc_start_sec
+        return round(proc_uptime_sec / 3600, 1)
+    except Exception:
+        return 0.0
+
+
+def _get_restart_info() -> tuple[int, str]:
+    """从 daemon.log 提取最近 24h 重启次数和最后一次重启原因"""
+    restart_count = 0
+    last_reason = "unknown"
+    try:
+        daemon_log = _FX_ROOT / "logs" / "daemon.log"
+        if not daemon_log.exists():
+            return 0, "unknown"
+        
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(hours=24)
+        
+        with open(daemon_log, encoding="utf-8") as f:
+            for line in f:
+                # 解析时间戳
+                m = re.match(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) UTC\]", line)
+                if not m:
+                    continue
+                ts_str = m.group(1)
+                ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                if ts < cutoff:
+                    continue
+                
+                # 统计重启
+                if "启动 main.py" in line:
+                    restart_count += 1
+                elif "内存" in line and "超过" in line:
+                    last_reason = "memory_guard"
+                elif "退出" in line and "重启" in line:
+                    last_reason = "crash_restart"
     except Exception as e:
-        logger.warning(f"[archiver] config import 失败: {e}")
-        return False
+        logger.warning(f"[archiver] 读 daemon.log 失败: {e}")
+    
+    return restart_count, last_reason
 
-    if not ARCHIVE_ENABLED:
-        return True
 
-    date_str = date_str or _bj_yesterday()
-    start_ms, end_ms = _day_range_ms(date_str)
-
-    # ── 1. 读平仓记录 ─────────────────────────────────────────────────────────
-    trade_log_path = _FX_ROOT / "logs" / "trade_log.jsonl"
-    trades = []
+def _get_ws_channel_status() -> dict:
+    """获取 WS 三通道状态"""
     try:
-        if trade_log_path.exists():
-            with open(trade_log_path, encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        r = json.loads(line)
-                    except Exception:
-                        continue
-                    # 筛选：北京时间昨天平仓（close_time 字段）
+        # 尝试从 ws_listener 实例获取
+        import sys
+        for obj in gc.get_objects():
+            if type(obj).__name__ == "WsOrderListener":
+                return obj.get_channel_status()
+    except Exception:
+        pass
+    
+    # fallback: 从 system.log 解析最近的连接状态
+    try:
+        system_log = _FX_ROOT / "logs" / "system.log"
+        if not system_log.exists():
+            return {"userData": False, "forceOrder": False, "markPrice": False}
+        
+        status = {"userData": False, "forceOrder": False, "markPrice": False}
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(minutes=10)
+        
+        with open(system_log, encoding="utf-8") as f:
+            for line in f:
+                m = re.match(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", line)
+                if not m:
+                    continue
+                ts_str = m.group(1)
+                ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                if ts < cutoff:
+                    continue
+                
+                if "userData 连接" in line or "userData 重连成功" in line:
+                    status["userData"] = True
+                elif "userData 异常" in line:
+                    status["userData"] = False
+                
+                if "forceOrder 连接" in line or "强平事件流已连接" in line:
+                    status["forceOrder"] = True
+                elif "forceOrder 异常" in line:
+                    status["forceOrder"] = False
+                
+                if "markPrice 连接" in line:
+                    status["markPrice"] = True
+                elif "markPrice 异常" in line:
+                    status["markPrice"] = False
+    except Exception as e:
+        logger.warning(f"[archiver] 读 system.log 失败: {e}")
+    
+    return status
+
+
+def _parse_scan_stats_24h() -> dict:
+    """从 system.log 解析最近 24h 的扫描统计"""
+    stats = {
+        "total_rounds": 0,
+        "raw_signals": 0,
+        "signals_entered_watch": 0,
+        "signals_triggered": 0,
+        "precheck_reject_reasons": {},
+        "score_distribution": {"below_40": 0, "40_to_48": 0, "48_to_50": 0, "above_50": 0},
+    }
+    
+    try:
+        system_log = _FX_ROOT / "logs" / "system.log"
+        if not system_log.exists():
+            return stats
+        
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(hours=24)
+        
+        with open(system_log, encoding="utf-8") as f:
+            for line in f:
+                m = re.match(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", line)
+                if not m:
+                    continue
+                ts_str = m.group(1)
+                ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                if ts < cutoff:
+                    continue
+                
+                # 扫描轮次
+                if "候选池刷新完成" in line:
+                    stats["total_rounds"] += 1
+                
+                # 原始信号数（从心跳日志提取）
+                m_raw = re.search(r"原始信号(\d+)个", line)
+                if m_raw:
+                    stats["raw_signals"] += int(m_raw.group(1))
+                
+                # 进入监控数
+                m_watch = re.search(r"进入监控(\d+)个", line)
+                if m_watch:
+                    stats["signals_entered_watch"] += int(m_watch.group(1))
+                
+                # 触发挂单数
+                m_triggered = re.search(r"成交(\d+)笔", line)
+                if m_triggered:
+                    stats["signals_triggered"] += int(m_triggered.group(1))
+                
+                # 预检拒绝原因
+                if "JUDGE_REJECT" in line:
+                    # 提取拒绝原因
+                    m_reason = re.search(r"JUDGE_REJECT\].*?:\s*(.+)$", line)
+                    if m_reason:
+                        reason = m_reason.group(1).strip()
+                        # 简化原因分类
+                        if "流动性" in reason or "liquidity" in reason.lower():
+                            key = "流动性不足"
+                        elif "已有持仓" in reason or "already" in reason.lower():
+                            key = "已有持仓"
+                        elif "熔断" in reason or "circuit" in reason.lower():
+                            key = "熔断中"
+                        elif "波动率" in reason or "ATR" in reason:
+                            key = "波动率不符"
+                        elif "EMA" in reason or "趋势" in reason or "空头结构" in reason or "多头排列" in reason or "下跌通道" in reason:
+                            key = "趋势不符"
+                        elif "量能" in reason or "vol_ratio" in reason or "放量" in reason:
+                            key = "量能不足"
+                        elif "方向不明确" in reason:
+                            key = "方向不明"
+                        elif "脉冲" in reason or "大阳" in reason:
+                            key = "脉冲保护"
+                        elif "未找到" in reason or "无有效" in reason:
+                            key = "无止跌/止涨信号"
+                        elif "不在回踩区间" in reason or "价格" in reason:
+                            key = "价格位置不符"
+                        elif "RSI" in reason or "超卖" in reason or "超买" in reason:
+                            key = "RSI异常"
+                        else:
+                            key = "其他"
+                        stats["precheck_reject_reasons"][key] = stats["precheck_reject_reasons"].get(key, 0) + 1
+                
+                # 评分分布（从 final_score 提取）
+                m_score = re.search(r"final_score[=:]?\s*(\d+)", line)
+                if m_score:
+                    score = int(m_score.group(1))
+                    if score < 40:
+                        stats["score_distribution"]["below_40"] += 1
+                    elif score < 48:
+                        stats["score_distribution"]["40_to_48"] += 1
+                    elif score < 50:
+                        stats["score_distribution"]["48_to_50"] += 1
+                    else:
+                        stats["score_distribution"]["above_50"] += 1
+    except Exception as e:
+        logger.warning(f"[archiver] 解析扫描统计失败: {e}")
+    
+    return stats
+
+
+def _parse_error_summary_24h() -> dict:
+    """从 system.log 解析最近 24h 的错误摘要"""
+    error_counts: dict[str, dict] = {}
+    ws_disconnect = 0
+    api_401 = 0
+    api_timeout = 0
+    
+    try:
+        system_log = _FX_ROOT / "logs" / "system.log"
+        if not system_log.exists():
+            return {"top_errors": [], "ws_disconnect_count": 0, "api_401_count": 0, "api_timeout_count": 0}
+        
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(hours=24)
+        
+        with open(system_log, encoding="utf-8") as f:
+            for line in f:
+                m = re.match(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", line)
+                if not m:
+                    continue
+                ts_str = m.group(1)
+                ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                if ts < cutoff:
+                    continue
+                
+                if "ERROR" in line or "WARNING" in line:
+                    # WS 断连
+                    if "异常" in line and ("后重连" in line or "重连" in line):
+                        ws_disconnect += 1
+                    
+                    # API 401
+                    if "401" in line or "Invalid API-key" in line:
+                        api_401 += 1
+                    
+                    # API timeout
+                    if "timeout" in line.lower() or "超时" in line:
+                        api_timeout += 1
+                    
+                    # 提取错误摘要
+                    m_err = re.search(r"(?:ERROR|WARNING)\s+\S+\s+(.+)$", line)
+                    if m_err:
+                        err_msg = m_err.group(1).strip()
+                        # 截断过长的错误信息
+                        if len(err_msg) > 100:
+                            err_msg = err_msg[:100] + "..."
+                        
+                        if err_msg not in error_counts:
+                            error_counts[err_msg] = {"count": 0, "last_seen": ts_str}
+                        error_counts[err_msg]["count"] += 1
+                        error_counts[err_msg]["last_seen"] = ts_str
+    except Exception as e:
+        logger.warning(f"[archiver] 解析错误摘要失败: {e}")
+    
+    # 取 top 5
+    top_errors = sorted(error_counts.items(), key=lambda x: x[1]["count"], reverse=True)[:5]
+    top_errors_list = [
+        {"message": msg, "count": data["count"], "last_seen": data["last_seen"]}
+        for msg, data in top_errors
+    ]
+    
+    return {
+        "top_errors": top_errors_list,
+        "ws_disconnect_count": ws_disconnect,
+        "api_401_count": api_401,
+        "api_timeout_count": api_timeout,
+    }
+
+
+def _get_key_config() -> dict:
+    """读取关键配置开关"""
+    try:
+        from config import (
+            OPT_OID_REJECT_ALL_BULL,
+            STOP_HUNT_ENABLED,
+            ENABLE_USDC_PAIRS,
+            OPT_LIQ_RELATIVE_STRENGTH,
+            LIQUIDITY_GATE_MIN_U,
+        )
+        # 尝试读取 SCORE_THRESHOLD（可能不存在）
+        try:
+            from config import SCORE_THRESHOLD
+        except ImportError:
+            SCORE_THRESHOLD = 50  # 默认值
+        
+        return {
+            "OPT_OID_REJECT_ALL_BULL": OPT_OID_REJECT_ALL_BULL,
+            "STOP_HUNT_ENABLED": STOP_HUNT_ENABLED,
+            "ENABLE_USDC_PAIRS": ENABLE_USDC_PAIRS,
+            "OPT_LIQ_RELATIVE_STRENGTH": OPT_LIQ_RELATIVE_STRENGTH,
+            "LIQUIDITY_GATE_MIN_U": LIQUIDITY_GATE_MIN_U,
+            "SCORE_THRESHOLD": SCORE_THRESHOLD,
+        }
+    except Exception as e:
+        logger.warning(f"[archiver] 读取配置失败: {e}")
+        return {}
+
+
+def _get_trade_summary(date_str: str) -> dict:
+    """从 trade_log.jsonl 提取指定日期的交易摘要"""
+    try:
+        trade_log_path = _FX_ROOT / "logs" / "trade_log.jsonl"
+        if not trade_log_path.exists():
+            return {"total_trades": 0, "win": 0, "loss": 0, "win_rate": 0.0, "total_pnl_usdt": 0.0, "by_mode": {}}
+        
+        # 计算日期范围（北京时间）
+        bj_tz = timezone(timedelta(hours=8))
+        day = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=bj_tz)
+        start_ms = int(day.timestamp() * 1000)
+        end_ms = start_ms + 86400_000 - 1
+        
+        trades = []
+        with open(trade_log_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    r = json.loads(line)
                     ct = r.get("close_time", 0)
                     if start_ms <= ct <= end_ms:
                         trades.append(r)
+                except Exception:
+                    continue
+        
+        total = len(trades)
+        wins = [t for t in trades if (t.get("pnl_usdt") or 0) > 0]
+        losses = [t for t in trades if (t.get("pnl_usdt") or 0) <= 0]
+        total_pnl = sum(t.get("pnl_usdt", 0) for t in trades)
+        win_rate = len(wins) / total if total else 0.0
+        
+        by_mode: dict = {}
+        for t in trades:
+            m = t.get("mode") or t.get("sig_type") or "unknown"
+            pnl = t.get("pnl_usdt", 0) or 0
+            if m not in by_mode:
+                by_mode[m] = {"count": 0, "win": 0, "pnl": 0.0}
+            by_mode[m]["count"] += 1
+            by_mode[m]["pnl"] += pnl
+            if pnl > 0:
+                by_mode[m]["win"] += 1
+        
+        for d in by_mode.values():
+            d["pnl"] = round(d["pnl"], 2)
+        
+        return {
+            "total_trades": total,
+            "win": len(wins),
+            "loss": len(losses),
+            "win_rate": round(win_rate, 4),
+            "total_pnl_usdt": round(total_pnl, 2),
+            "by_mode": by_mode,
+        }
     except Exception as e:
-        logger.error(f"[archiver] 读 trade_log 失败: {e}")
-        return False
+        logger.warning(f"[archiver] 交易摘要计算失败: {e}")
+        return {"total_trades": 0, "win": 0, "loss": 0, "win_rate": 0.0, "total_pnl_usdt": 0.0, "by_mode": {}}
 
-    # ── 2. 当前持仓快照 ───────────────────────────────────────────────────────
-    open_snapshot = []
+
+def _get_open_positions() -> list:
+    """获取当前持仓快照（精简版）"""
+    positions = []
     try:
         from shared.state import get_all_positions
         all_pos = get_all_positions()
+        now_ms = datetime.now(timezone.utc).timestamp() * 1000
+        
         for p in all_pos:
-            if p.get("status") == "open":
-                open_snapshot.append({
-                    "symbol":                p.get("symbol"),
-                    "direction":             p.get("direction"),
-                    "mode":                  p.get("mode"),
-                    "sig_type":              p.get("sig_type"),
-                    "entry_price":           p.get("entry_price"),
-                    "current_sl":            p.get("sl_price"),
-                    "tp1_price":             p.get("tp1_price"),
-                    "tp2_price":             p.get("tp2_price"),
-                    "quantity":              p.get("quantity"),
-                    "leverage":              p.get("leverage"),
-                    "open_time":             p.get("open_time"),
-                    "holding_minutes":       round(
-                        (datetime.now(timezone.utc).timestamp() * 1000 - (p.get("open_time") or 0)) / 60000, 1
-                    ),
-                    "signal_strength":       p.get("signal_strength"),
-                    "tp1_filled":            p.get("tp1_filled", False),
-                    "trailing_stop_activated": p.get("trailing_stop_activated", False),
-                    "atr_at_entry":          p.get("atr_at_entry"),
-                })
+            if p.get("status") != "open":
+                continue
+            
+            entry_price = p.get("entry_price", 0)
+            current_price = p.get("current_price") or p.get("mark_price") or entry_price
+            direction = (p.get("direction") or "long").upper()
+            
+            # 计算浮盈
+            unrealized_pnl = 0.0
+            if entry_price and current_price:
+                if direction == "LONG":
+                    unrealized_pnl = (current_price - entry_price) / entry_price * 100
+                else:
+                    unrealized_pnl = (entry_price - current_price) / entry_price * 100
+            
+            # 计算持仓时长
+            open_time = p.get("open_time", 0)
+            holding_hours = round((now_ms - open_time) / 3600000, 1) if open_time else 0.0
+            
+            positions.append({
+                "symbol": p.get("symbol"),
+                "direction": direction,
+                "mode": p.get("mode"),
+                "entry_price": entry_price,
+                "sl_price": p.get("sl_price"),
+                "current_price": current_price,
+                "unrealized_pnl_usdt": round(unrealized_pnl, 2),
+                "holding_hours": holding_hours,
+                "tp1_filled": p.get("tp1_filled", False),
+            })
     except Exception as e:
         logger.warning(f"[archiver] 读持仓快照失败: {e}")
+    
+    return positions
 
-    # ── 3. 计算 summary ───────────────────────────────────────────────────────
-    total   = len(trades)
-    wins    = [t for t in trades if (t.get("pnl_usdt") or 0) > 0]
-    losses  = [t for t in trades if (t.get("pnl_usdt") or 0) <= 0]
-    total_pnl = sum(t.get("pnl_usdt", 0) for t in trades)
-    win_rate  = len(wins) / total if total else 0.0
 
-    by_mode: dict = {}
-    by_strength: dict = {}
-    for t in trades:
-        m  = t.get("mode") or t.get("sig_type") or "unknown"
-        s  = t.get("signal_strength") or "unknown"
-        pnl = t.get("pnl_usdt", 0) or 0
-        is_win = pnl > 0
-
-        if m not in by_mode:
-            by_mode[m] = {"count": 0, "win": 0, "pnl": 0.0}
-        by_mode[m]["count"] += 1
-        by_mode[m]["pnl"]   += pnl
-        if is_win:
-            by_mode[m]["win"] += 1
-
-        if s not in by_strength:
-            by_strength[s] = {"count": 0, "win": 0, "pnl": 0.0}
-        by_strength[s]["count"] += 1
-        by_strength[s]["pnl"]   += pnl
-        if is_win:
-            by_strength[s]["win"] += 1
-
-    # 给 pnl 保留2位小数
-    for d in list(by_mode.values()) + list(by_strength.values()):
-        d["pnl"] = round(d["pnl"], 2)
-
-    # ── 4. 格式化 trades 字段 ──────────────────────────────────────────────────
-    trade_records = []
-    for t in trades:
-        ot = t.get("open_time") or 0
-        ct = t.get("close_time") or 0
-        hold_min = round((ct - ot) / 60000, 1) if ot and ct else None
-        trade_records.append({
-            "trade_id":          t.get("trade_id") or t.get("pos_id"),
-            "symbol":            t.get("symbol"),
-            "direction":         t.get("direction"),
-            "mode":              t.get("mode") or t.get("sig_type"),
-            "signal_strength":   t.get("signal_strength"),
-            "volatility_tier":   t.get("volatility_tier"),
-            "entry_price":       t.get("entry_price") or t.get("fill_price"),
-            "exit_price":        t.get("exit_price"),
-            "sl_price":          t.get("sl_price"),
-            "tp1_price":         t.get("tp1_price"),
-            "tp2_price":         t.get("tp2_price"),
-            "sl_dist_pct":       t.get("sl_dist_pct"),
-            "rr_tp1":            t.get("rr_tp1"),
-            "quantity":          t.get("quantity") or t.get("fill_qty"),
-            "leverage":          t.get("leverage"),
-            "pnl_usdt":          round(t.get("pnl_usdt", 0) or 0, 4),
-            "pnl_pct":           round(t.get("pnl_pct", 0) or 0, 4),
-            "holding_minutes":   hold_min,
-            "open_time":         ot,
-            "close_time":        ct,
-            "close_reason":      t.get("close_reason") or t.get("exit_reason"),
-            "tp1_filled":        t.get("tp1_filled"),
-            "tp2_filled":        t.get("tp2_filled"),
-            "sl_degraded":       t.get("sl_degraded"),
-            "liq_data_available": t.get("liq_data_available"),
-            "vol_ratio_at_entry": t.get("vol_ratio_at_entry") or (
-                (t.get("judge_detail") or {}).get("vol_ratio")
-            ),
-            "momentum_coeff":    t.get("momentum_coeff"),
-            "consistency_score": t.get("consistency_score"),
-            "judge_detail":      t.get("judge_detail"),
-            # ── v3.66 复盘字段：清算区降级信息 ──────────────────────────────
-            "liq_entry_raw":        t.get("liq_entry_raw"),
-            "liq_entry_dist_atr":  t.get("liq_entry_dist_atr"),
-            "entry_degraded_reason": t.get("entry_degraded_reason"),
-        })
-
-    # ── 4b. 资金费率成本汇总（从 pos_state 里的 funding_cost_total 读取）─────────
-    funding_summary: dict = {}
+def archive_daily(date_str: str | None = None, trigger: str = "scheduled") -> bool:
+    """
+    生成精简版诊断快照 JSON。
+    date_str: 指定日期（YYYY-MM-DD），默认为北京时间昨天。
+    trigger: "scheduled"（定时）或 "manual"（手动）。
+    返回 True 表示成功，False 表示失败。
+    """
     try:
-        from shared.state import get_all_positions as _gp
-        _all_pos = _gp()
-        _total_paid = 0.0
-        _total_received = 0.0
-        _by_position = []
-        for _p in _all_pos:
-            _fc = float(_p.get("funding_cost_total", 0) or 0)
-            if _fc == 0:
-                continue
-            _dir = (_p.get("direction") or "long").upper()
-            if _fc < 0:
-                _total_paid += _fc
-            else:
-                _total_received += _fc
-            _by_position.append({
-                "symbol":    _p.get("symbol"),
-                "direction": _dir,
-                "funding_cost": round(_fc, 4),
-            })
-        try:
-            from shared.binance_api import get_account as _ga
-            _acc = _ga()
-            _eq = float(_acc.get("totalMarginBalance", 0) or 0)
-        except Exception:
-            _eq = 0.0
-        _net = round(_total_paid + _total_received, 4)
-        funding_summary = {
-            "total_paid":          round(_total_paid, 4),
-            "total_received":      round(_total_received, 4),
-            "net_cost":            _net,
-            "net_cost_pct_of_equity": round(_net / (_eq + 1e-9) * 100, 4) if _eq > 0 else None,
-            "by_position":         _by_position,
-        }
-    except Exception as _fe:
-        logger.warning(f"[archiver] funding_summary 计算失败（非致命）: {_fe}")
-
-    # ── 4c. 滑点汇总（从 trade_records 里聚合）──────────────────────────────────
-    slippage_summary: dict = {}
-    try:
-        _entry_slips = [
-            float(t.get("entry_slippage_pct") or 0)
-            for t in trade_records if t.get("entry_slippage_pct") is not None
-        ]
-        _sl_slips = [
-            abs(float(t.get("sl_slippage_pct") or 0))
-            for t in trade_records if t.get("sl_slippage_pct") is not None
-        ]
-        _tp_slips = [
-            abs(float(t.get("tp_slippage_pct") or 0))
-            for t in trade_records if t.get("tp_slippage_pct") is not None
-        ]
-        _total_slip_u = sum(float(t.get("entry_slippage_u") or 0) for t in trade_records)
-        slippage_summary = {
-            "avg_entry_slippage_pct": round(sum(_entry_slips) / len(_entry_slips), 4) if _entry_slips else None,
-            "avg_sl_slippage_pct":    round(sum(_sl_slips) / len(_sl_slips), 4) if _sl_slips else None,
-            "max_sl_slippage_pct":    round(max(_sl_slips), 4) if _sl_slips else None,
-            "avg_tp_slippage_pct":    round(sum(_tp_slips) / len(_tp_slips), 4) if _tp_slips else None,
-            "total_slippage_cost_u":  round(_total_slip_u, 4),
-        }
-    except Exception as _se:
-        logger.warning(f"[archiver] slippage_summary 计算失败（非致命）: {_se}")
-
-    # ── 5. 组装输出 ───────────────────────────────────────────────────────────
-    archive_obj = {
-        "date":         date_str,
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "summary": {
-            "total_trades":  total,
-            "win":           len(wins),
-            "loss":          len(losses),
-            "win_rate":      round(win_rate, 4),
-            "total_pnl_usdt": round(total_pnl, 2),
-            "by_mode":        by_mode,
-            "by_signal_strength": by_strength,
+        from config import ARCHIVE_DIR
+    except Exception as e:
+        logger.warning(f"[archiver] config import 失败: {e}")
+        return False
+    
+    # 默认日期：北京时间昨天
+    if not date_str:
+        now_bj = datetime.now(timezone.utc) + timedelta(hours=8)
+        date_str = (now_bj - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    logger.info(f"[archiver] 开始生成诊断快照，日期={date_str}, trigger={trigger}")
+    
+    # 组装快照
+    snapshot = {
+        "meta": {
+            "date": date_str,
+            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "trigger": trigger,
+            "bot_version": _get_bot_version(),
+            "git_commit": _get_git_commit(),
+            "uptime_hours": _get_uptime_hours(),
         },
-        "funding_summary":         funding_summary,
-        "slippage_summary":        slippage_summary,
-        "trades":                  trade_records,
-        "open_positions_snapshot": open_snapshot,
+        "process_health": {
+            "ws_channels": _get_ws_channel_status(),
+            "restart_count_24h": _get_restart_info()[0],
+            "last_restart_reason": _get_restart_info()[1],
+        },
+        "scan_stats_24h": _parse_scan_stats_24h(),
+        "trade_summary": _get_trade_summary(date_str),
+        "open_positions": _get_open_positions(),
+        "error_summary_24h": _parse_error_summary_24h(),
+        "key_config": _get_key_config(),
     }
-
-    # ── 6. 写文件 ─────────────────────────────────────────────────────────────
-    ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = ARCHIVE_DIR / f"{date_str}.json"
+    
+    # 写文件
     try:
+        ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+        out_path = ARCHIVE_DIR / f"{date_str}.json"
         out_path.write_text(
-            json.dumps(archive_obj, ensure_ascii=False, indent=2),
+            json.dumps(snapshot, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        logger.info(f"[archiver] 写入 {out_path}")
+        logger.info(f"[archiver] 快照已写入 {out_path}")
     except Exception as e:
         logger.error(f"[archiver] 写文件失败: {e}")
         return False
-
-    # ── 7. git commit ─────────────────────────────────────────────────────────
-    rel_path = out_path.relative_to(_REPO_ROOT)
-    commit_msg = (
-        f"archive: {date_str} 交易记录 {total}笔 "
-        f"PnL{'+' if total_pnl >= 0 else ''}{total_pnl:.1f}U"
-    )
+    
+    # 推送通知
     try:
-        subprocess.run(
-            ["git", "add", str(rel_path)],
-            cwd=str(_REPO_ROOT), check=True, capture_output=True
+        from shared.notifier import notify
+        total_trades = snapshot["trade_summary"]["total_trades"]
+        total_rounds = snapshot["scan_stats_24h"]["total_rounds"]
+        raw_signals = snapshot["scan_stats_24h"]["raw_signals"]
+        error_count = len(snapshot["error_summary_24h"]["top_errors"])
+        
+        msg = (
+            f"📸 诊断快照已生成 {date_str}\n"
+            f"扫描{total_rounds}轮 / 信号{raw_signals}个 / "
+            f"交易{total_trades}笔 / 错误{error_count}条"
         )
-        subprocess.run(
-            ["git", "commit", "-m", commit_msg],
-            cwd=str(_REPO_ROOT), check=True, capture_output=True
-        )
-        logger.info(f"[archiver] git commit: {commit_msg}")
-    except subprocess.CalledProcessError as e:
-        logger.warning(f"[archiver] git commit 失败（已有 nothing to commit 或其他）: {e.stderr.decode()[:200]}")
-        # commit 失败不影响整体流程
-
-    # ── 8. git push（可选） ───────────────────────────────────────────────────
-    if ARCHIVE_GIT_PUSH:
-        try:
-            result = subprocess.run(
-                ["git", "push"],
-                cwd=str(_REPO_ROOT), capture_output=True, timeout=30
-            )
-            if result.returncode == 0:
-                logger.info("[archiver] git push 成功")
-            else:
-                logger.warning(f"[archiver] git push 失败（非致命）: {result.stderr.decode()[:200]}")
-        except Exception as e:
-            logger.warning(f"[archiver] git push 异常（非致命）: {e}")
-
-    # ── 8b. 全市场资金费率情绪快照（归档记录）──────────────────────────────────
-    market_sentiment_snap: dict = {}
-    try:
-        from shared.clawby_adapter import get_market_funding_sentiment as _gfs2
-        market_sentiment_snap = _gfs2()
-        if "error" in market_sentiment_snap:
-            market_sentiment_snap = {}
-    except Exception as _mse:
-        logger.debug(f"[archiver] market_sentiment 快照失败（非致命）: {_mse}")
-
-    # 追加到 archive_obj
-    if market_sentiment_snap:
-        try:
-            import json as _j2
-            if out_path.exists():
-                _obj2 = _j2.loads(out_path.read_text())
-                _obj2["market_sentiment"] = market_sentiment_snap
-                out_path.write_text(_j2.dumps(_obj2, ensure_ascii=False, indent=2), encoding="utf-8")
-        except Exception:
-            pass
-
-    # ── 9. 触发 AI 参数顾问分析（异步，不阻塞日报主流程）─────────────────────
+        notify(msg)
+        logger.info(f"[archiver] 通知已发送: {msg}")
+    except Exception as e:
+        logger.warning(f"[archiver] 通知发送失败（非致命）: {e}")
+    
+    # 触发 AI 参数顾问（异步，不阻塞）
     try:
         from ai_advisor import analyze as _ai_analyze
         import threading
@@ -344,50 +555,5 @@ def archive_daily(date_str: str | None = None) -> bool:
         logger.info("[archiver] AI 参数顾问已在后台启动")
     except Exception as e:
         logger.warning(f"[archiver] AI 参数顾问启动失败（非致命）: {e}")
-
-    # ── 9b. 组合 Beta/Delta 快照（写入已保存的 archive_obj 文件追加字段）─────────
-    try:
-        from tools.portfolio_risk import calc_portfolio_risk as _pf_risk
-        from shared.notifier import notify as _notify_fn
-        _pr = _pf_risk()
-        if "error" not in _pr:
-            # 读回 archive 文件，追加 portfolio_risk 字段后重写
-            _ap = out_path
-            if _ap.exists():
-                import json as _j
-                _obj = _j.loads(_ap.read_text())
-                _obj["portfolio_risk"] = _pr
-                _ap.write_text(_j.dumps(_obj, ensure_ascii=False, indent=2), encoding="utf-8")
-            # 告警检查
-            from config import PORTFOLIO_BETA_WARN_THRESH, PORTFOLIO_SINGLE_POS_MAX_PCT
-            _beta = _pr.get("portfolio_beta", 0.0)
-            _mx   = _pr.get("max_single_position_pct", 0.0)
-            _drop = _pr.get("btc_10pct_drop_loss_pct", 0.0)
-            if abs(_beta) >= PORTFOLIO_BETA_WARN_THRESH:
-                _notify_fn(f"⚠️ 组合 Beta={_beta:.2f}，BTC 跌10%预估亏损 {abs(_drop):.1f}%")
-            if _mx >= PORTFOLIO_SINGLE_POS_MAX_PCT * 100:
-                _notify_fn(f"⚠️ 单仓集中度过高：最大单仓占比 {_mx:.1f}%")
-            logger.info(f"[archiver] portfolio_risk 已写入 Beta={_beta:.2f}")
-    except Exception as e:
-        logger.warning(f"[archiver] portfolio_risk 写入失败（非致命）: {e}")
-
-    # ── 10. 事后追踪 + 参数敏感性分析（Signal Analytics，v3.28 新增）──────────────────
-    try:
-        from tools.track_outcomes import run as _track_outcomes
-        _to_stats = _track_outcomes()
-        logger.info(f"[archiver] track_outcomes: {_to_stats}")
-    except Exception as e:
-        logger.warning(f"[archiver] track_outcomes 失败（非致命）: {e}")
-
-    try:
-        from tools.param_sensitivity import daily_report as _param_report
-        _report_text = _param_report(days=14)
-        if _report_text and "数据不足" not in _report_text and "暂不生成" not in _report_text:
-            logger.info("[archiver] 参数敏感性报告已生成")
-            # 将报告附加到日报文件（若存在）
-            _rpt_file = ROOT / "logs" / f"param_sensitivity_{date_str}.txt"
-            _rpt_file.write_text(_report_text, encoding="utf-8")
-    except Exception as e:
-        logger.warning(f"[archiver] param_sensitivity 失败（非致命）: {e}")
-
+    
     return True

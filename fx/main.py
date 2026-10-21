@@ -607,6 +607,23 @@ async def main() -> None:
             # Windows 不支持 add_signal_handler
             pass
 
+    # SIGUSR1: 手动触发诊断快照
+    def _handle_sigusr1():
+        logger.info("[main] 收到 SIGUSR1，手动触发诊断快照...")
+        import threading
+        def _gen_snapshot():
+            try:
+                from archiver import archive_daily
+                archive_daily(trigger="manual")
+            except Exception as e:
+                logger.error(f"[main] SIGUSR1 快照生成失败: {e}")
+        threading.Thread(target=_gen_snapshot, daemon=True, name="sigusr1_snapshot").start()
+
+    try:
+        loop.add_signal_handler(signal.SIGUSR1, _handle_sigusr1)
+    except (NotImplementedError, AttributeError):
+        pass  # Windows 不支持
+
     # 捕获所有未处理的协程异常，防止 loop 意外退出
     def _handle_task_exception(loop, context):
         msg = context.get("exception", context["message"])
