@@ -716,6 +716,23 @@ def _is_stop_hunt(k1h: list, k15: list, ind: dict) -> bool:
     return False
 
 
+def _is_ema_trend_coarse(ind: dict, chg24: float) -> bool:
+    """
+    EMA 趋势策略粗筛（不依赖4H数据）。
+    只检查不需要4H K线的条件，满足才加入候选路由，
+    触发4H懒加载后由 _is_ema_trend / judge 做精筛。
+    条件：
+    - CHG24 在 -8%~+12% 范围内
+    - RSI_1h 在 45~72 范围内
+    """
+    if chg24 > 12.0 or chg24 < -8.0:
+        return False
+    rsi_1h = ind.get("rsi_1h", 50)
+    if not (45 <= rsi_1h <= 72):
+        return False
+    return True
+
+
 def _is_ema_trend(ind: dict, chg24: float) -> bool:
     """
     EMA 趋势跟随策略粗筛（v3.61；v3.83 起支持空头排列）。
@@ -1162,7 +1179,7 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
             _candidate_routes.append("stop_hunt")
         if _is_oi_divergence(ind):
             _candidate_routes.append("oi_divergence")
-        if _is_ema_trend(ind, chg24):
+        if _is_ema_trend_coarse(ind, chg24):
             _candidate_routes.append("ema_trend")
         if _is_range_bounce(k1h, ind):
             _candidate_routes.append("range_bounce")
