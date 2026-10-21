@@ -324,6 +324,9 @@ KLINE_CACHE_INTERVALS   = ["1h", "4h", "15m"]  # 缓存哪些周期
 KLINE_REQUEST_TIMEOUT   = (3, 5)  # (connect_s, read_s)：K 线单次 HTTP 请求超时
 KLINE_REQUEST_MAX_RETRY = 1       # K 线请求最多重试次数（总尝试 = 1 + 此值）
 KLINE_REQUEST_TOTAL_SEC = 8.0     # 单次 get_klines 调用总时限（秒，含重试、重试间隔、直连失败后改走代理）
+API_REQUEST_TIMEOUT     = (3, 5)    # 全局 REST 接口超时 (connect_s, read_s)：公开行情 _get 与签名查询/撤单/杠杆等
+API_REQUEST_MAX_RETRY   = 1         # 全局 REST 接口最多重试次数（_retry 总尝试 = 1 + 此值）
+ORDER_REQUEST_TIMEOUT   = (5, 10)   # 下单类接口（order / batchOrders / algoOrder）超时，比查询宽松
 ORDER_TIMEOUT_BREAKOUT    = 1800  # 秒  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 ORDER_TIMEOUT_NORMAL      = 14400 # 秒  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 

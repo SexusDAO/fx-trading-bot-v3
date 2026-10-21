@@ -26,14 +26,14 @@ class TestRetryStats(unittest.TestCase):
         def boom():
             calls.append(1); raise RuntimeError("HTTP 500")
         self.assertIsNone(A._retry(boom))
-        self.assertEqual(len(calls), 3)                                       # 重试 3 次
+        self.assertEqual(len(calls), 2)                                       # 默认 1 次尝试 + 1 次重试
         self.assertEqual([f for _, f in RM._api_fail_log], [True])           # 但只记 1 次失败
 
     def test_retry_then_success_counts_success_only(self):
         n = {"i": 0}
         def flaky():
             n["i"] += 1
-            if n["i"] < 3: raise RuntimeError("HTTP 500")
+            if n["i"] < 2: raise RuntimeError("HTTP 500")
             return [1]
         self.assertEqual(A._retry(flaky), [1])
         self.assertEqual([f for _, f in RM._api_fail_log], [False])

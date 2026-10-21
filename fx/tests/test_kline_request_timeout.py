@@ -76,6 +76,8 @@ def test_retry_sleep_not_over_half_second(monkeypatch):
     assert sl and max(sl) <= 0.5
 
 
-def test_other_endpoints_untouched():
+def test_other_endpoints_no_longer_use_timeout_10():
     src = (Path(__file__).parent.parent / "shared" / "binance_api.py").read_text()
-    assert "timeout=10" in src and "def get_mark_price" in src
+    assert "timeout=10" not in src
+    body = src[src.index("def get_klines("):src.index("def get_ticker(")]
+    assert "_call" not in body and "_retry(" not in body

@@ -132,7 +132,26 @@ def _record_api_outcome(success: bool) -> None:
         pass
 
 
-def _retry(fn, *args, retries=3, suppress_codes=None, is_write: bool = False, **kwargs):
+def _cfg(name, default):
+    try:
+        import config as _c
+        return getattr(_c, name, default)
+    except Exception:
+        return default
+
+
+def _api_timeout():
+    return tuple(_cfg("API_REQUEST_TIMEOUT", (3, 5)))
+
+
+def _order_timeout():
+    return tuple(_cfg("ORDER_REQUEST_TIMEOUT", (5, 10)))
+
+
+_ORDER_PATHS = ("/fapi/v1/order", "/fapi/v1/batchOrders", "/fapi/v1/algoOrder")
+
+
+def _retry(fn, *args, retries=None, suppress_codes=None, is_write: bool = False, **kwargs):
     """
     suppress_codes: 包含这些 Binance 错误码时不打 ERROR，直接返回 None
     连接类错误（SOCKS/Timeout）自动重建 Session 后重试，最多降级一次。
@@ -140,6 +159,8 @@ def _retry(fn, *args, retries=3, suppress_codes=None, is_write: bool = False, **
               抛 WriteTimeoutError 由调用方对账；默认 False，读请求行为不变。
     """
     global _PROXY_HEALTHY
+    if retries is None:
+        retries = 1 + max(int(_cfg("API_REQUEST_MAX_RETRY", 1)), 0)   # 总尝试次数 = 1 + 最大重试次数
     last_err = None
     for attempt in range(retries):
         try:
@@ -187,14 +208,14 @@ def _get(path, params=None):
     global _DIRECT_DISABLED
     if not _DIRECT_DISABLED:
         try:
-            r = _SESSION_DIRECT.get(f"{BASE_URL}{path}", params=params, timeout=10)
+            r = _SESSION_DIRECT.get(f"{BASE_URL}{path}", params=params, timeout=_api_timeout())
             r.raise_for_status()
             return r.json()
         except Exception as _e:
             # 直连失败（网络隔离环境），本进程内标记为不可用，后续直接走代理
             logger.debug(f"[api] 直连失败，本进程内切换为全代理模式: {_e}")
             _DIRECT_DISABLED = True
-    r = _SESSION.get(f"{BASE_URL}{path}", params=params, timeout=10)
+    r = _SESSION.get(f"{BASE_URL}{path}", params=params, timeout=_api_timeout())
     r.raise_for_status()
     return r.json()
 
@@ -206,7 +227,8 @@ def _signed_post(path, params: dict):
     qs = urllib.parse.urlencode(clean)
     clean["signature"] = hmac.new(API_SECRET.encode(), qs.encode(), hashlib.sha256).hexdigest()
     headers = {"X-MBX-APIKEY": API_KEY}
-    r = _SESSION.post(f"{BASE_URL}{path}", params=clean, headers=headers, timeout=10)
+    r = _SESSION.post(f"{BASE_URL}{path}", params=clean, headers=headers,
+                      timeout=_order_timeout() if path in _ORDER_PATHS else _api_timeout())
     if not r.ok:
         try:
             body = r.json()
@@ -227,7 +249,7 @@ def _signed_delete(path, params: dict):
     qs = urllib.parse.urlencode(clean)
     clean["signature"] = hmac.new(API_SECRET.encode(), qs.encode(), hashlib.sha256).hexdigest()
     headers = {"X-MBX-APIKEY": API_KEY}
-    r = _SESSION.delete(f"{BASE_URL}{path}", params=clean, headers=headers, timeout=10)
+    r = _SESSION.delete(f"{BASE_URL}{path}", params=clean, headers=headers, timeout=_api_timeout())
     r.raise_for_status()
     return r.json()
 
@@ -239,7 +261,7 @@ def _signed_get(path, params: dict):
     qs = urllib.parse.urlencode(clean)
     clean["signature"] = hmac.new(API_SECRET.encode(), qs.encode(), hashlib.sha256).hexdigest()
     headers = {"X-MBX-APIKEY": API_KEY}
-    r = _SESSION.get(f"{BASE_URL}{path}", params=clean, headers=headers, timeout=10)
+    r = _SESSION.get(f"{BASE_URL}{path}", params=clean, headers=headers, timeout=_api_timeout())
     r.raise_for_status()
     return r.json()
 
@@ -847,7 +869,7 @@ def keepalive_listen_key(listen_key: str) -> bool:
     try:
         r = _SESSION.put(f"{BASE_URL}/fapi/v1/listenKey",
                          params={"listenKey": listen_key},
-                         headers=headers, timeout=10)
+                         headers=headers, timeout=_api_timeout())
         r.raise_for_status()
         return True
     except Exception as e:
