@@ -15,9 +15,12 @@ fx/shared/kline_cache.py — K 线 REST 缓存（按收盘时间失效）
 """
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from typing import Callable, Optional
+
+logger = logging.getLogger(__name__)
 
 _INTERVAL_MS = {
     "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000,
@@ -44,15 +47,18 @@ class KlineCache:
         self._hit = 0
         self._miss = 0
         self._expired = 0
+        self._reasons: dict = {}      # miss 原因 -> 次数（诊断用）
 
     # ── 写入 ──────────────────────────────────────────────────────────────
     def set(self, symbol: str, interval: str, data: list) -> None:
         """写入缓存：data 为 api.get_klines 的完整返回（最后一根是未收盘的）。"""
         if not isinstance(data, list) or len(data) < 3:
+            logger.debug(f"[kline_cache] set 忽略 {symbol} {interval}: 数据无效 len={len(data) if isinstance(data, list) else type(data).__name__}")
             return
         try:
             last_close = int(data[-2][6])
         except (TypeError, ValueError, IndexError):
+            logger.debug(f"[kline_cache] set 忽略 {symbol} {interval}: 收盘时间无法解析")
             return
         entry = _Entry(list(data[:-1]), last_close, data[-1])
         with self._lock:
@@ -60,6 +66,7 @@ class KlineCache:
             if len(self._d) > self._max:
                 oldest = min(self._d, key=lambda k: self._d[k].access_ts)
                 self._d.pop(oldest, None)
+        logger.debug(f"[kline_cache] set 成功 {symbol} {interval} closed={len(entry.closed)} last_close={last_close}")
 
     # ── 读取 ──────────────────────────────────────────────────────────────
     def get(self, symbol: str, interval: str, limit: int,
@@ -72,8 +79,15 @@ class KlineCache:
         key = (symbol, interval)
         with self._lock:
             e = self._d.get(key)
-            if e is None or len(e.closed) < max(limit - 1, 0):
+            if e is None:
                 self._miss += 1
+                self._reasons["key_not_found"] = self._reasons.get("key_not_found", 0) + 1
+                logger.debug(f"[kline_cache] miss {symbol} {interval}: key 不存在 (size={len(self._d)})")
+                return None
+            if len(e.closed) < max(limit - 1, 0):
+                self._miss += 1
+                self._reasons["closed_too_short"] = self._reasons.get("closed_too_short", 0) + 1
+                logger.debug(f"[kline_cache] miss {symbol} {interval}: closed 不够长 have={len(e.closed)} need={max(limit - 1, 0)}")
                 return None
             e.access_ts = time.time()
             closed, last_close, snap = e.closed, e.last_close, e.live
@@ -89,13 +103,13 @@ class KlineCache:
             except Exception:
                 got = None
             if not got:
-                return self._count_miss()
+                return self._count_miss("live_fetch_empty_or_failed", key)
             live = got[-1]
 
         try:
             live_open = int(live[0])
         except (TypeError, ValueError, IndexError):
-            return self._count_miss()
+            return self._count_miss("live_open_unparsable", key)
         expected = last_close + 1
         if live_open == expected:
             with self._lock:
@@ -104,17 +118,21 @@ class KlineCache:
             return (closed[-n:] if n > 0 else []) + [live]
         if live_open > expected:
             return self._expire(key)
-        return self._count_miss()
+        return self._count_miss(f"live_open_lt_expected(live={live_open},expected={expected})", key)
 
-    def _count_miss(self):
+    def _count_miss(self, reason: str = "unknown", key=None):
         with self._lock:
             self._miss += 1
+            short = reason.split("(")[0]
+            self._reasons[short] = self._reasons.get(short, 0) + 1
+        logger.debug(f"[kline_cache] miss {key}: {reason}")
         return None
 
     def _expire(self, key):
         with self._lock:
             self._expired += 1
             self._d.pop(key, None)
+        logger.debug(f"[kline_cache] expired {key}: 新 K 线已收盘，条目移除")
         return None
 
     def invalidate(self, symbol: str, interval: str) -> None:
@@ -124,6 +142,10 @@ class KlineCache:
     def stats(self) -> dict:
         with self._lock:
             return {"hit": self._hit, "miss": self._miss, "expired": self._expired}
+
+    def miss_reasons(self) -> dict:
+        with self._lock:
+            return dict(self._reasons)
 
     def size(self) -> int:
         with self._lock:
