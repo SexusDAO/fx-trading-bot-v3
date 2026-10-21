@@ -73,6 +73,60 @@ SIGNAL_ANALYTICS_FILE = ROOT / "logs" / "signal_analytics.jsonl"
 _MARK_MAP_MAX_AGE_SEC = 30.0   # 批量标记价格用于「注册入场价」的最大允许年龄（秒），超过则单标的重取
 
 
+# ── [P1 阶段0] K 线请求耗时统计（开关 config.SCAN_KLINE_TIMING）────────────────
+#   analyze_symbol 在线程池里并发运行：每个线程用 threading.local 累计自己这次分析的 K 线请求次数/耗时，
+#   分析结束时并入本轮汇总（加锁），run_scan 并行分析结束后输出一条 info 汇总。
+import threading as _threading
+
+_KL_TLS = _threading.local()
+_KL_ROUND_LOCK = _threading.Lock()
+_KL_ROUND: dict = {"calls": 0, "ms": 0.0, "per_sym": {}}
+
+
+def _kline_timing_enabled() -> bool:
+    try:
+        import config as _c
+        return bool(getattr(_c, "SCAN_KLINE_TIMING", True))
+    except Exception:
+        return True
+
+
+def _kline_fetch(symbol: str, interval: str, limit: int) -> list:
+    """api.get_klines 的计时包装：行为与直接调用完全一致，只额外累计耗时。"""
+    if not _kline_timing_enabled():
+        return api.get_klines(symbol, interval, limit)
+    t0 = time.perf_counter()
+    try:
+        return api.get_klines(symbol, interval, limit)
+    finally:
+        acc = getattr(_KL_TLS, "acc", None)
+        if acc is not None:
+            acc[0] += 1
+            acc[1] += (time.perf_counter() - t0) * 1000.0
+
+
+def _kline_round_reset() -> dict | None:
+    """每轮扫描开始时清零汇总，并返回缓存统计快照（用于算本轮增量）。"""
+    with _KL_ROUND_LOCK:
+        _KL_ROUND["calls"] = 0
+        _KL_ROUND["ms"] = 0.0
+        _KL_ROUND["per_sym"] = {}
+    return None
+
+
+def _kline_round_summary() -> list:
+    """生成本轮 K 线请求汇总日志行（无请求时返回空列表）。"""
+    with _KL_ROUND_LOCK:
+        calls, ms, per = _KL_ROUND["calls"], _KL_ROUND["ms"], dict(_KL_ROUND["per_sym"])
+    if not calls:
+        return []
+    slow_sym, slow_ms = max(((k, v[1]) for k, v in per.items()), key=lambda x: x[1])
+    return [
+        f"[scanner] 本轮K线请求: 总次数={calls} 总耗时={ms / 1000:.1f}s "
+        f"平均每标的={ms / max(len(per), 1):.0f}ms 最慢标的={slow_sym}({slow_ms:.0f}ms)"
+    ]
+
+
 def _calc_route_quality(route: str, reason: dict, ind: dict, direction: str) -> int:
     """
     同一标的多条路径都通过 judge 时，用此函数评估相对质量，取分最高的路径输出。
@@ -753,7 +807,7 @@ def _oi_divergence_short(symbol: str, price: float, chg24: float,
     return False, ""
 
 # ── 分析单个标的 ──────────────────────────────────────────────────────────────
-def analyze_symbol(symbol: str, ticker: dict,
+def _analyze_symbol_impl(symbol: str, ticker: dict,
                    active_syms: set, pending_syms: set,
                    allowed_directions: set | None = None,
                    loss_blacklist: set | None = None,
@@ -818,8 +872,8 @@ def analyze_symbol(symbol: str, ticker: dict,
 
     try:
         # ── A. 拉取数据（4H 懒加载：pullback 不拉 4H，减少约 1/3 HTTP 请求）──
-        k15 = api.get_klines(symbol, "15m", 100)
-        k1h = api.get_klines(symbol, "1h",  100)
+        k15 = _kline_fetch(symbol, "15m", 100)
+        k1h = _kline_fetch(symbol, "1h",  100)
         if not k1h or len(k1h) < 25:
             return None
 
@@ -942,7 +996,7 @@ def analyze_symbol(symbol: str, ticker: dict,
         for _route in _candidate_routes:
             # 按需补拉 4H（只拉一次，后续路径复用）
             if _route in _NEED_4H and not _4h_loaded:
-                k4h = api.get_klines(symbol, "4h", 100)
+                k4h = _kline_fetch(symbol, "4h", 100)
                 _4h_loaded = True
                 if k4h:
                     ind_4h = calc_indicators(k15, k1h, k4h)
@@ -1216,6 +1270,27 @@ def analyze_symbol(symbol: str, ticker: dict,
         return None
 
 # ── 挂单维护 ──────────────────────────────────────────────────────────────────
+import functools as _functools
+
+
+@_functools.wraps(_analyze_symbol_impl)
+def analyze_symbol(*args, **kwargs):
+    """_analyze_symbol_impl 的统计外壳：累计本标的 K 线请求次数/耗时，结束时 debug 输出并并入本轮汇总。"""
+    symbol = args[0] if args else kwargs.get("symbol", "")
+    acc = [0, 0.0]
+    _KL_TLS.acc = acc
+    try:
+        return _analyze_symbol_impl(*args, **kwargs)
+    finally:
+        _KL_TLS.acc = None
+        if acc[0]:
+            logger.debug(f"[scanner] {symbol} K线请求: 次数={acc[0]} 总耗时={acc[1]:.0f}ms")
+            with _KL_ROUND_LOCK:
+                _KL_ROUND["calls"] += acc[0]
+                _KL_ROUND["ms"] += acc[1]
+                _KL_ROUND["per_sym"][symbol] = (acc[0], acc[1])
+
+
 def maintain_pending_order(pos: dict, ticker: dict) -> str:
     """
     对已有挂单的标的评估挂单是否仍合理。
@@ -1826,6 +1901,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
         logger.debug(f"[scanner] 全市场资金费率情绪获取失败（降级忽略）: {_fse}")
 
     signals_raw = []
+    _kline_round_reset()
     scan_deadline = time.time() + SCAN_TOTAL_TIMEOUT_SEC
     with concurrent.futures.ThreadPoolExecutor(max_workers=SCAN_MAX_WORKERS) as exe:
         futures = {
@@ -1858,6 +1934,8 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
             )
 
     result["signals_raw"] = len(signals_raw)
+    for _kl_line in _kline_round_summary():
+        logger.info(_kl_line)
 
     # ── 第四步：信号汇总与排序 ────────────────────────────────────────────────
     # v3.34: 槽位过滤已后移到评分过滤之后，先将 signals_raw 赋给 avail_signals
