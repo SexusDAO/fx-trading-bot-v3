@@ -152,14 +152,17 @@ def test_sync_subscribes_in_batches_loads_history_and_merges_pending():
 
 def test_sync_batches_large_subscription(monkeypatch):
     import config
-    monkeypatch.setattr(config, "KLINE_HUB_SYMBOLS_MAX", 100, raising=False)   # 不依赖线上配置值（现为 60）
+    monkeypatch.setattr(config, "KLINE_HUB_SYMBOLS_MAX", 100, raising=False)   # 不依赖线上配置值
     async def go():
         h = make_hub(lambda *a: [])
         h._sync_lock, h._fetch_sem = asyncio.Lock(), asyncio.Semaphore(6)
-        ws = FakeWS(); h._ws_market = ws; h._market_connected = True
-        h.subscribe_klines([f"S{i}USDT" for i in range(100)])             # 300 个 stream → 3 条 SUBSCRIBE
+        ws0, ws1 = FakeWS(), FakeWS()
+        h._shards[0].ws, h._shards[0].connected = ws0, True
+        h._shards[1].ws, h._shards[1].connected = ws1, True
+        h.subscribe_klines([f"S{i}USDT" for i in range(100)])             # 60 个标的在连接0(180 stream)，40 个在连接1(120 stream)
         await h._sync_once()
         await asyncio.gather(*list(h._load_tasks))
-        subs = [m for m in ws.sent if m["method"] == "SUBSCRIBE"]
-        assert len(subs) == 3 and all(len(m["params"]) <= H.SUB_BATCH for m in subs)
+        for ws, n in ((ws0, 180), (ws1, 120)):
+            subs = [m for m in ws.sent if m["method"] == "SUBSCRIBE"]
+            assert sum(len(m["params"]) for m in subs) == n and all(len(m["params"]) <= H.SUB_BATCH for m in subs)
     asyncio.run(go())

@@ -36,9 +36,9 @@ def _clean(monkeypatch):
     monkeypatch.setattr(H, "_default", None)
 
 
-def test_config_symbols_max_is_60():
+def test_config_symbols_max_is_120():
     import config
-    assert config.KLINE_HUB_SYMBOLS_MAX == 60
+    assert config.KLINE_HUB_SYMBOLS_MAX == 120
 
 
 # ── 断线重连：重新订阅全部流 + 重拉历史 ─────────────────────────────────────
