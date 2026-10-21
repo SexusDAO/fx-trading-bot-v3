@@ -42,12 +42,51 @@ STREAM_PATH = "/market/ws/!markPrice@arr@1s"   # 币安合约行情新路径（�
 MARKET_STREAM_PATH = "/market/stream"          # 组合流：!miniTicker@arr（后续还有 K 线），连上后用 SUBSCRIBE 订阅
 TICKER_STREAM = "!miniTicker@arr"
 TICKER_MAX_AGE_SEC = 10.0
+KLINE_INTERVALS = ("15m", "1h", "4h")
+_INTERVAL_MS = {"15m": 900_000, "1h": 3_600_000, "4h": 14_400_000}
+KLINE_HISTORY = 100                            # 每个 (标的, 周期) 保留/初始化拉取的 K 线根数
+KLINE_STALE_GRACE_MS = 10_000                  # 最后一根 K 线的结束时间已过去这么久仍无新推送 → 视为过旧，读取返回 None
+KLINE_FETCH_CONCURRENCY = 6                    # 历史 K 线 REST 拉取并发上限
+KLINE_RETRY_SEC = 30.0                         # 历史拉取失败后的重试间隔
+SUB_BATCH = 100                                # 每条 SUBSCRIBE/UNSUBSCRIBE 的 stream 数
 TICKER_MIN_COVERAGE = 0.9                      # 新鲜条目数 / 已见过的条目数 低于此值时，scanner 不采用 hub 的全量 ticker
+
+
+class _Series:
+    """一个 (标的, 周期) 的 K 线序列。rows=None 表示尚未就绪（历史未拉到/断线/出现缺口）。"""
+    __slots__ = ("rows", "pending", "loading", "retry_at")
+
+    def __init__(self):
+        self.rows = None
+        self.pending = []      # 历史拉取期间收到的 WS 行，拉完后合并
+        self.loading = False
+        self.retry_at = 0.0
+
+
+def _upsert(rows: list, row: list, iv_ms: int) -> bool:
+    """把一根 K 线并入 rows（最后一根是未收盘的）。返回 False 表示出现缺口（调用方应作废并重拉历史）。"""
+    t, last_t = row[0], rows[-1][0]
+    if t == last_t:
+        rows[-1] = row
+        return True
+    if t < last_t:                                   # 迟到的旧根：只替换最近几根里同开盘时间的那根
+        for i in range(len(rows) - 2, max(len(rows) - 4, -1), -1):
+            if rows[i][0] == t:
+                rows[i] = row
+                break
+        return True
+    if t == last_t + iv_ms:                          # 下一根：追加并裁掉最旧的一根
+        rows.append(row)
+        if len(rows) > KLINE_HISTORY:
+            del rows[0:len(rows) - KLINE_HISTORY]
+        return True
+    return False
 
 
 class MarketDataHub:
     def __init__(self, url: Optional[str] = None, clock: Callable[[], float] = time.monotonic,
-                 market_url: Optional[str] = None):
+                 market_url: Optional[str] = None, wall: Callable[[], float] = time.time,
+                 kline_fetcher: Optional[Callable] = None):
         self._url = url or (config.BINANCE_WS_URL + STREAM_PATH)
         self._market_url = market_url or (config.BINANCE_WS_URL + MARKET_STREAM_PATH)
         self._clock = clock
@@ -60,6 +99,18 @@ class MarketDataHub:
         self._ticker_seen: set = set()
         self._ticker_ready = False
         self._market_connected = False
+        self._wall = wall
+        self._kline_fetcher = kline_fetcher
+        self._series: dict = {}                  # {(SYMBOL, interval): _Series}
+        self._kl_lock = threading.Lock()
+        self._desired: list = []
+        self._gen = 0                            # 每次组合流断线 +1，用来丢弃断线前发出的历史拉取结果
+        self._ws_market = None
+        self._subscribed: set = set()            # 当前连接上已订阅的 K 线 stream 名
+        self._sync_event: Optional[asyncio.Event] = None
+        self._sync_lock: Optional[asyncio.Lock] = None
+        self._fetch_sem: Optional[asyncio.Semaphore] = None
+        self._load_tasks: set = set()
         self.market_reconnect_count: int = 0
         self.ticker_frame_count: int = 0
         # 可观测字段
@@ -140,6 +191,53 @@ class MarketDataHub:
                 out[sym] = d
         return out
 
+    # ── K 线读取 / 订阅接口 ────────────────────────────────────────────────
+    def subscribe_klines(self, symbols) -> None:
+        """设置要订阅的标的（整体替换，自动增删；线程安全）。周期固定 15m/1h/4h，标的数上限 KLINE_HUB_SYMBOLS_MAX。"""
+        syms, seen = [], set()
+        for x in symbols or []:
+            u = str(x).upper()
+            if u and u not in seen:
+                seen.add(u)
+                syms.append(u)
+        mx = int(getattr(config, "KLINE_HUB_SYMBOLS_MAX", 200))
+        if len(syms) > mx:
+            logger.warning(f"[hub] K线订阅标的 {len(syms)} 个超过上限 {mx}，只订阅前 {mx} 个")
+            syms = syms[:mx]
+        want = {(x, iv) for x in syms for iv in KLINE_INTERVALS}
+        with self._kl_lock:
+            self._desired = syms
+            for k in [k for k in self._series if k not in want]:
+                del self._series[k]
+            for k in want:
+                self._series.setdefault(k, _Series())
+        self._kick()
+
+    def _kick(self) -> None:
+        loop, ev = self._loop, self._sync_event
+        if loop is not None and ev is not None:
+            try:
+                loop.call_soon_threadsafe(ev.set)
+            except RuntimeError:
+                pass
+
+    def get_klines(self, symbol: str, interval: str, limit: int) -> Optional[list]:
+        """与 binance_api.get_klines 同格式（最后一根是未收盘的）；未就绪/未订阅/历史不足 limit/数据过旧返回 None。"""
+        if not self._market_connected:
+            return None
+        n = max(int(limit), 1)
+        with self._kl_lock:
+            st = self._series.get((str(symbol).upper(), interval))
+            if st is None or st.rows is None or len(st.rows) < n:
+                return None
+            if self._wall() * 1000 > float(st.rows[-1][6]) + KLINE_STALE_GRACE_MS:
+                return None
+            return [list(r) for r in st.rows[-n:]]
+
+    def kline_ready_counts(self) -> tuple:
+        with self._kl_lock:
+            return (sum(1 for st in self._series.values() if st.rows is not None), len(self._series))
+
     def ticker_coverage(self) -> tuple:
         """(新鲜条目数, 本次连接以来见过的条目数)。miniTicker@arr 只推有变化的标的，冷门标的可能长时间不更新。"""
         if not self._ticker_ready:
@@ -155,6 +253,7 @@ class MarketDataHub:
         return {
             "ready": self._ready, "connected": self._connected,
             "ticker_ready": self._ticker_ready, "ticker_symbols": len(self._tickers),
+            "kline_ready": self.kline_ready_counts()[0], "kline_total": self.kline_ready_counts()[1],
             "ticker_frame_count": self.ticker_frame_count, "market_reconnect_count": self.market_reconnect_count,
             "frame_count": self.frame_count, "reconnect_count": self.reconnect_count,
             "symbols": len(snap),
@@ -216,6 +315,39 @@ class MarketDataHub:
             return                                   # {"result":null,"id":..} 订阅确认
         if stream == TICKER_STREAM:
             self._handle_tickers(data)
+        elif "@kline_" in str(stream):
+            self._handle_kline(data)
+
+    def _handle_kline(self, data) -> None:
+        """处理 `<sym>@kline_<iv>`：k 对象 → REST 同格式行 [t,o,h,l,c,v,T,q,n,V,Q,"0"]；x=false 更新最后一根，下一根开盘时追加。"""
+        k = data.get("k") if isinstance(data, dict) else None
+        if not isinstance(k, dict):
+            return
+        try:
+            key = (str(k.get("s") or data.get("s")).upper(), k["i"])
+            row = [int(k["t"]), k["o"], k["h"], k["l"], k["c"], k["v"], int(k["T"]), k["q"],
+                   int(k.get("n", 0)), k.get("V", "0"), k.get("Q", "0"), "0"]
+        except (KeyError, TypeError, ValueError):
+            return
+        iv_ms = _INTERVAL_MS.get(key[1])
+        if iv_ms is None:
+            return
+        gap = False
+        with self._kl_lock:
+            st = self._series.get(key)
+            if st is None:
+                return
+            if st.rows is None:
+                st.pending.append(row)
+                if len(st.pending) > 60:
+                    del st.pending[0:len(st.pending) - 60]
+                return
+            if not _upsert(st.rows, row, iv_ms):
+                logger.warning(f"[hub] K线缺口 {key[0]} {key[1]}，作废并重拉历史")
+                st.rows, st.pending, gap = None, [row], True
+                st.retry_at = 0.0
+        if gap:
+            self._kick()
 
     def _handle_tickers(self, data) -> int:
         """解析 !miniTicker@arr（list[dict]）并合并进缓存。字段：s,c,o,h,l,v,q。返回更新的标的数。"""
@@ -262,6 +394,12 @@ class MarketDataHub:
             self._ticker_ready = False
             self._tickers = {}
             self._ticker_seen = set()
+        with self._kl_lock:
+            self._gen += 1
+            for st in self._series.values():
+                st.rows, st.pending, st.loading, st.retry_at = None, [], False, 0.0
+        self._ws_market = None
+        self._subscribed = set()
 
     def _on_disconnect(self) -> None:
         """断线：清空缓存并置未就绪，重连期间读取一律返回 None/{}（不返回旧数据）。"""
@@ -315,13 +453,18 @@ class MarketDataHub:
 
     async def _run(self) -> None:
         self._stop_event = asyncio.Event()
+        self._sync_event = asyncio.Event()
+        self._sync_lock = asyncio.Lock()
+        self._fetch_sem = asyncio.Semaphore(KLINE_FETCH_CONCURRENCY)
         stats_task = asyncio.ensure_future(self._stats_loop())
         market_task = asyncio.ensure_future(self._market_loop())
+        maint_task = asyncio.ensure_future(self._kline_maintainer())
         try:
             await self._connect_loop()
         finally:
             stats_task.cancel()
             market_task.cancel()
+            maint_task.cancel()
 
     async def _stats_loop(self) -> None:
         while True:
@@ -331,7 +474,8 @@ class MarketDataHub:
                 f"[hub] 5min统计: frame_count={s['frame_count']} 覆盖标的={s['symbols']} "
                 f"age_median={_fmt(s['age_median_sec'])}s age_max={_fmt(s['age_max_sec'])}s "
                 f"reconnect_count={s['reconnect_count']} ready={s['ready']} "
-                f"ticker_ready={s['ticker_ready']} ticker覆盖={s['ticker_symbols']} ticker帧={s['ticker_frame_count']}"
+                f"ticker_ready={s['ticker_ready']} ticker覆盖={s['ticker_symbols']} ticker帧={s['ticker_frame_count']} "
+                f"kline就绪={s['kline_ready']}/{s['kline_total']}"
             )
 
     async def _connect_loop(self) -> None:
@@ -411,7 +555,87 @@ class MarketDataHub:
         await ws.send(json.dumps({"method": method, "params": params, "id": self._sub_id}))
 
     async def _on_market_connected(self, ws) -> None:
+        self._ws_market = ws
+        self._subscribed = set()
         await self._send_subscribe(ws, [TICKER_STREAM])
+        await self._sync_once()                      # 重连后：重新订阅全部 K 线 stream 并重拉历史
+
+    async def _kline_maintainer(self) -> None:
+        """每 2 秒（或被唤醒时）对账：订阅增删、重试/补拉历史。"""
+        while not self._stopping:
+            try:
+                await asyncio.wait_for(self._sync_event.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                pass
+            self._sync_event.clear()
+            try:
+                await self._sync_once()
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.warning(f"[hub] K线对账异常: {e}")
+
+    async def _sync_once(self) -> None:
+        ws = self._ws_market
+        if ws is None or not self._market_connected:
+            return
+        async with self._sync_lock:
+            with self._kl_lock:
+                desired = {f"{s.lower()}@kline_{iv}" for s in self._desired for iv in KLINE_INTERVALS}
+            to_sub = sorted(desired - self._subscribed)
+            to_unsub = sorted(self._subscribed - desired)
+            for i in range(0, len(to_unsub), SUB_BATCH):
+                await self._send_subscribe(ws, to_unsub[i:i + SUB_BATCH], "UNSUBSCRIBE")
+                await asyncio.sleep(0.2)             # 币安限制：每秒最多 10 条入站消息
+            self._subscribed -= set(to_unsub)
+            for i in range(0, len(to_sub), SUB_BATCH):
+                await self._send_subscribe(ws, to_sub[i:i + SUB_BATCH])
+                self._subscribed.update(to_sub[i:i + SUB_BATCH])
+                await asyncio.sleep(0.2)
+            if to_sub or to_unsub:
+                logger.info(f"[hub] K线订阅对账: +{len(to_sub)} -{len(to_unsub)}，当前 {len(self._subscribed)} 个 stream")
+            now = self._wall()
+            todo = []
+            with self._kl_lock:
+                for key, st in self._series.items():
+                    if (st.rows is None and not st.loading and now >= st.retry_at
+                            and f"{key[0].lower()}@kline_{key[1]}" in self._subscribed):
+                        st.loading = True
+                        todo.append(key)
+                gen = self._gen
+            for key in todo:
+                t = asyncio.ensure_future(self._load_history(key, gen))
+                self._load_tasks.add(t)
+                t.add_done_callback(self._load_tasks.discard)
+
+    def _fetch(self, symbol: str, interval: str, limit: int):
+        fn = self._kline_fetcher
+        if fn is None:
+            from shared import binance_api
+            fn = binance_api.get_klines
+        return fn(symbol, interval, limit)
+
+    async def _load_history(self, key: tuple, gen: int) -> None:
+        sym, iv = key
+        rows = None
+        try:
+            async with self._fetch_sem:
+                rows = await asyncio.get_running_loop().run_in_executor(None, self._fetch, sym, iv, KLINE_HISTORY)
+        except Exception as e:
+            logger.warning(f"[hub] 历史K线拉取失败 {sym} {iv}: {e}")
+        with self._kl_lock:
+            st = self._series.get(key)
+            if st is None or gen != self._gen:
+                return                               # 标的已被移除，或期间发生过断线：结果作废
+            st.loading = False
+            if not isinstance(rows, list) or not rows:
+                st.retry_at = self._wall() + KLINE_RETRY_SEC
+                return
+            new = [list(r) for r in rows]
+            iv_ms = _INTERVAL_MS[iv]
+            for pr in st.pending:                    # 合并拉取期间收到的推送
+                _upsert(new, pr, iv_ms)
+            st.rows, st.pending = new, []
 
 
 def _fmt(v) -> str:
@@ -448,6 +672,15 @@ def get_mark_price(symbol: str) -> Optional[dict]:
 
 def get_all_mark_prices() -> dict:
     return _default.get_all_mark_prices() if _default is not None else {}
+
+
+def subscribe_klines(symbols) -> None:
+    if _default is not None:
+        _default.subscribe_klines(symbols)
+
+
+def get_klines(symbol: str, interval: str, limit: int) -> Optional[list]:
+    return _default.get_klines(symbol, interval, limit) if _default is not None else None
 
 
 def is_ticker_ready() -> bool:

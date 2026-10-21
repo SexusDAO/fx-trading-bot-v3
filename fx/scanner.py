@@ -203,6 +203,17 @@ def _get_all_mark_prices_list() -> list:
     return api.get_all_mark_prices()
 
 
+def _hub_subscribe_klines(symbols) -> None:
+    """把本轮候选池交给 hub 订阅 K 线（hub 关闭时不做任何事）。"""
+    if not _hub_enabled():
+        return
+    try:
+        from shared import market_data_hub as _hub
+        _hub.subscribe_klines(symbols)
+    except Exception as e:
+        logger.debug(f"[hub] K线订阅注入失败（忽略）: {e}")
+
+
 def _get_ticker_24h_cached(max_age_sec: float) -> dict:
     """全市场 24h 行情 {symbol: ticker}：hub 开启、就绪且覆盖率足够时读 hub，否则回落 REST 缓存（开关关闭时与原来完全一致）。
     miniTicker@arr 只推有变化的标的，所以新鲜条目数低于「已见过条目数」的 TICKER_MIN_COVERAGE 时不采用 hub，避免市场情绪等全量统计的口径变化。"""
@@ -224,7 +235,17 @@ def _get_ticker_24h_cached(max_age_sec: float) -> dict:
 
 def _get_klines_cached(symbol: str, interval: str, limit: int) -> list:
     """优先读缓存（命中时只额外请求 1 根未收盘 K 线）；未命中/失效/未启用/模块不可用时走 REST 并写回。
-    返回值与 api.get_klines 格式一致。"""
+    返回值与 api.get_klines 格式一致。
+    hub 开启且该 (标的, 周期) 的 WS K线就绪时优先读 hub；返回 None 时走下面原有的缓存/REST 逻辑。"""
+    if _hub_enabled():
+        try:
+            from shared import market_data_hub as _hub
+            _hd = _hub.get_klines(symbol, interval, limit)
+            if _hd:
+                logger.debug(f"[hub] {symbol} {interval} klines n={len(_hd)}（来自 WS 缓存）")
+                return _hd
+        except Exception as e:
+            logger.debug(f"[hub] K线读取失败，回落 REST: {e}")
     try:
         import config as _c
         enabled = bool(getattr(_c, "KLINE_CACHE_ENABLED", True)) and \
@@ -1981,6 +2002,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     # pending_syms 仍用于 analyze_symbol 内部判断，不在此处整体排除
     scan_pool = [s for s in pool if s not in active_sym_set]   # 只排除 open 持仓标的
     result["scanned"] = len(scan_pool)
+    _hub_subscribe_klines(scan_pool)
 
     # 方向约束：对应方向槽位已满时只扫描另一个方向（v3.53: 基于 open-only 计数）
     allowed_dirs: set | None = None
