@@ -70,6 +70,129 @@ SCANNER_LOG_FILE  = ROOT / "logs" / "scanner.log"
 SIGNAL_ANALYTICS_FILE = ROOT / "logs" / "signal_analytics.jsonl"
 
 # ── 路径质量评分（v3.81 质量择优）──────────────────────────────────────────────
+_MARK_MAP_MAX_AGE_SEC = 30.0   # 批量标记价格用于「注册入场价」的最大允许年龄（秒），超过则单标的重取
+
+
+# ── [P1 阶段0] K 线请求耗时统计（开关 config.SCAN_KLINE_TIMING）────────────────
+#   analyze_symbol 在线程池里并发运行：每个线程用 threading.local 累计自己这次分析的 K 线请求次数/耗时，
+#   分析结束时并入本轮汇总（加锁），run_scan 并行分析结束后输出一条 info 汇总。
+import threading as _threading
+
+_KL_TLS = _threading.local()
+_KL_ROUND_LOCK = _threading.Lock()
+_KL_ROUND: dict = {"calls": 0, "ms": 0.0, "per_sym": {}}
+
+
+def _kline_timing_enabled() -> bool:
+    try:
+        import config as _c
+        return bool(getattr(_c, "SCAN_KLINE_TIMING", True))
+    except Exception:
+        return True
+
+
+def _kline_fetch(symbol: str, interval: str, limit: int) -> list:
+    """api.get_klines 的计时包装：行为与直接调用完全一致，只额外累计耗时。"""
+    if not _kline_timing_enabled():
+        return api.get_klines(symbol, interval, limit)
+    t0 = time.perf_counter()
+    try:
+        return api.get_klines(symbol, interval, limit)
+    finally:
+        acc = getattr(_KL_TLS, "acc", None)
+        if acc is not None:
+            acc[0] += 1
+            acc[1] += (time.perf_counter() - t0) * 1000.0
+
+
+_KL_CACHE_STATS0: dict = {"hit": 0, "miss": 0, "expired": 0}
+
+
+def _kline_round_reset() -> None:
+    """每轮扫描开始时清零汇总，并记录缓存统计快照（用于算本轮增量）。"""
+    global _KL_CACHE_STATS0
+    with _KL_ROUND_LOCK:
+        _KL_ROUND["calls"] = 0
+        _KL_ROUND["ms"] = 0.0
+        _KL_ROUND["per_sym"] = {}
+    cache = _KLINE_CACHE
+    _KL_CACHE_STATS0 = cache.stats() if cache is not None else {"hit": 0, "miss": 0, "expired": 0}
+
+
+def _kline_round_summary() -> list:
+    """生成本轮 K 线请求汇总日志行（无请求时返回空列表）。"""
+    with _KL_ROUND_LOCK:
+        calls, ms, per = _KL_ROUND["calls"], _KL_ROUND["ms"], dict(_KL_ROUND["per_sym"])
+    lines = []
+    if calls:
+        slow_sym, slow_ms = max(((k, v[1]) for k, v in per.items()), key=lambda x: x[1])
+        lines.append(
+            f"[scanner] 本轮K线请求: 总次数={calls} 总耗时={ms / 1000:.1f}s "
+            f"平均每标的={ms / max(len(per), 1):.0f}ms 最慢标的={slow_sym}({slow_ms:.0f}ms)"
+        )
+    cache = _KLINE_CACHE
+    if cache is not None:
+        st = cache.stats()
+        d = {k: st[k] - _KL_CACHE_STATS0.get(k, 0) for k in ("hit", "miss", "expired")}
+        tot = d["hit"] + d["miss"] + d["expired"]
+        if tot:
+            lines.append(
+                f"[scanner] K线缓存: 命中={d['hit']} 未命中={d['miss']} 过期={d['expired']} "
+                f"命中率={d['hit'] / tot:.0%}"
+            )
+    return lines
+
+
+# ── [P1 阶段1+2] K 线 REST 缓存（按收盘时间失效）────────────────────────────────
+_KLINE_CACHE = None
+_KLINE_CACHE_FAILED = False
+
+
+def _get_kline_cache():
+    """惰性加载缓存模块；import/构造失败则记录一次 warning 并永久降级为直接 REST。"""
+    global _KLINE_CACHE, _KLINE_CACHE_FAILED
+    if _KLINE_CACHE is not None:
+        return _KLINE_CACHE
+    if _KLINE_CACHE_FAILED:
+        return None
+    try:
+        from shared.kline_cache import KlineCache
+        _KLINE_CACHE = KlineCache()
+    except Exception as e:
+        _KLINE_CACHE_FAILED = True
+        logger.warning(f"[scanner] K线缓存模块加载失败，降级为直接 REST: {e}")
+        return None
+    return _KLINE_CACHE
+
+
+def _get_klines_cached(symbol: str, interval: str, limit: int) -> list:
+    """优先读缓存（命中时只额外请求 1 根未收盘 K 线）；未命中/失效/未启用/模块不可用时走 REST 并写回。
+    返回值与 api.get_klines 格式一致。"""
+    try:
+        import config as _c
+        enabled = bool(getattr(_c, "KLINE_CACHE_ENABLED", True)) and \
+            interval in tuple(getattr(_c, "KLINE_CACHE_INTERVALS", ("1h", "4h", "15m")))
+    except Exception:
+        enabled = False
+    cache = _get_kline_cache() if enabled else None
+    if cache is None:
+        return _kline_fetch(symbol, interval, limit)
+    try:
+        data = cache.get(symbol, interval, limit, fetch_live=lambda: _kline_fetch(symbol, interval, 1))
+    except Exception as e:
+        logger.debug(f"[scanner] K线缓存读取异常（降级 REST）: {e}")
+        data = None
+    if data:
+        return data
+    data = _kline_fetch(symbol, interval, limit)
+    if data:
+        try:
+            cache.set(symbol, interval, data)
+        except Exception as e:
+            logger.debug(f"[scanner] K线缓存写入异常（忽略）: {e}")
+    return data
+
+
 def _calc_route_quality(route: str, reason: dict, ind: dict, direction: str) -> int:
     """
     同一标的多条路径都通过 judge 时，用此函数评估相对质量，取分最高的路径输出。
@@ -750,17 +873,20 @@ def _oi_divergence_short(symbol: str, price: float, chg24: float,
     return False, ""
 
 # ── 分析单个标的 ──────────────────────────────────────────────────────────────
-def analyze_symbol(symbol: str, ticker: dict,
+def _analyze_symbol_impl(symbol: str, ticker: dict,
                    active_syms: set, pending_syms: set,
                    allowed_directions: set | None = None,
                    loss_blacklist: set | None = None,
                    btc_trend: str = "",
                    market_mode: str = "",
-                   deadline: float | None = None) -> dict | None:
+                   deadline: float | None = None,
+                   mark_price_map: dict | None = None) -> dict | None:
     """
     完整分析一个标的，返回信号 dict 或 None。
     deadline:          整轮截止时间（time.monotonic() 基准）；单标的另有 SCAN_SYMBOL_TIMEOUT_SEC 总时限，
                        两者取先到者。每次发起 HTTP 请求前检查，超时直接 return None（不再发新请求）。
+    mark_price_map:    {symbol: premiumIndex 单项}（run_scan 每轮批量拉一次，含 markPrice/lastFundingRate 等）；
+                       命中则不再单独请求 get_mark_price，None/未命中降级为单标的 REST。
     active_syms:       (symbol, direction) 二元组集合，只排除同向仓位
     pending_syms:      当前有挂单的标的集合
     allowed_directions: 允许的方向集合（{"LONG"} / {"SHORT"} / None=不限制）
@@ -833,10 +959,10 @@ def analyze_symbol(symbol: str, ticker: dict,
         # ── A. 拉取数据（4H 懒加载：pullback 不拉 4H，减少约 1/3 HTTP 请求）──
         if _over_budget("15m K线"):
             return None
-        k15 = api.get_klines(symbol, "15m", 100)
+        k15 = _get_klines_cached(symbol, "15m", 100)
         if _over_budget("1h K线"):
             return None
-        k1h = api.get_klines(symbol, "1h",  100)
+        k1h = _get_klines_cached(symbol, "1h",  100)
         if not k1h or len(k1h) < 25:
             return None
 
@@ -844,9 +970,10 @@ def analyze_symbol(symbol: str, ticker: dict,
         p24     = float(k1h[-25][4]) if len(k1h) >= 25 else float(k1h[0][4])
         chg24   = (price - p24) / p24 * 100
 
+        # [fix] 优先复用 run_scan 批量拉好的标记价格/资金费率，省掉每个标的一次重复请求；无数据时降级为单标的 REST
         if _over_budget("标记价格"):
             return None
-        mp      = api.get_mark_price(symbol)
+        mp      = (mark_price_map or {}).get(symbol) or api.get_mark_price(symbol)
         funding = float(mp.get("lastFundingRate", 0))
 
         # [v3.85 OPT-6] 逐标的资金费结算窗口（替代全局 BTC 整点判断），开关 OPT_FUNDING_WINDOW_PER_SYMBOL
@@ -968,7 +1095,7 @@ def analyze_symbol(symbol: str, ticker: dict,
             if _route in _NEED_4H and not _4h_loaded:
                 if _over_budget("4h K线"):
                     return None
-                k4h = api.get_klines(symbol, "4h", 100)
+                k4h = _get_klines_cached(symbol, "4h", 100)
                 _4h_loaded = True
                 if k4h:
                     ind_4h = calc_indicators(k15, k1h, k4h)
@@ -1242,6 +1369,27 @@ def analyze_symbol(symbol: str, ticker: dict,
         return None
 
 # ── 挂单维护 ──────────────────────────────────────────────────────────────────
+import functools as _functools
+
+
+@_functools.wraps(_analyze_symbol_impl)
+def analyze_symbol(*args, **kwargs):
+    """_analyze_symbol_impl 的统计外壳：累计本标的 K 线请求次数/耗时，结束时 debug 输出并并入本轮汇总。"""
+    symbol = args[0] if args else kwargs.get("symbol", "")
+    acc = [0, 0.0]
+    _KL_TLS.acc = acc
+    try:
+        return _analyze_symbol_impl(*args, **kwargs)
+    finally:
+        _KL_TLS.acc = None
+        if acc[0]:
+            logger.debug(f"[scanner] {symbol} K线请求: 次数={acc[0]} 总耗时={acc[1]:.0f}ms")
+            with _KL_ROUND_LOCK:
+                _KL_ROUND["calls"] += acc[0]
+                _KL_ROUND["ms"] += acc[1]
+                _KL_ROUND["per_sym"][symbol] = (acc[0], acc[1])
+
+
 def maintain_pending_order(pos: dict, ticker: dict) -> str:
     """
     对已有挂单的标的评估挂单是否仍合理。
@@ -1827,6 +1975,16 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
         logger.info(f"[scanner] 累计亏损黑名单（预筛）: {_loss_blacklist}")
 
         # ── 第三步：并行分析（单标的 SCAN_SYMBOL_TIMEOUT_SEC，整轮 SCAN_TOTAL_TIMEOUT_SEC）─
+    # [fix] 全市场标记价格/资金费率批量拉一次（1 次请求），供所有并行任务复用；失败则为空 map，各标的降级走 REST
+    _mark_price_map: dict = {}
+    try:
+        for _m in (api.get_all_mark_prices() or []):
+            _ms = _m.get("symbol", "")
+            if _ms:
+                _mark_price_map[_ms] = _m
+    except Exception as _mpe:
+        logger.warning(f"[scanner] 批量标记价格获取失败，各标的降级单独请求: {_mpe}")
+    _mark_price_map_ts = time.monotonic()   # 批量数据的取数时间；注册入场价时用它判断是否仍足够新
     # 拉取一次 ticker 数据供所有并行任务复用（修复 vol24_usd 永远为 0 的 bug）
     try:
         from shared.binance_api import get_ticker_24h_cached
@@ -1879,8 +2037,9 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
         logger.debug(f"[scanner] 全市场资金费率情绪获取失败（降级忽略）: {_fse}")
 
     signals_raw = []
+    _kline_round_reset()
     _jobs = {
-        sym: (sym, _ticker_all.get(sym, {}), active_syms, pending_syms, allowed_dirs, _loss_blacklist, _btc_trend, _mkt_mode)
+        sym: (sym, _ticker_all.get(sym, {}), active_syms, pending_syms, allowed_dirs, _loss_blacklist, _btc_trend, _mkt_mode, _mark_price_map)
         for sym in scan_pool
     }
     _par_results, _unfinished = _run_parallel_with_deadline(
@@ -1894,6 +2053,8 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
                 result["class_counts"].get(res["sig_type"], 0) + 1
 
     result["signals_raw"] = len(signals_raw)
+    for _kl_line in _kline_round_summary():
+        logger.info(_kl_line)
 
     # ── 第四步：信号汇总与排序 ────────────────────────────────────────────────
     # v3.34: 槽位过滤已后移到评分过滤之后，先将 signals_raw 赋给 avail_signals
@@ -2502,7 +2663,8 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
 
     # ── 市场环境快照：注入所有信号（用于 trade_log 标注）─────────────────────
     try:
-        _all_mp = api.get_all_mark_prices() or []
+        # [fix] 复用本轮批量拉好的 _mark_price_map（资金费率均值不需要最新一刻的数据）；批量失败导致 map 为空时才再请求一次
+        _all_mp = list(_mark_price_map.values()) or (api.get_all_mark_prices() or [])
         _avg_fr = (sum(abs(float(x.get("lastFundingRate", 0))) for x in _all_mp) / len(_all_mp)
                    if _all_mp else 0.0)
     except Exception:
@@ -2566,7 +2728,12 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
                 mode = sig.get("sig_type", "pullback")
                 sig["mode"] = mode
                 try:
-                    mp     = api.get_mark_price(sym)
+                    # [fix] 优先复用本轮批量标记价格；但这里的 markPrice 会成为 pre_entry_price（入场价基准），
+                    #   批量数据取自扫描开始时，超过 _MARK_MAP_MAX_AGE_SEC 就视为过旧，改走单标的 REST 取最新价
+                    mp = None
+                    if time.monotonic() - _mark_price_map_ts <= _MARK_MAP_MAX_AGE_SEC:
+                        mp = _mark_price_map.get(sym)
+                    mp     = mp or api.get_mark_price(sym)
                     mark_p = float(mp.get("markPrice", 0))
                     sig["pre_entry_price"] = mark_p
 
