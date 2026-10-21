@@ -10,6 +10,11 @@ fx/shared/kline_cache.py — K 线 REST 缓存（按收盘时间失效）
     · 重取的未收盘 K 线开盘时间 == T + 1 → 仍在同一收盘周期 → 命中
     · 开盘时间 >  T + 1                    → 有新 K 线收盘了 → 失效（调用方重拉全量并 set）
     · 开盘时间 <  T + 1                    → 数据异常 → 视为未命中
+stale-while-revalidate（调用方传入 refresh 时启用）：
+  新 K 线收盘导致条目过期时，不立即删除：在「额外 2 个周期」(STALE_EXTRA_TTLS) 内继续返回旧的已收盘数据
+  （最后一根仍用 fetch_live 取到的最新未收盘 K 线），同时后台线程调用 refresh() 重拉全量并 set() 覆盖；
+  后台刷新失败则保留旧值继续用（至多撑满额外 2 个周期，期间 REFRESH_RETRY_SEC 秒后才会再试），超出窗口才真正过期。
+  不传 refresh 时行为与原来完全一致（过期即删除）。
 线程安全：所有对内部字典与计数器的读写都加锁；网络请求（fetch_live）在锁外执行。
 返回列表里的行对象与缓存共享（只读使用，调用方不得原地修改 K 线行）。
 """
@@ -27,6 +32,11 @@ _INTERVAL_MS = {
     "1h": 3_600_000, "2h": 7_200_000, "4h": 14_400_000, "6h": 21_600_000,
     "8h": 28_800_000, "12h": 43_200_000, "1d": 86_400_000,
 }
+
+
+STALE_EXTRA_TTLS = 2            # 过期后最多还可使用的额外周期数（15m K 线最多用到 45 分钟前的数据）
+REFRESH_RETRY_SEC = 30.0        # 后台刷新失败后，同一条目再次尝试的最短间隔
+REFRESH_WORKERS = 4             # 后台刷新并发数
 
 
 class _Entry:
@@ -48,6 +58,12 @@ class KlineCache:
         self._miss = 0
         self._expired = 0
         self._reasons: dict = {}      # miss 原因 -> 次数（诊断用）
+        self._stale = 0               # 返回过期旧值的次数（已计入 hit）
+        self._refresh_ok = 0
+        self._refresh_fail = 0
+        self._refreshing: set = set()
+        self._refresh_fail_ts: dict = {}
+        self._executor = None
 
     # ── 写入 ──────────────────────────────────────────────────────────────
     def set(self, symbol: str, interval: str, data: list) -> None:
@@ -70,11 +86,13 @@ class KlineCache:
 
     # ── 读取 ──────────────────────────────────────────────────────────────
     def get(self, symbol: str, interval: str, limit: int,
-            fetch_live: Optional[Callable[[], list]] = None) -> Optional[list]:
+            fetch_live: Optional[Callable[[], list]] = None,
+            refresh: Optional[Callable[[], list]] = None) -> Optional[list]:
         """命中且未失效：返回与 api.get_klines 同格式的列表（最后一根是未收盘的）；未命中/已失效返回 None。
 
         fetch_live：返回最新 1 根（未收盘）K 线的可调用对象（通常是 limit=1 的 REST 请求）。
                     不提供时退化为按本机时钟判断，并使用 set 时保存的未收盘快照（可能略旧）。
+        refresh：返回完整 K 线（同 api.get_klines）的可调用对象；提供时启用 stale-while-revalidate（见模块说明）。
         """
         key = (symbol, interval)
         with self._lock:
@@ -91,10 +109,15 @@ class KlineCache:
                 return None
             e.access_ts = time.time()
             closed, last_close, snap = e.closed, e.last_close, e.live
+        iv_ms = _INTERVAL_MS.get(interval)
+        swr = refresh is not None and iv_ms is not None
 
         if fetch_live is None:
             iv = _INTERVAL_MS.get(interval)
             if iv and time.time() * 1000 > last_close + iv:
+                behind = time.time() * 1000 - (last_close + iv)
+                if swr and behind <= STALE_EXTRA_TTLS * iv_ms:
+                    return self._serve_stale(key, closed, snap, limit, refresh)
                 return self._expire(key)
             live = snap
         else:
@@ -117,8 +140,59 @@ class KlineCache:
             n = limit - 1
             return (closed[-n:] if n > 0 else []) + [live]
         if live_open > expected:
+            if swr and live_open - expected <= STALE_EXTRA_TTLS * iv_ms:
+                return self._serve_stale(key, closed, live, limit, refresh)
             return self._expire(key)
         return self._count_miss(f"live_open_lt_expected(live={live_open},expected={expected})", key)
+
+    def _serve_stale(self, key, closed, live, limit, refresh):
+        """返回过期的旧已收盘数据 + 最新（或快照）未收盘 K 线，并在后台刷新。算作命中（前台没有发全量 REST）。"""
+        with self._lock:
+            self._hit += 1
+            self._stale += 1
+        self._schedule_refresh(key, refresh)
+        n = limit - 1
+        return (closed[-n:] if n > 0 else []) + [live]
+
+    def _schedule_refresh(self, key, refresh) -> None:
+        now = time.time()
+        with self._lock:
+            if key in self._refreshing or now - self._refresh_fail_ts.get(key, 0.0) < REFRESH_RETRY_SEC:
+                return
+            self._refreshing.add(key)
+            if self._executor is None:
+                from concurrent.futures import ThreadPoolExecutor
+                self._executor = ThreadPoolExecutor(max_workers=REFRESH_WORKERS, thread_name_prefix="kline-swr")
+            ex = self._executor
+        try:
+            ex.submit(self._do_refresh, key, refresh)
+        except Exception:
+            with self._lock:
+                self._refreshing.discard(key)
+
+    def _do_refresh(self, key, refresh) -> None:
+        ok = False
+        try:
+            data = refresh()
+            if isinstance(data, list) and len(data) >= 3:
+                self.set(key[0], key[1], data)
+                ok = True
+        except Exception as e:
+            logger.debug(f"[kline_cache] 后台刷新异常 {key}: {e}")
+        with self._lock:
+            self._refreshing.discard(key)
+            if ok:
+                self._refresh_ok += 1
+                self._refresh_fail_ts.pop(key, None)
+            else:
+                self._refresh_fail += 1
+                self._refresh_fail_ts[key] = time.time()
+        logger.debug(f"[kline_cache] 后台刷新{'成功' if ok else '失败（继续使用旧值）'} {key}")
+
+    def swr_stats(self) -> dict:
+        with self._lock:
+            return {"stale": self._stale, "refresh_ok": self._refresh_ok, "refresh_fail": self._refresh_fail,
+                    "refreshing": len(self._refreshing)}
 
     def _count_miss(self, reason: str = "unknown", key=None):
         with self._lock:

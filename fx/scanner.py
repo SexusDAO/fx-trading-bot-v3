@@ -140,6 +140,11 @@ def _kline_round_summary() -> list:
                 f"[scanner] K线缓存: 命中={d['hit']} 未命中={d['miss']} 过期={d['expired']} "
                 f"命中率={d['hit'] / tot:.0%}"
             )
+            try:
+                sw = cache.swr_stats()
+                lines[-1] += f" (其中旧值={sw['stale']} 后台刷新成功={sw['refresh_ok']} 失败={sw['refresh_fail']} 累计)"
+            except Exception:
+                pass
     return lines
 
 
@@ -271,7 +276,8 @@ def _get_klines_cached(symbol: str, interval: str, limit: int) -> list:
     if cache is None:
         return _kline_fetch(symbol, interval, limit)
     try:
-        data = cache.get(symbol, interval, limit, fetch_live=lambda: _kline_fetch(symbol, interval, 1))
+        data = cache.get(symbol, interval, limit, fetch_live=lambda: _kline_fetch(symbol, interval, 1),
+                         refresh=lambda: _kline_fetch(symbol, interval, limit))   # 过期后先用旧值，后台刷新
     except Exception as e:
         logger.debug(f"[scanner] K线缓存读取异常（降级 REST）: {e}")
         data = None
