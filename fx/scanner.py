@@ -1379,6 +1379,9 @@ def analyze_one(symbol: str, ticker: dict,
         return None
 
 
+_ROUTE_QUALITY: dict = {}  # 阶段3：symbol -> 本轮 route_quality（仅供 scan_signals.jsonl）
+
+
 def _apply_post_events(sig: dict | None, events: list) -> dict | None:
     """主进程后置处理：按顺序落盘 analytics / shadow 记录，再处理妖币 LLM，最后写通过记录。
     返回最终信号（LLM 可能改写为 range_bounce LONG，或否决返回 None）。"""
@@ -1448,6 +1451,7 @@ def _apply_post_events(sig: dict | None, events: list) -> dict | None:
             logger.debug(f"[scanner] {symbol} 妖币识别跳过: {_exp_e}")
 
     if pass_kwargs is not None:
+        _ROUTE_QUALITY[pass_kwargs.get("symbol")] = pass_kwargs.get("route_quality")  # 阶段3 对账用，不进信号 dict
         try:
             _write_signal_analytics(**pass_kwargs)
         except Exception as _e:
@@ -2481,6 +2485,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
         logger.debug(f"[scanner] 全市场资金费率情绪获取失败（降级忽略）: {_fse}")
 
     signals_raw = []
+    _ROUTE_QUALITY.clear()
     _kline_round_reset()
     _jobs = {
         sym: (sym, _ticker_all.get(sym, {}), active_syms, pending_syms, allowed_dirs, _loss_blacklist, _btc_trend, _mkt_mode)
@@ -2508,6 +2513,13 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
                 result["class_counts"].get(res["sig_type"], 0) + 1
 
     result["signals_raw"] = len(signals_raw)
+    # 阶段3：judge 通过的原始信号落盘，供影子触发器对账（无信号也写一行；失败不影响扫描）
+    try:
+        from shared.trigger_detector import write_scan_signals as _wss
+        _wss([{"symbol": r.get("symbol"), "sig_type": r.get("sig_type"), "direction": r.get("direction"),
+               "route_quality": _ROUTE_QUALITY.get(r.get("symbol"))} for r in signals_raw])
+    except Exception:
+        pass
     for _kl_line in _kline_round_summary():
         logger.info(_kl_line)
 

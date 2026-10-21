@@ -670,6 +670,19 @@ async def main() -> None:
 
             hub = None
 
+    # 阶段3：影子触发器（默认关闭；只读 hub 内存，不下单）
+    try:
+        from config import TRIGGER_DETECTOR_ENABLED as _TD_ON
+    except ImportError:
+        _TD_ON = False
+    if _TD_ON and hub is not None:
+        try:
+            from shared.trigger_detector import TriggerDetector
+            TriggerDetector(hub=hub).start()
+            logger.info("[main] trigger_detector 已启动（影子模式）")
+        except Exception as e:
+            logger.warning(f"[main] trigger_detector 启动失败（忽略）: {e}")
+
     # ── 分析进程池预热（SCAN_USE_PROCESS_POOL=True 时；失败不影响启动，扫描时会回落线程池）──
     try:
         import config as _cfg_pp

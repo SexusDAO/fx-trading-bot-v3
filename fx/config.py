@@ -998,3 +998,6 @@ OPT_DIVERGENCE_GATE_WEIGHT_CAP = 2.0
 # [v3.88 OPT-15] oi_divergence 近5根全阳（SHORT）/全阴（LONG）时直接拒绝信号；默认开启（与其他 OPT_* 不同）。
 #   关闭则恢复 mark*0.992 / mark*1.008 兜底。
 OPT_OID_REJECT_ALL_BULL = True
+
+# ── 阶段3：影子触发器（只观测，不下单、不发 REST）──────────────────────────────
+TRIGGER_DETECTOR_ENABLED = False  # True：每秒轮询 hub 内存，写 logs/trigger_log.jsonl 并与 logs/scan_signals.jsonl 对账
