@@ -755,9 +755,12 @@ def analyze_symbol(symbol: str, ticker: dict,
                    allowed_directions: set | None = None,
                    loss_blacklist: set | None = None,
                    btc_trend: str = "",
-                   market_mode: str = "") -> dict | None:
+                   market_mode: str = "",
+                   mark_price_map: dict | None = None) -> dict | None:
     """
     完整分析一个标的，返回信号 dict 或 None。
+    mark_price_map:    {symbol: premiumIndex 单项}（run_scan 每轮批量拉一次，含 markPrice/lastFundingRate 等）；
+                       命中则不再单独请求 get_mark_price，None/未命中降级为单标的 REST。
     active_syms:       (symbol, direction) 二元组集合，只排除同向仓位
     pending_syms:      当前有挂单的标的集合
     allowed_directions: 允许的方向集合（{"LONG"} / {"SHORT"} / None=不限制）
@@ -821,7 +824,8 @@ def analyze_symbol(symbol: str, ticker: dict,
         p24     = float(k1h[-25][4]) if len(k1h) >= 25 else float(k1h[0][4])
         chg24   = (price - p24) / p24 * 100
 
-        mp      = api.get_mark_price(symbol)
+        # [fix] 优先复用 run_scan 批量拉好的标记价格/资金费率，省掉每个标的一次重复请求；无数据时降级为单标的 REST
+        mp      = (mark_price_map or {}).get(symbol) or api.get_mark_price(symbol)
         funding = float(mp.get("lastFundingRate", 0))
 
         # [v3.85 OPT-6] 逐标的资金费结算窗口（替代全局 BTC 整点判断），开关 OPT_FUNDING_WINDOW_PER_SYMBOL
@@ -1757,6 +1761,15 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
         logger.info(f"[scanner] 累计亏损黑名单（预筛）: {_loss_blacklist}")
 
         # ── 第三步：并行分析（单标的 SCAN_SYMBOL_TIMEOUT_SEC，整轮 SCAN_TOTAL_TIMEOUT_SEC）─
+    # [fix] 全市场标记价格/资金费率批量拉一次（1 次请求），供所有并行任务复用；失败则为空 map，各标的降级走 REST
+    _mark_price_map: dict = {}
+    try:
+        for _m in (api.get_all_mark_prices() or []):
+            _ms = _m.get("symbol", "")
+            if _ms:
+                _mark_price_map[_ms] = _m
+    except Exception as _mpe:
+        logger.warning(f"[scanner] 批量标记价格获取失败，各标的降级单独请求: {_mpe}")
     # 拉取一次 ticker 数据供所有并行任务复用（修复 vol24_usd 永远为 0 的 bug）
     try:
         from shared.binance_api import get_ticker_24h_cached
@@ -1812,7 +1825,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     scan_deadline = time.time() + SCAN_TOTAL_TIMEOUT_SEC
     with concurrent.futures.ThreadPoolExecutor(max_workers=SCAN_MAX_WORKERS) as exe:
         futures = {
-            exe.submit(analyze_symbol, sym, _ticker_all.get(sym, {}), active_syms, pending_syms, allowed_dirs, _loss_blacklist, _btc_trend, _mkt_mode): sym
+            exe.submit(analyze_symbol, sym, _ticker_all.get(sym, {}), active_syms, pending_syms, allowed_dirs, _loss_blacklist, _btc_trend, _mkt_mode, _mark_price_map): sym
             for sym in scan_pool
         }
         try:
