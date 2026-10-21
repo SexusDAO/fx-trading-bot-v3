@@ -1,0 +1,674 @@
+{
+"0:0:-": [
+"b09b0701b76e257b8045",
+null
+],
+"0:1:-": [
+"52053c8cd57ae488c882",
+"pullback/LONG"
+],
+"0:1:llm_low_conf": [
+"c1c09ee7c2417bdc3861",
+null
+],
+"0:1:llm_open": [
+"a5518a92720b3e903965",
+"range_bounce/LONG"
+],
+"0:1:llm_veto": [
+"c1c09ee7c2417bdc3861",
+null
+],
+"0:2:-": [
+"ba7ff6fbd2730e02d97a",
+"pullback/LONG"
+],
+"0:3:-": [
+"8e4d24d3679b45324c1b",
+"reversal/SHORT"
+],
+"0:3:-:down": [
+"e11ba62f7787c66c06a5",
+"reversal/SHORT"
+],
+"10:0:-": [
+"89ddeb79a583b7691895",
+null
+],
+"10:1:-": [
+"194410486142b565f05f",
+"pullback/LONG"
+],
+"10:2:-": [
+"f8bbc2c1b0427906c524",
+"pullback/LONG"
+],
+"10:3:-": [
+"89ddeb79a583b7691895",
+null
+],
+"11:0:-": [
+"20c90203f803ed622c4d",
+null
+],
+"11:1:-": [
+"0da55aef95cf4544d072",
+"pullback/SHORT"
+],
+"11:2:-": [
+"8000569f9da14669a4c6",
+"pullback/SHORT"
+],
+"11:3:-": [
+"20c90203f803ed622c4d",
+null
+],
+"12:0:-": [
+"6fc534657e6887907a44",
+null
+],
+"12:1:-": [
+"d715e99c6e54a278abd4",
+"pullback/LONG"
+],
+"12:2:-": [
+"78c299a7b37b55ef7aea",
+"pullback/LONG"
+],
+"12:3:-": [
+"e99708026d78afe1a6b6",
+"reversal/SHORT"
+],
+"13:0:-": [
+"587657ecb7be0fc02b99",
+null
+],
+"13:1:-": [
+"0f107353bb5bc8563798",
+"pullback/SHORT"
+],
+"13:2:-": [
+"e30f00362cc2632023ca",
+"pullback/SHORT"
+],
+"13:3:-": [
+"b1b3b4edf783fa0b42a8",
+"reversal/SHORT"
+],
+"14:0:-": [
+"ad907f762257f8bd3cc9",
+null
+],
+"14:1:-": [
+"f6e1292533a16badeb63",
+null
+],
+"14:2:-": [
+"f6e1292533a16badeb63",
+null
+],
+"14:3:-": [
+"ad907f762257f8bd3cc9",
+null
+],
+"15:0:-": [
+"f6e1292533a16badeb63",
+null
+],
+"15:1:-": [
+"f6e1292533a16badeb63",
+null
+],
+"15:2:-": [
+"f6e1292533a16badeb63",
+null
+],
+"15:3:-": [
+"f6e1292533a16badeb63",
+null
+],
+"16:0:-": [
+"6d1d2e5c2c5d417be45e",
+null
+],
+"16:1:-": [
+"d934839789680be4b201",
+"pullback/LONG"
+],
+"16:2:-": [
+"fc574f4cbb6eee660d88",
+"pullback/LONG"
+],
+"16:3:-": [
+"6d1d2e5c2c5d417be45e",
+null
+],
+"17:0:-": [
+"78a00ee4764c23b335e0",
+null
+],
+"17:1:-": [
+"dbeb4c616e92e8fc3380",
+"pullback/SHORT"
+],
+"17:2:-": [
+"01b97868411f514ca153",
+"pullback/SHORT"
+],
+"17:3:-": [
+"78a00ee4764c23b335e0",
+null
+],
+"18:0:-": [
+"7cd82843bca01712ceb7",
+null
+],
+"18:1:-": [
+"796fccc230eac3fe6661",
+"pullback/LONG"
+],
+"18:2:-": [
+"b6cf95e330c37ac8f04a",
+"pullback/LONG"
+],
+"18:3:-": [
+"76d4ae2c54fdff0f6293",
+"reversal/SHORT"
+],
+"19:0:-": [
+"028dc5e1b9865b3dbda5",
+null
+],
+"19:1:-": [
+"7815110a7259187b983e",
+"pullback/SHORT"
+],
+"19:2:-": [
+"0b8239f3592b125c85d5",
+"pullback/SHORT"
+],
+"19:3:-": [
+"028dc5e1b9865b3dbda5",
+null
+],
+"1:0:-": [
+"57a313c4e27edc2a0601",
+null
+],
+"1:1:-": [
+"9cb05acf26ab10c9c067",
+"pullback/SHORT"
+],
+"1:1:llm_low_conf": [
+"f6e1292533a16badeb63",
+null
+],
+"1:1:llm_open": [
+"4793a0fdadb26e996153",
+"range_bounce/LONG"
+],
+"1:1:llm_veto": [
+"f6e1292533a16badeb63",
+null
+],
+"1:2:-": [
+"043523431879a28e96fd",
+"pullback/SHORT"
+],
+"1:3:-": [
+"57a313c4e27edc2a0601",
+null
+],
+"1:3:-:down": [
+"76ed5d049fa26e3656dc",
+null
+],
+"20:0:-": [
+"1eb5862f59ed401a3e62",
+null
+],
+"20:1:-": [
+"d900072071b0ae55564f",
+"pullback/LONG"
+],
+"20:2:-": [
+"a7c89f555796f53c6b72",
+"pullback/LONG"
+],
+"20:3:-": [
+"1eb5862f59ed401a3e62",
+null
+],
+"21:0:-": [
+"f6e1292533a16badeb63",
+null
+],
+"21:1:-": [
+"f6e1292533a16badeb63",
+null
+],
+"21:2:-": [
+"f6e1292533a16badeb63",
+null
+],
+"21:3:-": [
+"f6e1292533a16badeb63",
+null
+],
+"22:0:-": [
+"c795ccba0d8e5491dcc0",
+null
+],
+"22:1:-": [
+"240278060c1b9f2fb2cd",
+"pullback/LONG"
+],
+"22:2:-": [
+"5bb5374d80687c4a3188",
+"pullback/LONG"
+],
+"22:3:-": [
+"c795ccba0d8e5491dcc0",
+null
+],
+"23:0:-": [
+"b389e446a2acc9274f7b",
+null
+],
+"23:1:-": [
+"4b1192162eb608b455d0",
+"pullback/SHORT"
+],
+"23:2:-": [
+"3dad37f63b0269f1462d",
+"pullback/SHORT"
+],
+"23:3:-": [
+"447caa706ccc43af46e6",
+"reversal/SHORT"
+],
+"24:0:-": [
+"3c4ff9e2b9b869d71130",
+null
+],
+"24:1:-": [
+"4aeaf9f6c3d8d11a71b2",
+"pullback/LONG"
+],
+"24:2:-": [
+"96b78a093061f2f6ceb9",
+"pullback/LONG"
+],
+"24:3:-": [
+"deded6ea5fff122ab6fb",
+"reversal/SHORT"
+],
+"25:0:-": [
+"79e20d8c788b762a00f5",
+null
+],
+"25:1:-": [
+"944bd60f0e26cc56b0cc",
+"pullback/SHORT"
+],
+"25:2:-": [
+"b8aed11cb132cc3d1370",
+"pullback/SHORT"
+],
+"25:3:-": [
+"c42e6e6341ceca43e722",
+"reversal/SHORT"
+],
+"26:0:-": [
+"20c0a8a90fb77435f042",
+null
+],
+"26:1:-": [
+"a85d05389e55229be6d9",
+null
+],
+"26:2:-": [
+"a85d05389e55229be6d9",
+null
+],
+"26:3:-": [
+"f7fac832fb31f554b421",
+null
+],
+"27:0:-": [
+"f6e1292533a16badeb63",
+null
+],
+"27:1:-": [
+"f6e1292533a16badeb63",
+null
+],
+"27:2:-": [
+"f6e1292533a16badeb63",
+null
+],
+"27:3:-": [
+"f6e1292533a16badeb63",
+null
+],
+"28:0:-": [
+"2ccbb9e5b45e8c55ca93",
+null
+],
+"28:1:-": [
+"a221f31916506989f5e3",
+"pullback/LONG"
+],
+"28:2:-": [
+"7183eb15bc26e31b47ca",
+"pullback/LONG"
+],
+"28:3:-": [
+"93f9e286a3578908186c",
+"reversal/SHORT"
+],
+"29:0:-": [
+"b7f4fa5a5b666e59d2d7",
+null
+],
+"29:1:-": [
+"5a11f5e4f018706152b6",
+"pullback/SHORT"
+],
+"29:2:-": [
+"6c8621f902bcf8544d71",
+"pullback/SHORT"
+],
+"29:3:-": [
+"710c42318260160033a1",
+"reversal/SHORT"
+],
+"2:0:-": [
+"03b31138e4ebf57cf1d0",
+null
+],
+"2:1:-": [
+"e7ddf1f2b715e40e5b70",
+"pullback/LONG"
+],
+"2:1:llm_low_conf": [
+"f6e1292533a16badeb63",
+null
+],
+"2:1:llm_open": [
+"6e94d4a009cd11b4f90e",
+"range_bounce/LONG"
+],
+"2:1:llm_veto": [
+"f6e1292533a16badeb63",
+null
+],
+"2:2:-": [
+"ac553d60b54ce2c90e1e",
+"pullback/LONG"
+],
+"2:3:-": [
+"03b31138e4ebf57cf1d0",
+null
+],
+"2:3:-:down": [
+"b7322a7bbd175c3c9b66",
+null
+],
+"30:0:-": [
+"9ec24fff36cec5eef68f",
+null
+],
+"30:1:-": [
+"310df279704296588e33",
+"pullback/LONG"
+],
+"30:2:-": [
+"4c4278215263b38dad67",
+"pullback/LONG"
+],
+"30:3:-": [
+"9ec24fff36cec5eef68f",
+null
+],
+"31:0:-": [
+"6fed374ac69ca2c0f56a",
+null
+],
+"31:1:-": [
+"d22ca9ac6549a6959ffd",
+"pullback/SHORT"
+],
+"31:2:-": [
+"bf77ff9bbb98db2d1dcd",
+"pullback/SHORT"
+],
+"31:3:-": [
+"f8a08d73c3ca4a4551bb",
+"reversal/SHORT"
+],
+"32:0:-": [
+"e6d7f22d43399ee06352",
+null
+],
+"32:1:-": [
+"c78bd056800595a4a45e",
+"pullback/SHORT"
+],
+"32:2:-": [
+"10cd543562e34da7389f",
+"pullback/SHORT"
+],
+"32:3:-": [
+"e6d7f22d43399ee06352",
+null
+],
+"33:0:-": [
+"f6e1292533a16badeb63",
+null
+],
+"33:1:-": [
+"f6e1292533a16badeb63",
+null
+],
+"33:2:-": [
+"f6e1292533a16badeb63",
+null
+],
+"33:3:-": [
+"f6e1292533a16badeb63",
+null
+],
+"34:0:-": [
+"98fac2eda6531ceabedd",
+null
+],
+"34:1:-": [
+"aa1f707b1532ab417cde",
+"pullback/LONG"
+],
+"34:2:-": [
+"e39fa7108bf7ab65ad50",
+"pullback/LONG"
+],
+"34:3:-": [
+"98fac2eda6531ceabedd",
+null
+],
+"35:0:-": [
+"f771a186960723acb779",
+null
+],
+"35:1:-": [
+"a8c9e4e3d32984cc53c3",
+"pullback/SHORT"
+],
+"35:2:-": [
+"7d09b35555c9f452eac4",
+"pullback/SHORT"
+],
+"35:3:-": [
+"47a1966550d9ec7c8e5c",
+"reversal/SHORT"
+],
+"3:0:-": [
+"46f31d289c69ca1a101b",
+null
+],
+"3:1:-": [
+"e12ad69184030e4509a5",
+"pullback/LONG"
+],
+"3:1:llm_low_conf": [
+"44d4e444a7383a637ef6",
+null
+],
+"3:1:llm_open": [
+"54724722bc13dff8d9bc",
+"range_bounce/LONG"
+],
+"3:1:llm_veto": [
+"44d4e444a7383a637ef6",
+null
+],
+"3:2:-": [
+"3556d69ed0d1e3d91f5e",
+"pullback/LONG"
+],
+"3:3:-": [
+"54b7627e77f999e6b5da",
+"reversal/SHORT"
+],
+"3:3:-:down": [
+"9ad033ed4e03a779da51",
+"reversal/SHORT"
+],
+"4:0:-": [
+"e17595b415eb053aa940",
+null
+],
+"4:1:-": [
+"66ca4782307b8d0c304f",
+"pullback/LONG"
+],
+"4:1:llm_low_conf": [
+"f6e1292533a16badeb63",
+null
+],
+"4:1:llm_open": [
+"ad8ae9438f944e14ac2e",
+"range_bounce/LONG"
+],
+"4:1:llm_veto": [
+"f6e1292533a16badeb63",
+null
+],
+"4:2:-": [
+"808e79bc3d0536718cab",
+"pullback/LONG"
+],
+"4:3:-": [
+"e17595b415eb053aa940",
+null
+],
+"4:3:-:down": [
+"68c4b29d46ff9e670869",
+null
+],
+"5:0:-": [
+"523c2e8b6a5c7838b125",
+null
+],
+"5:1:-": [
+"7a79588711c7749b045c",
+"pullback/SHORT"
+],
+"5:1:llm_low_conf": [
+"8d2677cb8c26f34629fb",
+null
+],
+"5:1:llm_open": [
+"cf97d2ed80720f23b7bb",
+"range_bounce/LONG"
+],
+"5:1:llm_veto": [
+"8d2677cb8c26f34629fb",
+null
+],
+"5:2:-": [
+"9bd0016f3525c562bc1a",
+"pullback/SHORT"
+],
+"5:3:-": [
+"e5bdfeb69164c5de2fa4",
+"reversal/SHORT"
+],
+"5:3:-:down": [
+"734466b51e3a4db69a10",
+"reversal/SHORT"
+],
+"6:0:-": [
+"2f6891b5ea8335fd89dc",
+null
+],
+"6:1:-": [
+"39e9f3a831319acec6b2",
+"pullback/LONG"
+],
+"6:2:-": [
+"2f219c3600019eae01b3",
+"pullback/LONG"
+],
+"6:3:-": [
+"d089cef25ddc19297151",
+"reversal/SHORT"
+],
+"7:0:-": [
+"a56d9515697988d5cf33",
+null
+],
+"7:1:-": [
+"828468412fb24de76992",
+"pullback/SHORT"
+],
+"7:2:-": [
+"999fda05242434c8e1ae",
+"pullback/SHORT"
+],
+"7:3:-": [
+"f41df6bb9817914ccce9",
+"reversal/SHORT"
+],
+"8:0:-": [
+"f6a285112b9da77eb735",
+null
+],
+"8:1:-": [
+"116dabb02e792af9125c",
+"pullback/SHORT"
+],
+"8:2:-": [
+"a9533ac60ab1b4431de1",
+"pullback/SHORT"
+],
+"8:3:-": [
+"f6a285112b9da77eb735",
+null
+],
+"9:0:-": [
+"f6e1292533a16badeb63",
+null
+],
+"9:1:-": [
+"f6e1292533a16badeb63",
+null
+],
+"9:2:-": [
+"f6e1292533a16badeb63",
+null
+],
+"9:3:-": [
+"f6e1292533a16badeb63",
+null
+]
+}

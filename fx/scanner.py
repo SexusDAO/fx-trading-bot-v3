@@ -826,20 +826,24 @@ def _llm_classify(symbol: str, chg24: float, funding: float, ind: dict) -> str:
     return "breakout"
 
 
-def classify(symbol: str, chg24: float, funding: float, ind: dict) -> str:
+def classify(symbol: str, chg24: float, funding: float, ind: dict, stock_closed: bool | None = None) -> str:
     """
     按优先级分类，优先级：reversal > breakout > pullback（兜底）
     多模式冲突时触发固定规则分类（_llm_classify）。
     """
-    # v3.1: stock closed guard
-    try:
-        import sys as _s, pathlib as _p
-        _s.path.insert(0, str(_p.Path(__file__).parent.parent))
-        from calc_position_size_real import _is_stock_token, _us_market_open
-        if _is_stock_token(symbol) and not _us_market_open():
+    # v3.1: stock closed guard（调用方显式传入 stock_closed 时不再读时钟/外部模块）
+    if stock_closed is not None:
+        if stock_closed:
             return "skip_stock_closed"
-    except Exception:
-        pass
+    else:
+        try:
+            import sys as _s, pathlib as _p
+            _s.path.insert(0, str(_p.Path(__file__).parent.parent))
+            from calc_position_size_real import _is_stock_token, _us_market_open
+            if _is_stock_token(symbol) and not _us_market_open():
+                return "skip_stock_closed"
+        except Exception:
+            pass
     is_rev = _is_reversal(chg24, funding, ind)
     is_brk = _is_breakout(chg24, ind)
 
@@ -910,8 +914,11 @@ def _in_symbol_funding_window(symbol: str, mp: dict, funding_abs: float) -> tupl
 
 
 # ── OI 背离检查 ───────────────────────────────────────────────────────────────
+_OI_24H_UNSET = object()   # oi_24h 参数的"未传入"哨兵（传 None 表示缓存不足 24H）
+
+
 def _oi_divergence(symbol: str, price: float, chg24: float,
-                   high_24h: float, oi_now: float = 0) -> tuple[bool, str]:
+                   high_24h: float, oi_now: float = 0, oi_24h=_OI_24H_UNSET) -> tuple[bool, str]:
     """
     做多方向：价格接近24H高点（>=98%）且 OI 同期下降超过20% → 背离。
     OI 对比基准取自本地缓存（oi_cache.json），精度优于接口历史数据。
@@ -924,7 +931,8 @@ def _oi_divergence(symbol: str, price: float, chg24: float,
     if oi_now <= 0:
         return False, ""   # 当前OI无效，跳过
 
-    oi_24h = get_oi_24h_ago(symbol)
+    if oi_24h is _OI_24H_UNSET:
+        oi_24h = get_oi_24h_ago(symbol)
     if oi_24h is None:
         logger.debug(f"[scanner] {symbol} LONG OI背离保护跳过（缓存不足24H，重启后24H内此保护不生效）")
         return False, ""   # 缓存数据不足24H，跳过
@@ -939,7 +947,7 @@ def _oi_divergence(symbol: str, price: float, chg24: float,
 
 
 def _oi_divergence_short(symbol: str, price: float, chg24: float,
-                         low_24h: float, oi_now: float = 0) -> tuple[bool, str]:
+                         low_24h: float, oi_now: float = 0, oi_24h=_OI_24H_UNSET) -> tuple[bool, str]:
     """
     做空方向 OI 背离检查：
     价格接近24H最低点（<= low_24h * 102%）且 OI 同期上升超过20%
@@ -958,7 +966,8 @@ def _oi_divergence_short(symbol: str, price: float, chg24: float,
     if oi_now <= 0:
         return False, ""
 
-    oi_24h = get_oi_24h_ago(symbol)
+    if oi_24h is _OI_24H_UNSET:
+        oi_24h = get_oi_24h_ago(symbol)
     if oi_24h is None:
         logger.debug(f"[scanner] {symbol} SHORT OI背离保护跳过（缓存不足24H，重启后24H内此保护不生效）")
         return False, ""   # 缓存不足24H，跳过
@@ -972,145 +981,177 @@ def _oi_divergence_short(symbol: str, price: float, chg24: float,
     return False, ""
 
 # ── 分析单个标的 ──────────────────────────────────────────────────────────────
-def _analyze_symbol_impl(symbol: str, ticker: dict,
-                   active_syms: set, pending_syms: set,
-                   allowed_directions: set | None = None,
-                   loss_blacklist: set | None = None,
-                   btc_trend: str = "",
-                   market_mode: str = "",
-                   deadline: float | None = None,
-                   mark_price_map: dict | None = None) -> dict | None:
-    """
-    完整分析一个标的，返回信号 dict 或 None。
-    deadline:          整轮截止时间（time.monotonic() 基准）；单标的另有 SCAN_SYMBOL_TIMEOUT_SEC 总时限，
-                       两者取先到者。每次发起 HTTP 请求前检查，超时直接 return None（不再发新请求）。
-    mark_price_map:    {symbol: premiumIndex 单项}（run_scan 每轮批量拉一次，含 markPrice/lastFundingRate 等）；
-                       命中则不再单独请求 get_mark_price，None/未命中降级为单标的 REST。
-    active_syms:       (symbol, direction) 二元组集合，只排除同向仓位
-    pending_syms:      当前有挂单的标的集合
-    allowed_directions: 允许的方向集合（{"LONG"} / {"SHORT"} / None=不限制）
-    loss_blacklist:    累计亏损黑名单（零成本预筛，不拉 K 线前直接跳过）
-    btc_trend:         BTC 趋势（"up"/"down"/"neutral"），用于熊市粗筛
-    """
-    # ── 零成本预筛（不拉任何接口）────────────────────────────────────────────
+def _prescreen_ticker(symbol: str, ticker: dict, loss_blacklist, is_weekend: bool) -> bool:
+    """零成本预筛（纯函数，不拉任何接口）：返回 False 表示直接跳过该标的。"""
     if loss_blacklist and symbol in loss_blacklist:
-        return None   # 黑名单标的直接跳过，无需拉 K 线
-
-    # ── v3.54 ticker 快速预筛（5ms，拦截明显不符合任何策略条件的标的）──────────
-    # 目标：把 scan_pool ~110 个里约 50% 的标的在拉 K 线前就排除，降低耗时
-    # [v3.87 STEP2] 删除未使用的 _chg（上一轮删除方向粗筛后遗留）
+        return False   # 黑名单标的直接跳过，无需拉 K 线
+    # v3.54 ticker 快速预筛（5ms，拦截明显不符合任何策略条件的标的）
     _vol   = float(ticker.get("quoteVolume", 0))
     _h24   = float(ticker.get("highPrice", 0))
     _l24   = float(ticker.get("lowPrice", 0))
-    _p24   = float(ticker.get("lastPrice", _h24))
     _amp   = (_h24 - _l24) / (_l24 + 1e-9) * 100 if _l24 > 0 else 0.0
     # 1. 成交量过低 → 流动性不足，所有策略都不适合
     if _vol < 500_000:   # 50万U，比候选池门槛（100万）低，给误差空间
-        return None
-    # 2. 振幅过低 → ATR 必然不达标，reversal/breakout/pullback 均会在 judge 被拒
-    _is_wk = _is_weekend_period(datetime.now(timezone.utc))
-    _amp_min = 0.6 if _is_wk else 1.0   # 周末门槛更低
-    if _amp < _amp_min:
-        return None
-    # 3. reversal 粗筛：chg24 绝对值 < 3% 且不是 range_bounce 候选 → 极可能被 classify 分到 pullback
-    #    pullback 本身不过分，不在这里拦截，只排除 reversal 路径的无效噪音
-    #    （不拦截 pullback/range_bounce，它们对 chg24 无强依赖）
-
-    # ── 周末 ATR 代理预筛（v3.28）────────────────────────────────────────────
-    # refresh_pool 的振幅预筛工作日是 2.5%，周末用日内振幅代理 ATR，单独放宽到 1.0%
-    # judges.py 里的硬门槛通过 _weekend_mode 标志同步降低（见下方 ind 注入）
-    _now_wk = datetime.now(timezone.utc)
-    _is_weekend_sym = _is_weekend_period(_now_wk)
-    if _is_weekend_sym:
-        _h24 = float(ticker.get("highPrice", 0))
-        _l24 = float(ticker.get("lowPrice",  0))
-        _p24 = float(ticker.get("lastPrice", 0))
-        if _h24 > 0 and _l24 > 0 and _p24 > 0:
-            _amp_proxy = (_h24 - _l24) / (_l24 + 1e-9) * 100
-            if _amp_proxy < 0.8:
-                return None  # v3.46: 周末振幅代理 < 0.8%，预筛拒绝（降低以允许中波动档进入）
-
-    chg24_rough = float(ticker.get("priceChangePercent", 0))
-    # v3.83 修复：原「方向粗筛」会在只允许单边时丢弃大涨/大跌标的，
-    # 但大涨恰是 reversal SHORT、大跌恰是 reversal LONG 的触发条件，属于方向判断反了。
-    # 方向约束已在 judge 通过后统一检查（见下方「方向约束检查」），此处不再预筛。
-    # v3.83 修复：原「熊市禁多」预筛直接 return None，会连带屏蔽该标的的
-    # oi_divergence / stop_hunt / range_bounce 等所有路径。改为只在 reversal LONG 判定后拒绝。
-    _bear_block_rev_long = (btc_trend == "down" and chg24_rough <= -8)
-
-    # [fix] 单标的总时限：以 monotonic 计时，发起每个 HTTP 请求前检查
-    #   （原先靠 as_completed 里对「已完成 future」调 result(timeout) 判断，永远不会触发）
-    _t_sym0  = time.monotonic()
-    _t_limit = _t_sym0 + SCAN_SYMBOL_TIMEOUT_SEC
-    if deadline is not None:
-        _t_limit = min(_t_limit, deadline)
-
-    def _over_budget(stage: str) -> bool:
-        if time.monotonic() > _t_limit:
-            logger.info(
-                f"[scanner] {symbol} 单标的超时(已用 {time.monotonic() - _t_sym0:.1f}s，"
-                f"限 {SCAN_SYMBOL_TIMEOUT_SEC}s/整轮截止)，在「{stage}」前放弃"
-            )
-            return True
         return False
+    # 2. 振幅过低 → ATR 必然不达标，reversal/breakout/pullback 均会在 judge 被拒
+    _amp_min = 0.6 if is_weekend else 1.0   # 周末门槛更低
+    if _amp < _amp_min:
+        return False
+    # 周末 ATR 代理预筛（v3.28）：用日内振幅代理 ATR，单独放宽到 0.8%
+    if is_weekend:
+        _h = float(ticker.get("highPrice", 0))
+        _l = float(ticker.get("lowPrice",  0))
+        _p = float(ticker.get("lastPrice", 0))
+        if _h > 0 and _l > 0 and _p > 0:
+            _amp_proxy = (_h - _l) / (_l + 1e-9) * 100
+            if _amp_proxy < 0.8:
+                return False  # v3.46: 周末振幅代理 < 0.8%，预筛拒绝
+    return True
 
+
+def _build_signal(symbol: str, direction: str, sig_type: str, reason, chg24: float, funding: float,
+                  ind: dict, oi_now: float, k1h: list, now_ms: int) -> dict:
+    """由选定的路线/方向/reason 拼出信号 dict（纯计算：仓位上限、VP、stop_hunt 止损提示、资金费率协同）。"""
+    # 输出信号（不含入场价/止损价，由 executor 实时计算）
+    _sig = {
+        "symbol":    symbol,
+        "direction": direction,
+        "sig_type":  sig_type,
+        "chg24":     round(chg24, 2),
+        "funding":   funding,
+        "ind":       ind,
+        "reason":    reason,
+        "oi_now":    oi_now,
+        "ts":        int(now_ms),
+    }
+    # [fix] 提升 reason 里的 position_size_cap / signal_strength 到顶层
+    _sig["position_size_cap"] = float(
+        (reason or {}).get("position_size_cap") or 0.5
+    )
+    _sig["signal_strength"] = (reason or {}).get("signal_strength", "medium")
+    # v3.62: Volume Profile 注入——用建好的 1H K 线计算 VP 结构位
     try:
-        # ── A. 拉取数据（4H 懒加载：pullback 不拉 4H，减少约 1/3 HTTP 请求）──
-        if _over_budget("15m K线"):
+        from shared.indicators import calc_volume_profile as _cvp
+        _vp_result = _cvp(k1h)
+        if _vp_result.get("valid"):
+            _sig["vp"] = _vp_result
+            logger.debug(
+                f"[scanner] {symbol} VP: poc={_vp_result['poc']:.4g} "
+                f"vah={_vp_result['vah']:.4g} val={_vp_result['val']:.4g}"
+            )
+    except Exception as _vp_e:
+        logger.debug(f"[scanner] {symbol} VP 计算跳过: {_vp_e}")
+    # v3.49: stop_hunt 将 sl_price_hint 传入 signal，供 calc_sl_tp 覆盖止损
+    if sig_type == "stop_hunt" and isinstance(reason, dict):
+        _sl_hint = reason.get("sl_price_hint")
+        if _sl_hint:
+            _sig["sl_price_hint"] = _sl_hint
+        _sig["signal_strength"] = reason.get("signal_strength", "medium")
+    # ── 资金费率+主策略协同（v3.72）：单标的精细化仓位调整 ────────────────────
+    try:
+        from config import (
+            FUNDING_SYNERGY_BONUS, FUNDING_SYNERGY_PENALTY,
+            FUNDING_SYNERGY_THRESH,
+        )
+        if sig_type != "funding_arb" and abs(funding) > FUNDING_SYNERGY_THRESH:
+            _funding_favors_long  = funding < 0   # 负费率 = 空头付费 = 多头收费
+            _direction_is_long    = direction.upper() == "LONG"
+            _is_synergy   = (_direction_is_long and _funding_favors_long) or (not _direction_is_long and not _funding_favors_long)
+            _is_against   = (_direction_is_long and not _funding_favors_long) or (not _direction_is_long and _funding_favors_long)
+
+            _cur_cap = float(_sig.get("position_size_cap", 0.5) or 0.5)
+            if _is_synergy:
+                _new_cap = round(min(_cur_cap * FUNDING_SYNERGY_BONUS, 0.80), 3)
+                if _new_cap != _cur_cap:
+                    _sig["position_size_cap"] = _new_cap
+                    _sig["funding_synergy"]   = "bonus"
+                    logger.info(
+                        f"[scanner] {symbol} 费率协同加权: "
+                        f"funding={funding*100:.4f}% 方向{direction} cap {_cur_cap:.2f}→{_new_cap:.2f}"
+                    )
+            elif _is_against:
+                _new_cap = round(_cur_cap * FUNDING_SYNERGY_PENALTY, 3)
+                if _new_cap != _cur_cap:
+                    _sig["position_size_cap"] = _new_cap
+                    _sig["funding_synergy"]   = "penalty"
+                    logger.info(
+                        f"[scanner] {symbol} 费率逆向降权: "
+                        f"funding={funding*100:.4f}% 方向{direction} cap {_cur_cap:.2f}→{_new_cap:.2f}"
+                    )
+    except Exception as _fsy_e:
+        logger.debug(f"[scanner] {symbol} 费率协同计算跳过: {_fsy_e}")
+    return _sig
+
+
+def analyze_one(symbol: str, ticker: dict,
+                k15: list, k1h: list, k4h: list,
+                active_syms: set, pending_syms: set,
+                allowed_dirs: set | None,
+                loss_blacklist: set | None,
+                btc_trend: str,
+                market_mode: str,
+                mark_price_map: dict,
+                prefetch: dict,
+                events: list | None = None) -> dict | None:
+    """
+    此函数同时被以下两个入口调用：
+    - run_scan（主动批量轮询，当前模式）
+    - TriggerDetector（被动事件触发，待实现于阶段3+）
+    参数必须显式传入，函数内部不做任何 IO。
+
+    纯计算入口：不发 REST/网络请求，不写文件，不读 scanner 层的 state；所有外部数据来自参数。
+    （judges.py 内部自己的 state/liq_cache/consistency_log 文件读写保持原样，不在此范围。）
+    _over_budget / _KL_TLS 计时、资金费结算窗口检查（含时钟与 REST）留在 _analyze_symbol_impl。
+
+    prefetch 字段：
+      oi_now / oi_1h_ago: float；oi_24h_ago: float | None；oi_hist_6: list（get_oi_history limit=6）
+      funding_velocity: dict（_funding_rate_velocity 的返回值，调用 judge 前写入 judges._fr_velocity_cache）
+      mp: dict（该标的 premiumIndex）；is_weekend / stock_closed: bool
+      dir_cooldown_long / dir_cooldown_short: bool；now_ms: int
+    events: 可选输出列表。需要落盘/联网的副作用以 dict 追加到这里，由调用方（主进程）在拿到返回值后统一处理
+      （见 _apply_post_events）：analytics / shadow_reject / llm / analytics_pass。
+    返回信号 dict 或 None；妖币 LLM 判定不在此函数内调用（以 llm 事件交给主进程）。
+    """
+    if events is None:
+        events = []
+    try:
+        is_weekend = bool(prefetch.get("is_weekend"))
+        if not _prescreen_ticker(symbol, ticker, loss_blacklist, is_weekend):
             return None
-        k15 = _get_klines_cached(symbol, "15m", 100)
-        if _over_budget("1h K线"):
-            return None
-        k1h = _get_klines_cached(symbol, "1h",  100)
         if not k1h or len(k1h) < 25:
             return None
+
+        chg24_rough = float(ticker.get("priceChangePercent", 0))
+        # v3.83：熊市禁止 reversal LONG 只在该路径 judge 通过后拒绝
+        _bear_block_rev_long = (btc_trend == "down" and chg24_rough <= -8)
 
         price   = float(k1h[-1][4])
         p24     = float(k1h[-25][4]) if len(k1h) >= 25 else float(k1h[0][4])
         chg24   = (price - p24) / p24 * 100
 
-        # [fix] 优先复用 run_scan 批量拉好的标记价格/资金费率，省掉每个标的一次重复请求；无数据时降级为单标的 REST
-        if _over_budget("标记价格"):
-            return None
-        mp      = (mark_price_map or {}).get(symbol) or _get_mark_price(symbol)
+        mp      = prefetch.get("mp") or (mark_price_map or {}).get(symbol) or {}
         funding = float(mp.get("lastFundingRate", 0))
 
-        # [v3.85 OPT-6] 逐标的资金费结算窗口（替代全局 BTC 整点判断），开关 OPT_FUNDING_WINDOW_PER_SYMBOL
-        try:
-            from config import OPT_FUNDING_WINDOW_PER_SYMBOL as _OPT_FW
-        except Exception:
-            _OPT_FW = False
-        if _OPT_FW:
-            _fw_blk, _fw_why = _in_symbol_funding_window(symbol, mp, abs(funding))
-            if _fw_blk:
-                logger.debug(f"[scanner] {symbol} 资金费结算窗口内跳过: {_fw_why}")
-                return None
+        # judge 内部的 _funding_rate_velocity 会发 HTTP：调用 judge 前把主进程预取的结果写进它的缓存，让它命中缓存
+        _fv = prefetch.get("funding_velocity")
+        if _fv is not None:
+            from shared import judges as _judges_mod
+            _judges_mod._fr_velocity_cache[symbol] = (_fv, time.time() + _judges_mod._FR_CACHE_TTL)
 
         # ── B. 先用 k4h=[] 计算 1H/15M 指标，用于分类 ────────────────────────
         ind = calc_indicators(k15, k1h, [])
-        # 注入 vol24_usd + symbol 供四层分类使用
         ind["vol24_usd"]     = float(ticker.get("quoteVolume", 0))
         ind["symbol"]        = symbol
-        ind["_weekend_mode"] = _is_weekend_sym  # v3.28: 供 judges.py 周末 ATR 门槛切换
-        ind["market_mode"]   = market_mode  # 由调用方传入，供 _calc_route_quality 使用
+        ind["_weekend_mode"] = is_weekend
+        ind["market_mode"]   = market_mode
 
-        # OI（尽力获取，失败不阻塞）
-        oi_now = 0.0
-        try:
-            if _over_budget("持仓量"):
-                return None
-            oi_data = api.get_open_interest(symbol)
-            oi_now  = float(oi_data.get("openInterest", 0))
-        except Exception:
-            pass
+        oi_now = float(prefetch.get("oi_now") or 0.0)
 
         # v3.58: OI 历史时序（过去6根1H）——计算 OI 趋势方向和斜率
-        oi_trend  = "neutral"   # rising / falling / neutral
-        oi_slope  = 0.0         # 每小时变化率（%）
+        oi_trend  = "neutral"
+        oi_slope  = 0.0
         try:
-            if _over_budget("OI 历史(6)"):
-                return None
-            _oi_hist = _get_oi_history_cached(symbol, period="1h", limit=6)
+            _oi_hist = prefetch.get("oi_hist_6")
             if _oi_hist and len(_oi_hist) >= 3:
                 _oi_vals = [float(h["sumOpenInterest"]) for h in _oi_hist]
                 _oi_first = _oi_vals[0]
@@ -1124,35 +1165,15 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
             pass
         ind["oi_trend"] = oi_trend
         ind["oi_slope"] = round(oi_slope, 4)
-        # v3.60: 主流程也注入 oi_now 和 oi_1h_ago 到 ind，供 _is_oi_divergence + judge_oi_divergence 使用
         ind["oi_now"]    = oi_now
-        # oi_1h_ago: 取 oi_history 的第一条（直接扦3根，-2 是 1H 前的历史实汉关K）
-        _oi_1h_ago = 0.0
-        try:
-            if _over_budget("OI 历史(3)"):
-                return None
-            _oi_hist_3 = _get_oi_history_cached(symbol, period="1h", limit=3)
-            if _oi_hist_3 and len(_oi_hist_3) >= 2:
-                _oi_1h_ago = float(_oi_hist_3[0].get("sumOpenInterest", 0))
-        except Exception:
-            pass
-        ind["oi_1h_ago"] = _oi_1h_ago
+        ind["oi_1h_ago"] = float(prefetch.get("oi_1h_ago") or 0.0)
 
         # ── C. 标的分类 ────────────────────────────────────────────────────────
         # v3.38: 股票代币休市检查提前到路由之前，防止 range_bounce 绕过休市保护
-        try:
-            from calc_position_size_real import _is_stock_token as _ist, _us_market_open as _umo
-            if _ist(symbol) and not _umo():
-                logger.debug(f"[scanner] {symbol} 股票代币休市期间，跳过")
-                return None
-        except Exception:
-            pass
+        if prefetch.get("stock_closed"):
+            logger.debug(f"[scanner] {symbol} 股票代币休市期间，跳过")
+            return None
 
-        # ── 策略路由优先级（高到低）v3.80 多路尝试 ──────────────────────────────
-        # 改造说明：原「互斥 elif 链」→「有序候选路由列表 + 逐条 judge 直到首个通过」
-        # 优先级不变，改变的是：高优先级路径 judge 失败后，继续尝试下一条，不直接丢弃标的
-        # 每条 judge 不论通过/失败都写 signal_analytics（供 track_rejected.py 事后对照分析）
-        # 4H K 线懒加载：进入候选列表时不拉，进入 judge 前按需补拉（拉一次后复用）
         _sh_enabled  = getattr(__import__('config'), 'STOP_HUNT_ENABLED', True)
         _sh_excluded = getattr(__import__('config'), 'STOP_HUNT_EXCLUDED_SYMBOLS', [])
 
@@ -1167,7 +1188,7 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
         if _is_range_bounce(k1h, ind):
             _candidate_routes.append("range_bounce")
         # classify() 的三条路拆开独立尝试（pullback 永远是兜底）
-        _classify_type = classify(symbol, chg24, funding, ind)
+        _classify_type = classify(symbol, chg24, funding, ind, stock_closed=bool(prefetch.get("stock_closed")))
         if _classify_type == "skip_stock_closed":
             logger.debug(f"[scanner] {symbol} 股票代币休市期间（classify降级），跳过")
             return None
@@ -1180,48 +1201,43 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
             _candidate_routes.append("pullback")
 
         # ── C.5 + D. 全路径 judge + 质量择优（v3.81）────────────────────────────
-        # 不再「第一个通过就 break」，而是跑完所有候选路径，收集全部通过结果，
-        # 再根据 _calc_route_quality 四维分择出质量最高的信号输出。
-        # 4H K 线懒加载：第一次需要时拉取，后续路径复用同一份 k4h
+        # 4H K 线：主进程已全部预取；与原先懒加载保持同样的可见性（第一次需要 4H 的路线才生效）
         _NEED_4H = {"reversal", "breakout", "range_bounce", "stop_hunt", "oi_divergence", "ema_trend"}
-        k4h = []
+        _k4h = []
         _4h_loaded = False
 
         _passed_signals: list[dict] = []  # 收集所有通过 judge 的路径
 
         for _route in _candidate_routes:
-            # 按需补拉 4H（只拉一次，后续路径复用）
             if _route in _NEED_4H and not _4h_loaded:
-                if _over_budget("4h K线"):
-                    return None
-                k4h = _get_klines_cached(symbol, "4h", 100)
+                _k4h = k4h
                 _4h_loaded = True
-                if k4h:
-                    ind_4h = calc_indicators(k15, k1h, k4h)
+                if _k4h:
+                    ind_4h = calc_indicators(k15, k1h, _k4h)
                     for _k4h_key in ("ema9_4h", "ema20_4h", "ema50_4h", "rsi_4h", "ema_bull_4h"):
                         ind[_k4h_key] = ind_4h.get(_k4h_key, ind.get(_k4h_key))
 
             # 执行对应 judge
             if _route == "reversal":
-                _ok, _reason = judge_reversal(k1h, k4h, k15, ind, chg24, funding)
+                _ok, _reason = judge_reversal(k1h, _k4h, k15, ind, chg24, funding)
                 _dir = _reason.get("direction", "long").upper()
             elif _route == "breakout":
-                _ok, _reason = judge_breakout(k1h, k4h, k15, ind, chg24, funding)
+                _ok, _reason = judge_breakout(k1h, _k4h, k15, ind, chg24, funding)
                 _dir = _reason.get("breakout_direction", "long").upper()
             elif _route == "range_bounce":
-                _ok, _reason = judge_range_bounce(k1h, k4h, k15, ind, chg24, funding)
+                _ok, _reason = judge_range_bounce(k1h, _k4h, k15, ind, chg24, funding)
                 _dir = "LONG"
             elif _route == "stop_hunt":
-                _ok, _reason = judge_stop_hunt(k1h, k4h, k15, ind, chg24, funding)
+                _ok, _reason = judge_stop_hunt(k1h, _k4h, k15, ind, chg24, funding)
                 _dir = _reason.get("direction", "LONG").upper()
             elif _route == "oi_divergence":
-                _ok, _reason = judge_oi_divergence(k1h, k4h, k15, ind, chg24, funding)
+                _ok, _reason = judge_oi_divergence(k1h, _k4h, k15, ind, chg24, funding)
                 _dir = _reason.get("direction", "long").upper()
             elif _route == "ema_trend":
-                _ok, _reason = judge_ema_trend(k1h, k4h, k15, ind, chg24, funding)
+                _ok, _reason = judge_ema_trend(k1h, _k4h, k15, ind, chg24, funding)
                 _dir = (_reason.get("direction") or "long").upper() if isinstance(_reason, dict) else "LONG"
             else:  # pullback
-                _ok, _reason = judge_pullback(k1h, k4h, k15, ind, chg24, funding)
+                _ok, _reason = judge_pullback(k1h, _k4h, k15, ind, chg24, funding)
                 _dir = "LONG" if ind["ema_bull_1h"] else "SHORT"
 
             # v3.83：熊市禁止 reversal LONG（由原预筛下沉到此，仅影响该路径）
@@ -1231,26 +1247,23 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
                 _reason["reject_reason"] = "熊市禁止 reversal LONG（BTC 下跌且 24H 跌幅>=8%）"
 
             if not _ok:
-                # 写每条失败路径的拒绝记录（对照组分析用）
                 logger.info(
                     f"[JUDGE_REJECT] {symbol} {_route} {_dir}: "
                     f"{_reason.get('reject_reason', 'unknown') if isinstance(_reason, dict) else _reason}"
                 )
-                _write_signal_analytics(
+                # 拒绝记录 → 事件（主进程落盘）；ind 取当时快照，等价于原来的同步写入
+                events.append({"kind": "analytics", "kwargs": dict(
                     symbol=symbol, mode=_route, direction=_dir,
                     judge_passed=False,
                     reject_reason=(_reason.get('reject_reason') if isinstance(_reason, dict) else str(_reason)),
-                    ind=ind, reason=_reason if isinstance(_reason, dict) else {},
+                    ind=dict(ind), reason=_reason if isinstance(_reason, dict) else {},
                     btc_trend=btc_trend, market_mode="",
-                )
-                # [v3.89 SHADOW] A 类：判定精筛被拒写入影子日志（judge 内部首个失败即返回，无法继续穿透同一 judge 的后续条件）
-                try:
-                    from shared import shadow_trace as _st1
-                    _rd = _reason if isinstance(_reason, dict) else {}
-                    _st1.record_judge_rejection(symbol=symbol, route=_route, direction=_dir,
-                                                reason=str(_rd.get("reject_reason", _reason)), ind=ind)
-                except Exception:
-                    pass
+                )})
+                _rd = _reason if isinstance(_reason, dict) else {}
+                events.append({"kind": "shadow_reject", "kwargs": dict(
+                    symbol=symbol, route=_route, direction=_dir,
+                    reason=str(_rd.get("reject_reason", _reason)), ind=dict(ind),
+                )})
                 continue
 
             # judge 通过：计算质量分并加入候选列表
@@ -1294,7 +1307,7 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
             pass
 
         # ── 方向约束检查（对应方向槽位已满时跳过）──────────────────────
-        if allowed_directions is not None and direction not in allowed_directions:
+        if allowed_dirs is not None and direction not in allowed_dirs:
             return None
 
         # ── 方向冲突检查（同向排除，反向允许进入 judge）──────────────────────
@@ -1302,17 +1315,13 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
             logger.debug(f"[scanner] {symbol} {direction} 方向冲突: 已有同向持仓")
             return None
 
-        # ── v3.44 同标的同方向开仓冷却检查（与止损冷却独立）──────────────────
-        # 防止同一标的同方向在短时间内连续开仓（回测验证：10-03/10-05两次三连仓是最大回撤来源）
-        try:
-            from shared.state import is_open_dir_cooldown as _is_odc
-            if _is_odc(symbol, direction):
-                logger.info(f"[scanner] {symbol} {direction} 同向开仓冷却中，跳过")
-                return None
-        except Exception as _odc_e:
-            logger.debug(f"[scanner] open_dir_cooldown 检查异常: {_odc_e}")
+        # ── v3.44 同标的同方向开仓冷却检查（主进程预取，两个方向各一个布尔）──────────
+        if prefetch.get("dir_cooldown_long" if direction == "LONG" else "dir_cooldown_short"):
+            logger.info(f"[scanner] {symbol} {direction} 同向开仓冷却中，跳过")
+            return None
+        _oi_24h = prefetch.get("oi_24h_ago")
         if direction == "LONG":
-            oi_div, oi_reason = _oi_divergence(symbol, price, chg24, ind["high_24h"], oi_now)
+            oi_div, oi_reason = _oi_divergence(symbol, price, chg24, ind["high_24h"], oi_now, oi_24h=_oi_24h)
             if oi_div:
                 logger.info(f"[scanner] {symbol} LONG {oi_reason}")
                 return None
@@ -1320,7 +1329,7 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
             low_24h = ind.get("low_24h", 0)
             if low_24h > 0:
                 oi_div_s, oi_reason_s = _oi_divergence_short(
-                    symbol, price, chg24, low_24h, oi_now
+                    symbol, price, chg24, low_24h, oi_now, oi_24h=_oi_24h
                 )
                 if oi_div_s:
                     logger.info(f"[scanner] {symbol} SHORT {oi_reason_s}")
@@ -1331,141 +1340,261 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
             logger.debug(f"[scanner] {symbol} 资金费率过高: {funding*100:.4f}%")
             return None
 
-        # ── v3.43 妖币识别：大涨后横盘，LLM 判断是否值得做 range_bounce LONG ────
-        # 放在资金费率检查后、return 前，正常流程可达（修复 v3.41 误放 except 块的 bug）
+        # ── v3.43 妖币识别：纯规则部分在这里，LLM 调用后置到主进程（llm 事件）────────
         if sig_type != "range_bounce":
             try:
-                from config import LLM_JUDGE_ENABLED, LLM_JUDGE_EXPLOSIVE_COIN, LLM_JUDGE_MIN_CONFIDENCE
+                from config import LLM_JUDGE_ENABLED, LLM_JUDGE_EXPLOSIVE_COIN
                 if LLM_JUDGE_ENABLED and LLM_JUDGE_EXPLOSIVE_COIN:
-                    from shared.llm_judge import is_explosive_coin, judge_explosive_coin_llm
+                    from shared.llm_judge import is_explosive_coin
                     _is_exp, _g3d, _g24h = is_explosive_coin(k1h)
                     if _is_exp:
-                        logger.info(
-                            f"[scanner] {symbol} 检测到妖币：3日+{_g3d:.0f}% "
-                            f"24H{_g24h:+.1f}%，交给LLM判断"
-                        )
-                        _llm_v = judge_explosive_coin_llm(
-                            symbol, _g3d, _g24h,
-                            ind.get("rsi_1h", 50), ind.get("rsi_4h", 50),
-                            ind.get("atr_ratio", 0), funding
-                        )
-                        if (_llm_v.get("decision") == "open"
-                                and _llm_v.get("confidence", 0) >= LLM_JUDGE_MIN_CONFIDENCE):
-                            sig_type  = "range_bounce"
-                            direction = "LONG"
-                            # [v3.87 STEP2] 删除未使用的 ok=True：结果经 sig_type/direction/reason 传出到下方 _sig，并非丢失
-                            reason    = {
-                                "signal_strength":  "medium",
-                                "position_size_cap": 0.3,
-                                "llm_explosive":    True,
-                                "llm_reason":       _llm_v.get("reason", ""),
-                            }
-                            logger.info(
-                                f"[scanner] {symbol} 妖币LLM判定蓄势，"
-                                f"confidence={_llm_v['confidence']:.2f} "
-                                f"reason={_llm_v.get('reason', '')}"
-                            )
-                        else:
-                            logger.info(f"[scanner] {symbol} 妖币LLM判定出货或不确定，跳过")
-                            return None
+                        events.append({"kind": "llm", "symbol": symbol, "g3d": _g3d, "g24h": _g24h,
+                                       "rsi_1h": ind.get("rsi_1h", 50), "rsi_4h": ind.get("rsi_4h", 50),
+                                       "atr_ratio": ind.get("atr_ratio", 0), "funding": funding,
+                                       "chg24": chg24, "ind": ind, "oi_now": oi_now, "k1h": k1h,
+                                       "now_ms": int(prefetch.get("now_ms") or 0)})
             except Exception as _exp_e:
                 logger.debug(f"[scanner] {symbol} 妖币识别跳过: {_exp_e}")
 
-        # 输出信号（不含入场价/止损价，由 executor 实时计算）
-        _sig = {
-            "symbol":    symbol,
-            "direction": direction,
-            "sig_type":  sig_type,
-            "chg24":     round(chg24, 2),
-            "funding":   funding,
-            "ind":       ind,
-            "reason":    reason,
-            "oi_now":    oi_now,
-            "ts":        int(time.time() * 1000),
-        }
-        # [fix] 提升 reason 里的 position_size_cap / signal_strength 到顶层
-        # 后续的 funding_synergy、post_shock、市场情绪降仓都读 sig.get("position_size_cap", 0.5)
-        # 如果 judge 给的0.3（range_bounce medium）但顶层没有这个字段，降仓逻辑会从错误的00.5开始计算
-        _sig["position_size_cap"] = float(
-            (reason or {}).get("position_size_cap") or 0.5
-        )
-        # 评分环节和周末过滤现在有两套读法，统一提升为 sig.get("signal_strength", "medium")
-        _sig["signal_strength"] = (reason or {}).get("signal_strength", "medium")
-        # v3.62: Volume Profile 注入——用建好的 1H K 线计算 VP 结构位
-        # 放入 signal["vp"]  executor 传入 calc_sl_tp，供 SL/TP 增强使用
-        try:
-            from shared.indicators import calc_volume_profile as _cvp
-            _vp_result = _cvp(k1h)
-            if _vp_result.get("valid"):
-                _sig["vp"] = _vp_result
-                logger.debug(
-                    f"[scanner] {symbol} VP: poc={_vp_result['poc']:.4g} "
-                    f"vah={_vp_result['vah']:.4g} val={_vp_result['val']:.4g}"
-                )
-        except Exception as _vp_e:
-            logger.debug(f"[scanner] {symbol} VP 计算跳过: {_vp_e}")
-        # v3.49: stop_hunt 将 sl_price_hint 传入 signal，供 calc_sl_tp 覆盖止损
-        if sig_type == "stop_hunt" and isinstance(reason, dict):
-            _sl_hint = reason.get("sl_price_hint")
-            if _sl_hint:
-                _sig["sl_price_hint"] = _sl_hint
-            _sig["signal_strength"] = reason.get("signal_strength", "medium")
-        # ── 资金费率+主策略协同（v3.72）：单标的精细化仓位调整 ────────────────────
-        # 双重优势（方向与费率一致）→ 仓位上浮；付高费率（方向与费率相反）→ 降仓
-        # funding_arb 专属信号不走此逻辑（已有独立仓位计算）
-        try:
-            from config import (
-                FUNDING_SYNERGY_BONUS, FUNDING_SYNERGY_PENALTY,
-                FUNDING_SYNERGY_THRESH,
-            )
-            if sig_type != "funding_arb" and abs(funding) > FUNDING_SYNERGY_THRESH:
-                # LONG 做多：正费率（多头付费）是劣势；负费率（空头付费）是优势
-                # SHORT 做空：正费率（多头付费）是优势；负费率（空头付费）是劣势
-                _funding_favors_long  = funding < 0   # 负费率 = 空头付费 = 多头收费
-                _direction_is_long    = direction.upper() == "LONG"
-                _is_synergy   = (_direction_is_long and _funding_favors_long) or                                 (not _direction_is_long and not _funding_favors_long)
-                _is_against   = (_direction_is_long and not _funding_favors_long) or                                 (not _direction_is_long and _funding_favors_long)
+        _sig = _build_signal(symbol, direction, sig_type, reason, chg24, funding, ind, oi_now, k1h,
+                             int(prefetch.get("now_ms") or 0))
 
-                _cur_cap = float(_sig.get("position_size_cap", 0.5) or 0.5)
-                if _is_synergy:
-                    _new_cap = round(min(_cur_cap * FUNDING_SYNERGY_BONUS, 0.80), 3)
-                    if _new_cap != _cur_cap:
-                        _sig["position_size_cap"] = _new_cap
-                        _sig["funding_synergy"]   = "bonus"
-                        logger.info(
-                            f"[scanner] {symbol} 费率协同加权: "
-                            f"funding={funding*100:.4f}% 方向{direction} cap {_cur_cap:.2f}→{_new_cap:.2f}"
-                        )
-                elif _is_against:
-                    _new_cap = round(_cur_cap * FUNDING_SYNERGY_PENALTY, 3)
-                    if _new_cap != _cur_cap:
-                        _sig["position_size_cap"] = _new_cap
-                        _sig["funding_synergy"]   = "penalty"
-                        logger.info(
-                            f"[scanner] {symbol} 费率逆向降权: "
-                            f"funding={funding*100:.4f}% 方向{direction} cap {_cur_cap:.2f}→{_new_cap:.2f}"
-                        )
-        except Exception as _fsy_e:
-            logger.debug(f"[scanner] {symbol} 费率协同计算跳过: {_fsy_e}")
-
-        # v3.28: 写入通过记录到 signal_analytics.jsonl（含竞争路径信息）
+        # v3.28: 通过记录（含竞争路径信息）→ 事件；LLM 否决时主进程不写
         _competing_routes = [
             {"route": s["route"], "quality": s["quality"], "passed": True}
             for s in _passed_signals if s is not _best
         ] if len(_passed_signals) > 1 else []
-        _write_signal_analytics(
+        events.append({"kind": "analytics_pass", "kwargs": dict(
             symbol=symbol, mode=sig_type, direction=direction,
             judge_passed=True, reject_reason=None,
             ind=ind, reason=reason if isinstance(reason, dict) else {},
             btc_trend=btc_trend, market_mode="",
             route_quality=_best["quality"] if _passed_signals else None,
             competing_routes=_competing_routes,
-        )
+        )})
         return _sig
 
     except Exception as e:
         logger.debug(f"[scanner] {symbol} analyze 失败: {e}")
         return None
+
+
+def _apply_post_events(sig: dict | None, events: list) -> dict | None:
+    """主进程后置处理：按顺序落盘 analytics / shadow 记录，再处理妖币 LLM，最后写通过记录。
+    返回最终信号（LLM 可能改写为 range_bounce LONG，或否决返回 None）。"""
+    llm_ev = None
+    pass_ev = None
+    for ev in events:
+        k = ev.get("kind")
+        if k == "analytics":
+            try:
+                _write_signal_analytics(**ev["kwargs"])
+            except Exception as _e:
+                logger.debug(f"[scanner] analytics 写入失败（忽略）: {_e}")
+        elif k == "shadow_reject":
+            try:
+                from shared import shadow_trace as _st1
+                _st1.record_judge_rejection(**ev["kwargs"])
+            except Exception:
+                pass
+        elif k == "llm":
+            llm_ev = ev
+        elif k == "analytics_pass":
+            pass_ev = ev
+    if sig is None:
+        return None
+
+    pass_kwargs = dict(pass_ev["kwargs"]) if pass_ev else None
+    if llm_ev is not None:
+        symbol = llm_ev["symbol"]
+        try:
+            from config import LLM_JUDGE_MIN_CONFIDENCE
+            from shared.llm_judge import judge_explosive_coin_llm
+            logger.info(
+                f"[scanner] {symbol} 检测到妖币：3日+{llm_ev['g3d']:.0f}% "
+                f"24H{llm_ev['g24h']:+.1f}%，交给LLM判断"
+            )
+            _llm_v = judge_explosive_coin_llm(
+                symbol, llm_ev["g3d"], llm_ev["g24h"],
+                llm_ev["rsi_1h"], llm_ev["rsi_4h"], llm_ev["atr_ratio"], llm_ev["funding"]
+            )
+            if (_llm_v.get("decision") == "open"
+                    and _llm_v.get("confidence", 0) >= LLM_JUDGE_MIN_CONFIDENCE):
+                reason = {
+                    "signal_strength":  "medium",
+                    "position_size_cap": 0.3,
+                    "llm_explosive":    True,
+                    "llm_reason":       _llm_v.get("reason", ""),
+                }
+                sig = _build_signal(symbol, "LONG", "range_bounce", reason, llm_ev["chg24"], llm_ev["funding"],
+                                    llm_ev["ind"], llm_ev["oi_now"], llm_ev["k1h"], llm_ev["now_ms"])
+                if pass_kwargs is not None:
+                    pass_kwargs.update(mode="range_bounce", direction="LONG", reason=reason)
+                logger.info(
+                    f"[scanner] {symbol} 妖币LLM判定蓄势，"
+                    f"confidence={_llm_v['confidence']:.2f} "
+                    f"reason={_llm_v.get('reason', '')}"
+                )
+            else:
+                logger.info(f"[scanner] {symbol} 妖币LLM判定出货或不确定，跳过")
+                return None
+        except Exception as _exp_e:
+            logger.debug(f"[scanner] {symbol} 妖币识别跳过: {_exp_e}")
+
+    if pass_kwargs is not None:
+        try:
+            _write_signal_analytics(**pass_kwargs)
+        except Exception as _e:
+            logger.debug(f"[scanner] analytics 写入失败（忽略）: {_e}")
+    return sig
+
+
+def _analyze_symbol_impl(symbol: str, ticker: dict,
+                   active_syms: set, pending_syms: set,
+                   allowed_directions: set | None = None,
+                   loss_blacklist: set | None = None,
+                   btc_trend: str = "",
+                   market_mode: str = "",
+                   deadline: float | None = None,
+                   mark_price_map: dict | None = None) -> dict | None:
+    """
+    完整分析一个标的，返回信号 dict 或 None。
+    本函数负责全部 IO（REST、state 读取、时钟）并打包成 prefetch，纯计算交给 analyze_one，
+    随后在这里处理 analyze_one 产生的落盘/LLM 事件。
+    deadline:          整轮截止时间（time.monotonic() 基准）；单标的另有 SCAN_SYMBOL_TIMEOUT_SEC 总时限，
+                       两者取先到者。每次发起 HTTP 请求前检查，超时直接 return None（不再发新请求）。
+    mark_price_map:    {symbol: premiumIndex 单项}（run_scan 每轮批量拉一次）；未命中降级为单标的 REST。
+    active_syms:       (symbol, direction) 二元组集合，只排除同向仓位
+    pending_syms:      当前有挂单的标的集合
+    allowed_directions: 允许的方向集合（{"LONG"} / {"SHORT"} / None=不限制）
+    loss_blacklist:    累计亏损黑名单（零成本预筛，不拉 K 线前直接跳过）
+    btc_trend:         BTC 趋势（"up"/"down"/"neutral"），用于熊市粗筛
+    """
+    # ── 零成本预筛（不拉任何接口）────────────────────────────────────────────
+    is_weekend = _is_weekend_period(datetime.now(timezone.utc))
+    if not _prescreen_ticker(symbol, ticker, loss_blacklist, is_weekend):
+        return None
+
+    # [fix] 单标的总时限：以 monotonic 计时，发起每个 HTTP 请求前检查
+    _t_sym0  = time.monotonic()
+    _t_limit = _t_sym0 + SCAN_SYMBOL_TIMEOUT_SEC
+    if deadline is not None:
+        _t_limit = min(_t_limit, deadline)
+
+    def _over_budget(stage: str) -> bool:
+        if time.monotonic() > _t_limit:
+            logger.info(
+                f"[scanner] {symbol} 单标的超时(已用 {time.monotonic() - _t_sym0:.1f}s，"
+                f"限 {SCAN_SYMBOL_TIMEOUT_SEC}s/整轮截止)，在「{stage}」前放弃"
+            )
+            return True
+        return False
+
+    try:
+        # ── A. 拉取数据（4H 现在对所有通过预筛的标的预取）──
+        if _over_budget("15m K线"):
+            return None
+        k15 = _get_klines_cached(symbol, "15m", 100)
+        if _over_budget("1h K线"):
+            return None
+        k1h = _get_klines_cached(symbol, "1h",  100)
+        if not k1h or len(k1h) < 25:
+            return None
+
+        # [fix] 优先复用 run_scan 批量拉好的标记价格/资金费率；无数据时降级为单标的 REST
+        if _over_budget("标记价格"):
+            return None
+        mp      = (mark_price_map or {}).get(symbol) or _get_mark_price(symbol)
+        funding = float(mp.get("lastFundingRate", 0))
+
+        # [v3.85 OPT-6] 逐标的资金费结算窗口（含时钟与 REST，所以留在这里；命中则不再拉后续数据）
+        try:
+            from config import OPT_FUNDING_WINDOW_PER_SYMBOL as _OPT_FW
+        except Exception:
+            _OPT_FW = False
+        if _OPT_FW:
+            _fw_blk, _fw_why = _in_symbol_funding_window(symbol, mp, abs(funding))
+            if _fw_blk:
+                logger.debug(f"[scanner] {symbol} 资金费结算窗口内跳过: {_fw_why}")
+                return None
+
+        # OI（尽力获取，失败不阻塞）
+        oi_now = 0.0
+        try:
+            if _over_budget("持仓量"):
+                return None
+            oi_data = api.get_open_interest(symbol)
+            oi_now  = float(oi_data.get("openInterest", 0))
+        except Exception:
+            pass
+
+        # OI 历史（过去6根1H）；oi_1h_ago 取其最后 3 根的第一条（与原先 limit=3 的请求等价）
+        oi_hist_6: list = []
+        try:
+            if _over_budget("OI 历史(6)"):
+                return None
+            oi_hist_6 = _get_oi_history_cached(symbol, period="1h", limit=6) or []
+        except Exception:
+            pass
+        oi_1h_ago = 0.0
+        try:
+            _oi_hist_3 = oi_hist_6[-3:]
+            if _oi_hist_3 and len(_oi_hist_3) >= 2:
+                oi_1h_ago = float(_oi_hist_3[0].get("sumOpenInterest", 0))
+        except Exception:
+            pass
+
+        # 股票代币休市检查（时钟 + 外部模块）
+        stock_closed = False
+        try:
+            from calc_position_size_real import _is_stock_token as _ist, _us_market_open as _umo
+            stock_closed = bool(_ist(symbol) and not _umo())
+        except Exception:
+            pass
+
+        # 4H K 线（预取）
+        if _over_budget("4h K线"):
+            return None
+        k4h = _get_klines_cached(symbol, "4h", 100)
+
+        # judge 内部 _funding_rate_velocity 的 HTTP（60s 缓存）在主进程预取
+        funding_velocity: dict = {}
+        try:
+            from shared.judges import _funding_rate_velocity
+            funding_velocity = _funding_rate_velocity(symbol)
+        except Exception:
+            pass
+
+        # state 读取：同向开仓冷却（两个方向）、24h 前 OI
+        cd_long = cd_short = False
+        try:
+            from shared.state import is_open_dir_cooldown as _is_odc
+            cd_long, cd_short = bool(_is_odc(symbol, "LONG")), bool(_is_odc(symbol, "SHORT"))
+        except Exception as _odc_e:
+            logger.debug(f"[scanner] open_dir_cooldown 检查异常: {_odc_e}")
+        oi_24h_ago = None
+        try:
+            oi_24h_ago = get_oi_24h_ago(symbol)
+        except Exception:
+            pass
+
+        prefetch = {
+            "oi_now": oi_now, "oi_1h_ago": oi_1h_ago, "oi_24h_ago": oi_24h_ago,
+            "oi_hist_6": oi_hist_6, "funding_velocity": funding_velocity, "mp": mp,
+            "is_weekend": is_weekend, "stock_closed": stock_closed,
+            "dir_cooldown_long": cd_long, "dir_cooldown_short": cd_short,
+            "now_ms": int(time.time() * 1000),
+        }
+        events: list = []
+        sig = analyze_one(symbol, ticker, k15, k1h, k4h, active_syms, pending_syms,
+                          allowed_directions, loss_blacklist, btc_trend, market_mode,
+                          mark_price_map or {}, prefetch, events)
+        return _apply_post_events(sig, events)
+
+    except Exception as e:
+        logger.debug(f"[scanner] {symbol} analyze 失败: {e}")
+        return None
+
 
 # ── 挂单维护 ──────────────────────────────────────────────────────────────────
 import functools as _functools
