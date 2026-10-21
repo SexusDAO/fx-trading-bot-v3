@@ -1162,8 +1162,9 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
             _candidate_routes.append("stop_hunt")
         if _is_oi_divergence(ind):
             _candidate_routes.append("oi_divergence")
-        if _is_ema_trend(ind, chg24):
-            _candidate_routes.append("ema_trend")
+        # ema_trend 需要4H数据，粗筛阶段4H未加载
+        # 直接加入候选，judge前会触发4H懒加载，judge内部做精筛
+        _candidate_routes.append("ema_trend")
         if _is_range_bounce(k1h, ind):
             _candidate_routes.append("range_bounce")
         # classify() 的三条路拆开独立尝试（pullback 永远是兜底）
