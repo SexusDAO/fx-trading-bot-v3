@@ -1344,11 +1344,11 @@ def refresh_pool() -> list:
             if sym:
                 fr_map[sym] = abs(float(mp.get("lastFundingRate", 0)))
 
+        from config import ENABLE_USDC_PAIRS
+        _allow_usdc = ENABLE_USDC_PAIRS
         usdt = []
         for t in tickers:
             sym = t.get("symbol", "")
-            from config import ENABLE_USDC_PAIRS
-            _allow_usdc = ENABLE_USDC_PAIRS
             if not (sym.endswith("USDT") or (_allow_usdc and sym.endswith("USDC"))):
                 continue
             if sym in POOL_STABLE_COINS:
