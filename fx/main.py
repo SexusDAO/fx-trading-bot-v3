@@ -679,8 +679,6 @@ async def main() -> None:
         asyncio.create_task(_loop_reset_circuit(),                             name="reset_circuit"),
         asyncio.create_task(_loop_event_latency_monitor(),                     name="loop_latency"),
         asyncio.create_task(_loop_track_outcomes(3600),                        name="track_outcomes"),
-        # ── 临时诊断：内存追踪（30分钟一次） ─────────────────────────────────────
-        asyncio.create_task(_loop_mem_trace(1800),                             name="mem_trace"),
     ]
 
     # ── 5. 优雅退出 ─────────────────────────────────────────────────────────
