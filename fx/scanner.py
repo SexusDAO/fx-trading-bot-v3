@@ -2039,11 +2039,13 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     signals_raw = []
     _kline_round_reset()
     _jobs = {
-        sym: (sym, _ticker_all.get(sym, {}), active_syms, pending_syms, allowed_dirs, _loss_blacklist, _btc_trend, _mkt_mode, _mark_price_map)
+        sym: (sym, _ticker_all.get(sym, {}), active_syms, pending_syms, allowed_dirs, _loss_blacklist, _btc_trend, _mkt_mode)
         for sym in scan_pool
     }
+    # [fix] mark_price_map 用 partial 以关键字绑定：analyze_symbol 的第 9 个位置参数是 deadline，
+    # _run_parallel_with_deadline 又以关键字传 deadline，位置传 map 会 TypeError(multiple values for 'deadline')
     _par_results, _unfinished = _run_parallel_with_deadline(
-        analyze_symbol, _jobs, SCAN_MAX_WORKERS, SCAN_TOTAL_TIMEOUT_SEC
+        _functools.partial(analyze_symbol, mark_price_map=_mark_price_map), _jobs, SCAN_MAX_WORKERS, SCAN_TOTAL_TIMEOUT_SEC
     )
     result["scan_unfinished"] = len(_unfinished)
     for sym, res in _par_results:

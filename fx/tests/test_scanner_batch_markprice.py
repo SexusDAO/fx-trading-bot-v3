@@ -40,7 +40,7 @@ def env(monkeypatch):
 
 def _run(map_, symbol="XUSDT"):
     try:
-        sc.analyze_symbol(symbol, TICKER, set(), set(), None, None, "", "", map_)
+        sc.analyze_symbol(symbol, TICKER, set(), set(), None, None, "", "", mark_price_map=map_)
     except _Stop as st:
         return st.funding
     pytest.skip("测试 ticker 被预筛/其他逻辑提前拦截，未走到标记价格之后")
@@ -71,5 +71,28 @@ def test_empty_map_falls_back_to_rest(env):
 def test_run_scan_builds_map_once_and_passes_it():
     src = (Path(__file__).parent.parent / "scanner.py").read_text()
     assert "_mark_price_map[_ms] = _m" in src
-    assert "_mkt_mode, _mark_price_map): sym" in src
+    assert "partial(analyze_symbol, mark_price_map=_mark_price_map)" in src
+    assert "_mkt_mode, _mark_price_map)" not in src   # 不能再位置传 map（会与 deadline 冲突）
     assert src.count("(mark_price_map or {}).get(symbol)") == 1
+
+
+def test_run_scan_call_pattern_no_deadline_conflict(env):
+    """复现 run_scan 的真实调用：partial 绑 map + 8 个位置参数 + 关键字 deadline，不得 TypeError。"""
+    import functools, time
+    fn = functools.partial(sc.analyze_symbol, mark_price_map={"XUSDT": {"markPrice": "100", "lastFundingRate": "-0.0123"}})
+    args = ("XUSDT", TICKER, set(), set(), None, None, "", "")
+    try:
+        fn(*args, deadline=time.monotonic() + 60)
+    except _Stop as st:
+        assert st.funding == pytest.approx(-0.0123)
+    # 经 _run_parallel_with_deadline 走一遍：异常会被吞，所以单独断言没有 TypeError 级失败
+    seen = []
+    def probe(*a, **k):
+        seen.append(k)
+        try:
+            return fn(*a, **k)
+        except _Stop as st:
+            return st.funding
+    res, unfinished = sc._run_parallel_with_deadline(probe, {"XUSDT": args}, 1, 30)
+    assert seen and "deadline" in seen[0] and "mark_price_map" not in seen[0]
+    assert unfinished == [] and res == [("XUSDT", pytest.approx(-0.0123))]
