@@ -19,7 +19,11 @@ import signal
 import sys
 import shutil
 import subprocess
+import tracemalloc
 from pathlib import Path
+
+# ── 临时诊断：启动 tracemalloc 追踪内存分配 ────────────────────────────────
+tracemalloc.start()
 
 # ── 启动前依赖检查：确保 SOCKS 代理依赖可用 ─────────────────────────────────
 def _ensure_deps():
@@ -244,6 +248,53 @@ async def _loop_funding_arb(interval_sec: int = 1800, signal_watcher=None) -> No
         except Exception as _e:
             logger.error(f"[main] funding_arb_scan 异常: {_e}", exc_info=True)
         await _aio.sleep(interval_sec)
+
+
+async def _loop_mem_trace(interval_sec: int = 1800) -> None:
+    """每30分钟输出一次内存诊断信息（临时诊断用，不 commit）"""
+    import gc
+    await asyncio.sleep(300)  # 启动后 5 分钟开始第一次采样
+    while True:
+        try:
+            # tracemalloc Top 20
+            snapshot = tracemalloc.take_snapshot()
+            top_stats = snapshot.statistics('lineno')
+            logger.warning("[mem-trace] ====== TOP20 内存分配位置 ======")
+            for stat in top_stats[:20]:
+                logger.warning(f"[mem-trace]   {stat}")
+            
+            # 关键对象大小
+            try:
+                from shared.liq_cache import _CACHE as _liq_cache
+                logger.warning(f"[mem-trace] liq_cache keys={len(_liq_cache)}")
+            except Exception:
+                logger.warning("[mem-trace] liq_cache: 无法访问")
+            
+            try:
+                from shared.signal_watcher import SignalWatcher
+                # 尝试从全局获取 signal_watcher 实例
+                import sys
+                for obj in gc.get_objects():
+                    if isinstance(obj, SignalWatcher):
+                        logger.warning(f"[mem-trace] signal_watcher._last_event_ts keys={len(obj._last_event_ts)}")
+                        logger.warning(f"[mem-trace] signal_watcher._evt_drop_log_ts keys={len(obj._evt_drop_log_ts)}")
+                        break
+            except Exception:
+                logger.warning("[mem-trace] signal_watcher: 无法访问")
+            
+            # 当前 RSS
+            try:
+                pid = os.getpid()
+                rss_kb = int(open(f"/proc/{pid}/status").read().split("VmRSS:")[1].split()[0])
+                logger.warning(f"[mem-trace] 当前 RSS={rss_kb // 1024}MB")
+            except Exception:
+                pass
+            
+            logger.warning("[mem-trace] ==================================")
+        except Exception as e:
+            logger.error(f"[mem-trace] 内存诊断异常: {e}", exc_info=True)
+        
+        await asyncio.sleep(interval_sec)
 
 
 async def _loop_reset_circuit() -> None:
@@ -590,6 +641,8 @@ async def main() -> None:
         asyncio.create_task(_loop_refresh_pool(1800),                          name="refresh_pool"),
         asyncio.create_task(_loop_reset_circuit(),                             name="reset_circuit"),
         asyncio.create_task(_loop_track_outcomes(3600),                        name="track_outcomes"),
+        # ── 临时诊断：内存追踪（30分钟一次） ─────────────────────────────────────
+        asyncio.create_task(_loop_mem_trace(1800),                             name="mem_trace"),
     ]
 
     # ── 5. 优雅退出 ─────────────────────────────────────────────────────────
@@ -606,6 +659,23 @@ async def main() -> None:
         except NotImplementedError:
             # Windows 不支持 add_signal_handler
             pass
+
+    # SIGUSR1: 手动触发诊断快照
+    def _handle_sigusr1():
+        logger.info("[main] 收到 SIGUSR1，手动触发诊断快照...")
+        import threading
+        def _gen_snapshot():
+            try:
+                from archiver import archive_daily
+                archive_daily(trigger="manual")
+            except Exception as e:
+                logger.error(f"[main] SIGUSR1 快照生成失败: {e}")
+        threading.Thread(target=_gen_snapshot, daemon=True, name="sigusr1_snapshot").start()
+
+    try:
+        loop.add_signal_handler(signal.SIGUSR1, _handle_sigusr1)
+    except (NotImplementedError, AttributeError):
+        pass  # Windows 不支持
 
     # 捕获所有未处理的协程异常，防止 loop 意外退出
     def _handle_task_exception(loop, context):
