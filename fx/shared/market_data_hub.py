@@ -38,7 +38,7 @@ NO_MSG_TIMEOUT = 30         # 秒：30 秒无任何消息 → 断开重连
 SINGLE_MAX_AGE_SEC = 5.0    # 单标的读取：超过则返回 None
 ALL_MAX_AGE_SEC = 10.0      # 全量快照：超过的条目被过滤
 STATS_LOG_INTERVAL = 300    # 秒：5 分钟一条 info
-STREAM_PATH = "/ws/!markPrice@arr@1s"
+STREAM_PATH = "/market/ws/!markPrice@arr@1s"   # 币安合约行情新路径（旧路径 /ws/ 已不推送行情）
 
 
 class MarketDataHub:

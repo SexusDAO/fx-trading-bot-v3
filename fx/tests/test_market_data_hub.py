@@ -168,9 +168,19 @@ def test_flag_off_never_touches_hub(monkeypatch):
     assert sc._get_all_mark_prices_list() == [{"symbol": "A", "src": "rest"}]
 
 
-def test_default_config_flag_is_false():
+def test_default_config_flag_is_true():
     import config
-    assert config.MARKET_DATA_HUB_ENABLED is False
+    assert config.MARKET_DATA_HUB_ENABLED is True
+
+
+def test_stream_urls_use_market_path():
+    import config
+    from shared import ws_listener as W
+    assert H.STREAM_PATH == "/market/ws/!markPrice@arr@1s"
+    assert H.MarketDataHub()._url == config.BINANCE_WS_URL + "/market/ws/!markPrice@arr@1s"
+    assert W.MARK_PRICE_URL_TPL.endswith("/market/stream?streams={streams}")
+    assert W.FORCE_ORDER_URL.endswith("/market/ws/!forceOrder@arr")
+    assert W.USER_DATA_URL_TPL.endswith("/ws/{listen_key}") and "/market/" not in W.USER_DATA_URL_TPL
 
 
 def test_flag_on_ready_uses_hub(monkeypatch, hub):

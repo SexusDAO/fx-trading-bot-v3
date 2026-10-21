@@ -72,9 +72,9 @@ RECONNECT_MAX        = getattr(config, "WS_RECONNECT_MAX",         60)       # �
 COMPENSATION_TIMEOUT = getattr(config, "WS_COMPENSATION_TIMEOUT",  30)       # [v3.89 #3] 断线 REST 补偿任务最长运行秒数
 COMPENSATION_INTERVAL = getattr(config, "WS_COMPENSATION_INTERVAL", 10)      # [v3.89 #3] 补偿任务两次执行间隔秒数
 LIQ_WINDOW_SEC       = getattr(config, "WS_LIQ_WINDOW_SEC",        14400)    # 4 小时缓存窗口（基准计算需要）
-MARK_PRICE_URL_TPL   = config.BINANCE_WS_URL + "/stream?streams={streams}"
+MARK_PRICE_URL_TPL   = config.BINANCE_WS_URL + "/market/stream?streams={streams}"   # 行情新路径；userData 仍走 /ws/{listenKey}
 USER_DATA_URL_TPL    = config.BINANCE_WS_URL + "/ws/{listen_key}"
-FORCE_ORDER_URL      = "wss://fstream.binance.com/ws/!forceOrder@arr"
+FORCE_ORDER_URL      = "wss://fstream.binance.com/market/ws/!forceOrder@arr"
 
 OrderCallback = Callable[[dict], Awaitable[None]]
 PriceCallback = Callable[[str, float, int], Awaitable[None]]
