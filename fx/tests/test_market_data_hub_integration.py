@@ -164,4 +164,4 @@ def test_scanner_injects_scan_pool_into_hub(monkeypatch):
     sc._hub_subscribe_klines(["AUSDT", "BUSDT"])
     assert got == [["AUSDT", "BUSDT"]]
     src = (Path(__file__).parent.parent / "scanner.py").read_text()
-    assert 'result["scanned"] = len(scan_pool)\n    _hub_subscribe_klines(scan_pool)' in src
+    assert 'result["scanned"] = len(scan_pool)' in src and '_hub_subscribe_klines(list(scan_pool) + sorted(active_sym_set) + ["BTCUSDT"])' in src

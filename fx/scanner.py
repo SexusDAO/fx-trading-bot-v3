@@ -2017,7 +2017,8 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     # pending_syms 仍用于 analyze_symbol 内部判断，不在此处整体排除
     scan_pool = [s for s in pool if s not in active_sym_set]   # 只排除 open 持仓标的
     result["scanned"] = len(scan_pool)
-    _hub_subscribe_klines(scan_pool)
+    # 持仓标的和 BTCUSDT 也订阅（patrol / 挂单维护读它们的 K 线）；hub 对重复标的去重并限制总数
+    _hub_subscribe_klines(list(scan_pool) + sorted(active_sym_set) + ["BTCUSDT"])
 
     # 方向约束：对应方向槽位已满时只扫描另一个方向（v3.53: 基于 open-only 计数）
     allowed_dirs: set | None = None

@@ -332,6 +332,43 @@ async def _execute_trail_sl_inner(pos: dict, new_sl: float,
 # ─────────────────────────────────────────────────────────────────────────────
 # A. WebSocket 实时监听任务
 # ─────────────────────────────────────────────────────────────────────────────
+def _pm_hub_enabled() -> bool:
+    try:
+        import config as _c
+        return bool(getattr(_c, "MARKET_DATA_HUB_ENABLED", False))
+    except Exception:
+        return False
+
+
+def _pm_mark_price(symbol: str) -> dict:
+    """巡检用标记价：hub 开启、就绪且数据足够新(<=5s)时读 hub，否则回落 REST（开关关闭时与原来完全一致）。"""
+    if _pm_hub_enabled():
+        try:
+            from shared import market_data_hub as _hub
+            if _hub.is_ready():
+                _d = _hub.get_mark_price(symbol)
+                if _d:
+                    logger.debug(f"[hub] {symbol} price={_d.get('markPrice')} age={_d.get('age_sec')}s")
+                    return _d
+        except Exception as _e:
+            logger.debug(f"[hub] 标记价读取失败，回落 REST: {_e}")
+    return api.get_mark_price(symbol)
+
+
+def _pm_klines(symbol: str, interval: str, limit: int) -> list:
+    """巡检用 K 线（格式与 REST 完全一致）：hub 就绪时读 hub，None 则回落 api.get_klines。"""
+    if _pm_hub_enabled():
+        try:
+            from shared import market_data_hub as _hub
+            _d = _hub.get_klines(symbol, interval, limit)
+            if _d:
+                logger.debug(f"[hub] {symbol} {interval} klines n={len(_d)}（来自 WS 缓存）")
+                return _d
+        except Exception as _e:
+            logger.debug(f"[hub] K线读取失败，回落 REST: {_e}")
+    return api.get_klines(symbol, interval, limit)
+
+
 class PositionManager:
     """
     持仓管理器主类。
@@ -1057,7 +1094,7 @@ class PositionManager:
         price = _last_price.get(symbol)
         if price is None:
             try:
-                md = api.get_mark_price(symbol)
+                md = _pm_mark_price(symbol)
                 price = float(md.get("markPrice", entry))
             except Exception:
                 price = entry
@@ -1205,7 +1242,7 @@ class PositionManager:
                     except Exception as _e:
                         logger.warning(f"[pm] {symbol} 早期横盘豁免:槽位检查失败 {_e}")
                     try:
-                        _klines_4h = api.get_klines(symbol, "4h", 60)
+                        _klines_4h = _pm_klines(symbol, "4h", 60)
                         # 只用已闭合的 4H bar:排除最后一根(当前未完成bar)
                         # 未闭合bar的实时价格会随1H波动压低EMA20,导致gap虚小误杀持仓
                         _now_ms = int(time.time() * 1000)
@@ -1501,9 +1538,9 @@ class PositionManager:
         try:
             # 拉取最新指标
             now_ms = time.time() * 1000
-            k1h = api.get_klines(symbol, "1h", limit=30)
+            k1h = _pm_klines(symbol, "1h", 30)
             k1h = [k for k in k1h if float(k[6]) < now_ms]
-            k15 = api.get_klines(symbol, "15m", limit=10)
+            k15 = _pm_klines(symbol, "15m", 10)
             k15 = [k for k in k15 if float(k[6]) < now_ms]
 
             if len(k1h) < 15 or len(k15) < 3:
@@ -1568,13 +1605,13 @@ class PositionManager:
 
         try:
             # 1H K线
-            k1h = api.get_klines(symbol, "1h", limit=55)
+            k1h = _pm_klines(symbol, "1h", 55)
             now_ms = time.time() * 1000
             k1h = [k for k in k1h if float(k[6]) < now_ms]
             closes_1h = [float(k[4]) for k in k1h]
 
             # 4H K线
-            k4h = api.get_klines(symbol, "4h", limit=55)
+            k4h = _pm_klines(symbol, "4h", 55)
             k4h = [k for k in k4h if float(k[6]) < now_ms]
             closes_4h = [float(k[4]) for k in k4h]
 
@@ -1584,7 +1621,7 @@ class PositionManager:
             ema50_4h = _calc_ema(closes_4h, 50)
 
             # 资金费率
-            md      = api.get_mark_price(symbol)
+            md      = _pm_mark_price(symbol)
             funding = float(md.get("lastFundingRate", 0))
             price   = float(md.get("markPrice", pos["entry_price"]))
 
@@ -4085,9 +4122,9 @@ async def _check_pending_health_static(pos: dict) -> None:
 
     # ── 拉市场数据 ────────────────────────────────────────────────────────────
     try:
-        k1h_raw  = _api.get_klines(symbol, "1h", 60)   # EMA50 需至少 50 根,60 有余量
-        k15_raw  = _api.get_klines(symbol, "15m", 20)
-        mp_data  = _api.get_mark_price(symbol)
+        k1h_raw  = _pm_klines(symbol, "1h", 60)   # EMA50 需至少 50 根,60 有余量
+        k15_raw  = _pm_klines(symbol, "15m", 20)
+        mp_data  = _pm_mark_price(symbol)
         now_ms_v = _t.time() * 1000
         k1h = [k for k in k1h_raw if float(k[6]) < now_ms_v]
         k15 = [k for k in k15_raw if float(k[6]) < now_ms_v]
