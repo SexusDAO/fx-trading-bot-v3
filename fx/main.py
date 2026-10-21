@@ -19,11 +19,42 @@ import signal
 import sys
 import shutil
 import subprocess
+import time
+import faulthandler
+import threading
+import io
 import tracemalloc
 from pathlib import Path
 
-# ── 临时诊断：启动 tracemalloc 追踪内存分配 ────────────────────────────────
-tracemalloc.start()
+# ── 临时诊断（定位后删除）────────────────────────────────────────────────
+# 内存分配追踪：保留 10 帧调用栈，用于定位内存泄漏源头
+tracemalloc.start(10)
+
+# ── 临时诊断（定位后删除）────────────────────────────────────────────────
+# 事件循环看门狗：独立线程检测事件循环阻塞，超过 2 秒 dump 所有线程堆栈
+_loop_heartbeat_ts = time.monotonic()
+
+async def _loop_heartbeat():
+    """每 0.5 秒更新心跳时间戳，供看门狗线程检测事件循环是否存活。"""
+    global _loop_heartbeat_ts
+    while True:
+        _loop_heartbeat_ts = time.monotonic()
+        await asyncio.sleep(0.5)
+
+def _watchdog_thread_fn():
+    """后台 daemon 线程：检测事件循环阻塞，超过 2 秒时 dump 所有线程堆栈。
+    10 秒冷却防止连续刷屏。"""
+    last_dump = 0.0
+    while True:
+        time.sleep(0.5)
+        lag = time.monotonic() - _loop_heartbeat_ts
+        if lag > 2.0 and time.monotonic() - last_dump > 10.0:
+            buf = io.StringIO()
+            faulthandler.dump_traceback(file=buf, all_threads=True)
+            logger.error(
+                f"[watchdog] 事件循环阻塞 {lag:.1f}s，线程堆栈:\n{buf.getvalue()}"
+            )
+            last_dump = time.monotonic()
 
 # ── 启动前依赖检查：确保 SOCKS 代理依赖可用 ─────────────────────────────────
 def _ensure_deps():
@@ -287,49 +318,35 @@ async def _loop_funding_arb(interval_sec: int = 1800, signal_watcher=None) -> No
         await _aio.sleep(interval_sec)
 
 
-async def _loop_mem_trace(interval_sec: int = 1800) -> None:
-    """每30分钟输出一次内存诊断信息（临时诊断用，不 commit）"""
-    import gc
+# ── 临时诊断（定位后删除）────────────────────────────────────────────────
+async def _loop_mem_snapshot(interval_sec: int = 1200) -> None:
+    """每 20 分钟输出一次内存快照：tracemalloc Top 15 + RSS + asyncio 任务数。"""
     await asyncio.sleep(300)  # 启动后 5 分钟开始第一次采样
     while True:
         try:
-            # tracemalloc Top 20
+            # tracemalloc Top 15
             snapshot = tracemalloc.take_snapshot()
             top_stats = snapshot.statistics('lineno')
-            logger.warning("[mem-trace] ====== TOP20 内存分配位置 ======")
-            for stat in top_stats[:20]:
-                logger.warning(f"[mem-trace]   {stat}")
-            
-            # 关键对象大小
-            try:
-                from shared.liq_cache import _CACHE as _liq_cache
-                logger.warning(f"[mem-trace] liq_cache keys={len(_liq_cache)}")
-            except Exception:
-                logger.warning("[mem-trace] liq_cache: 无法访问")
-            
-            try:
-                from shared.signal_watcher import SignalWatcher
-                # 尝试从全局获取 signal_watcher 实例
-                import sys
-                for obj in gc.get_objects():
-                    if isinstance(obj, SignalWatcher):
-                        logger.warning(f"[mem-trace] signal_watcher._last_event_ts keys={len(obj._last_event_ts)}")
-                        logger.warning(f"[mem-trace] signal_watcher._evt_drop_log_ts keys={len(obj._evt_drop_log_ts)}")
-                        break
-            except Exception:
-                logger.warning("[mem-trace] signal_watcher: 无法访问")
+            lines = ["[mem] TOP15 内存分配:"]
+            for stat in top_stats[:15]:
+                size_mib = stat.size / 1024 / 1024
+                lines.append(f"[mem]   {size_mib:.1f} MiB  {stat}")
             
             # 当前 RSS
             try:
                 pid = os.getpid()
                 rss_kb = int(open(f"/proc/{pid}/status").read().split("VmRSS:")[1].split()[0])
-                logger.warning(f"[mem-trace] 当前 RSS={rss_kb // 1024}MB")
+                rss_mb = rss_kb // 1024
             except Exception:
-                pass
+                rss_mb = -1
             
-            logger.warning("[mem-trace] ==================================")
+            # asyncio 活跃任务数
+            task_count = len(asyncio.all_tasks())
+            
+            lines.append(f"[mem] RSS={rss_mb}MB asyncio任务数={task_count}")
+            logger.warning("\n".join(lines))
         except Exception as e:
-            logger.error(f"[mem-trace] 内存诊断异常: {e}", exc_info=True)
+            logger.error(f"[mem] 内存快照异常: {e}", exc_info=True)
         
         await asyncio.sleep(interval_sec)
 
@@ -604,6 +621,12 @@ async def _sync_positions_on_startup() -> None:
 async def main() -> None:
     logger.info("[main] fx 交易系统 V3.0 启动")
 
+    # ── 临时诊断（定位后删除）────────────────────────────────────────────────
+    # 启动事件循环看门狗线程：检测阻塞 > 2s 时 dump 所有线程堆栈
+    _wd = threading.Thread(target=_watchdog_thread_fn, daemon=True, name="watchdog")
+    _wd.start()
+    logger.info("[main] 事件循环看门狗线程已启动（阻塞 > 2s dump 堆栈）")
+
     # ── 1. 初始化 WebSocket 监听器 ──────────────────────────────────────────
     from shared.ws_listener import WsOrderListener
     ws = WsOrderListener()
@@ -666,6 +689,8 @@ async def main() -> None:
         logger.warning(f"[main] liq_cache 启动失败（非致命）: {_lce}")
 
     tasks = [
+        # ── 临时诊断（定位后删除）────────────────────────────────────────────
+        asyncio.create_task(_loop_heartbeat(),                                  name="heartbeat"),
         # ── 优先级 1：持仓维护（止损/止盈/巡检） ───────────────────────────────
         asyncio.create_task(_adjust_sl_tp_loop_static(),                       name="adjust_sl_tp"),
         asyncio.create_task(_loop_patrol(300, 30),                             name="patrol"),
@@ -679,6 +704,9 @@ async def main() -> None:
         asyncio.create_task(_loop_reset_circuit(),                             name="reset_circuit"),
         asyncio.create_task(_loop_event_latency_monitor(),                     name="loop_latency"),
         asyncio.create_task(_loop_track_outcomes(3600),                        name="track_outcomes"),
+        # ── 临时诊断（定位后删除）────────────────────────────────────────────────
+        # 内存快照：每 20 分钟输出 tracemalloc Top 15 + RSS + asyncio 任务数
+        asyncio.create_task(_loop_mem_snapshot(1200),                          name="mem_snapshot"),
     ]
 
     # ── 5. 优雅退出 ─────────────────────────────────────────────────────────
