@@ -622,6 +622,10 @@ def _apply_leverage_budget(symbol: str, direction: str, nominal: float, equity: 
     """
     try:
         import config as _cfg
+        if not hasattr(_cfg, "LEVERAGE_UTILIZATION_ENABLED"):
+            # 参数缺失（曾因 config.py 被覆盖而整块丢失）≠ 显式关闭：不再静默放行，留一条告警
+            logger.warning("[leverage] LEVERAGE_UTILIZATION_ENABLED 读取失败，杠杆预算已跳过，请检查 config.py")
+            return True, nominal, ""
         if not getattr(_cfg, "LEVERAGE_UTILIZATION_ENABLED", False):
             return True, nominal, ""
         from shared.risk_manager import calc_leverage_remaining
