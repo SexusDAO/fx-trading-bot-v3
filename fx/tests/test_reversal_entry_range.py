@@ -168,3 +168,11 @@ def test_old_half_width_0_5_would_instant_trigger_on_degraded_entry(monkeypatch)
     e = sw.WatchEntry(signal=sig, entry_low=low, entry_high=high, entry_price=ep,
                       expire_ts=time.time() + 600, on_trigger=_noop)
     assert e.price_in_range(1000.0)
+
+
+def test_fallback_when_config_key_missing_matches_config(monkeypatch):
+    """config 缺该键时 compute_entry_range 的回退值必须与 config 默认值一致（0.3），且仍 < 0.5 降级偏移。"""
+    monkeypatch.delattr(config, "SIGNAL_WATCH_ENTRY_BUFFER_ATR_REVERSAL")
+    low, high, _ = sw.compute_entry_range(_sig("SHORT"), mark_price=ENTRY)
+    assert low == pytest.approx(ENTRY - 0.3 * ATR) and high == pytest.approx(ENTRY + 0.3 * ATR)
+    assert 0.3 == HALF
