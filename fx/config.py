@@ -483,7 +483,13 @@ SIGNAL_WATCH_BREAKOUT_EXPIRE_MIN  = 30     # breakout 信号有效期，分钟
 SIGNAL_WATCH_PULLBACK_EXPIRE_MIN  = 240    # pullback/reversal 信号有效期，分钟
 SIGNAL_WATCH_GC_INTERVAL_SEC      = 60     # GC 间隔，秒
 SIGNAL_WATCH_ENTRY_BUFFER_PCT_PULLBACK  = 0.030   # pullback 触发区间 ±3%（山寨行情1分钟3%属正常，提前埋单）
-SIGNAL_WATCH_ENTRY_BUFFER_PCT_REVERSAL  = 0.030   # reversal 触发区间 ±3%
+SIGNAL_WATCH_ENTRY_BUFFER_PCT_REVERSAL  = 0.030   # reversal 触发区间 ±3%（v3.91 起 reversal 改用下方 ATR 半宽，此值不再用于 reversal）
+SIGNAL_WATCH_ENTRY_BUFFER_ATR_REVERSAL = 0.3  # reversal 触发区间半宽，单位 ATR（原 0.5）
+# reversal 有两处降级路径会产生 entry = mark ± 0.5ATR：
+#   ① calc_sl_tp._entry_reversal 挂单价过远降级
+#   ② signal_watcher recheck 清算区位移重挂
+# 触发半宽必须 < 0.5ATR，否则降级后 mark 价在区间边界上立刻秒触发。
+# 0.3ATR 留出 0.2ATR 余量，1.2ATR 降级路径本身没有冲突。
 SIGNAL_WATCH_ENTRY_BUFFER_PCT_BREAKOUT  = 0.010   # breakout 触发区间 ±1%（追涨不宜太宽）
 
 # ── scanner.py 使用的别名（与上方参数对应）────────────────────────────────────

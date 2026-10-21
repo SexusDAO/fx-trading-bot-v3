@@ -270,10 +270,22 @@ def compute_entry_range(
                 high    = mark_price * (1 + buf)
                 entry_p = mark_price
         # pullback / reversal：以 entry_price 为中心
-        elif mode == "pullback" or mode == "reversal":
-            buf        = _BUF_PULLBACK if mode == "pullback" else _BUF_REVERSAL
+        elif mode == "pullback":
+            buf        = _BUF_PULLBACK
             low        = entry_price * (1 - buf)
             high       = entry_price * (1 + buf)
+            entry_p    = entry_price
+        elif mode == "reversal":
+            # [fix] 触发区间改用 ATR 维度，防止 mark 价已在区间内导致秒触发
+            #   原 ±3% 固定比例在 entry 因降级紧贴 mark 时完全失效
+            try:
+                from config import SIGNAL_WATCH_ENTRY_BUFFER_ATR_REVERSAL as _BUF_REVERSAL_ATR
+            except ImportError:
+                _BUF_REVERSAL_ATR = 0.3   # 与 config.SIGNAL_WATCH_ENTRY_BUFFER_ATR_REVERSAL 保持一致
+            atr_sig    = (signal.get("ind") or {}).get("atr_1h") or mark_price * 0.02
+            half       = atr_sig * _BUF_REVERSAL_ATR
+            low        = entry_price - half
+            high       = entry_price + half
             entry_p    = entry_price
         else:
             buf        = _BUF_PULLBACK
@@ -1404,18 +1416,18 @@ class SignalWatcher:
                 return False, ""
             _rsi_sc, _rsi_lc = _SURVIVAL_RSI_SC, _SURVIVAL_RSI_LC
             if direction == 'SHORT':
-                # 价格反向下跌超过 0.5 ATR → reversal SHORT 信号证伪
-                reversal_threshold = trigger_price - atr_trigger * 0.5
+                # 价格反向下跌超过 1 ATR → reversal SHORT 信号证伪
+                reversal_threshold = trigger_price - atr_trigger * 1.0
                 if price < reversal_threshold:
-                    return True, f"reversal SHORT 价格反向下跌至 {price:.6g} < 触发价-0.5ATR={reversal_threshold:.6g}"
+                    return True, f"reversal SHORT 价格反向下跌至 {price:.6g} < 触发价-1ATR={reversal_threshold:.6g}"
                 # RSI 回落至门槛以下 → 超买消退
                 if rsi_1h < _rsi_sc:
                     return True, f"reversal SHORT RSI1H={rsi_1h:.1f} 回落至 {_rsi_sc} 以下，超买消退"
             else:
-                # 价格反向上涨超过 0.5 ATR → reversal LONG 信号证伪
-                reversal_threshold = trigger_price + atr_trigger * 0.5
+                # 价格反向上涨超过 1 ATR → reversal LONG 信号证伪
+                reversal_threshold = trigger_price + atr_trigger * 1.0
                 if price > reversal_threshold:
-                    return True, f"reversal LONG 价格反向上涨至 {price:.6g} > 触发价+0.5ATR={reversal_threshold:.6g}"
+                    return True, f"reversal LONG 价格反向上涨至 {price:.6g} > 触发价+1ATR={reversal_threshold:.6g}"
                 # RSI 回升至门槛以上 → 超卖消退（45 而非 40，避免正常反弹初期误撤）
                 if rsi_1h > _rsi_lc:
                     return True, f"reversal LONG RSI1H={rsi_1h:.1f} 回升至 {_rsi_lc} 以上，超卖消退"
