@@ -1460,9 +1460,13 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
         _sig_id_pre = signal.get("_sig_id", "")
         if _sig_id_pre:
             try:
-                from shared.notifier import card_append, discard_signal, notify_async
-                card_append(_sig_id_pre, f"\n❌ 挂单失败：{reason}")
-                discard_signal(_sig_id_pre)   # 延迟 flush 现在包含失败行一并推送
+                # 注意：本函数后面还有 `from shared.notifier import card_append, ...`，会让 card_append 成为局部变量，
+                #   此处必须本地 import，否则 UnboundLocalError 被下面的 except 吞掉，卡片追加不出去
+                from shared.notifier import card_append, card_remove, _hhmm
+                # 卡片已在价格触发时 flush 发出：追加预检拒绝原因并清理卡片缓存
+                #（此时再 discard_signal 已无缓冲内容可丢，不再调用）
+                card_append(_sig_id_pre, f"\n❌ {_hhmm()} 预检拒绝\n {reason}")
+                card_remove(_sig_id_pre)
             except Exception:
                 pass
         return False
