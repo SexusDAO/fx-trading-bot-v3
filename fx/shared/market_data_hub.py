@@ -46,6 +46,9 @@ KLINE_INTERVALS = ("15m", "1h", "4h")
 _INTERVAL_MS = {"15m": 900_000, "1h": 3_600_000, "4h": 14_400_000}
 KLINE_HISTORY = 100                            # 每个 (标的, 周期) 保留/初始化拉取的 K 线根数
 KLINE_STALE_GRACE_MS = 10_000                  # 最后一根 K 线的结束时间已过去这么久仍无新推送 → 视为过旧，读取返回 None
+# 历史 K 线拉取专用线程池：不占用 asyncio 默认线程池，避免与扫描等线程竞争
+from concurrent.futures import ThreadPoolExecutor
+_LOAD_POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix="hub-load")
 KLINE_FETCH_CONCURRENCY = 6                    # 历史 K 线 REST 拉取并发上限
 KLINE_RETRY_SEC = 30.0                         # 历史拉取失败后的重试间隔
 KLINE_STREAM_PER_CONN = 180                    # 单条 /market/stream 连接上的 K 线 stream 上限（币安单连接 200，留出 ticker 等余量）
@@ -686,7 +689,7 @@ class MarketDataHub:
         rows = None
         try:
             async with self._fetch_sem:
-                rows = await asyncio.get_running_loop().run_in_executor(None, self._fetch, sym, iv, KLINE_HISTORY)
+                rows = await asyncio.get_running_loop().run_in_executor(_LOAD_POOL, self._fetch, sym, iv, KLINE_HISTORY)
         except Exception as e:
             logger.warning(f"[hub] 历史K线拉取失败 {sym} {iv}: {e}")
         with self._kl_lock:
