@@ -559,7 +559,7 @@ class SignalWatcher:
             )
             # ── 创建信号卡片（进入监控节点）─────────────────────────────────
             try:
-                from shared.notifier import card_create, make_card_header, fmt_node_monitor
+                from shared.notifier import buffer_signal, card_append, make_card_header, fmt_node_monitor
                 _sig       = entry.signal
                 _dir       = _sig.get("direction", "LONG").upper()
                 _mode      = entry.mode
@@ -573,8 +573,9 @@ class SignalWatcher:
                 _expire_min   = int(max(0, expire_ts - time.time()) / 60)
                 _sl_deg       = bool(_sig.get("sl_degraded") or (_sig.get("params") or {}).get("sl_degraded"))
                 _monitor_line = fmt_node_monitor(_score_val, entry_price, _expire_min, _sl_deg)
-                card_create(_sig_id, _header)
-                from shared.notifier import card_append
+                # [fix] 只进缓冲区（buffer_signal），不 flush：等 _trigger 里价格触发后再 flush 合并发出
+                #   未触发就过期/被淘汰 → discard_signal 静默丢弃，不会产生幽灵卡片
+                buffer_signal(_sig_id, _header)
                 card_append(_sig_id, _monitor_line)
             except Exception as _ne:
                 logger.debug(f"[signal_watcher] 信号卡片创建失败（非致命）: {_ne}")
@@ -897,13 +898,13 @@ class SignalWatcher:
         try:
             # ── 卡片追加：价格触发挂单行 ─────────────────────────────────────
             try:
-                from shared.notifier import card_append, fmt_node_trigger
+                from shared.notifier import card_append, flush_signal, fmt_node_trigger
                 _sig_id_t = entry.signal.get("_sig_id", "")
                 if _sig_id_t:
                     card_append(_sig_id_t, fmt_node_trigger(price, entry.entry_price))
-                    # [fix] 不在此处 flush：等 executor 确认下单成功后再推送
-                    # 若 executor 预检拒绝，会补发失败通知并 discard_signal 静默丢弃
-                    # flush_signal(_sig_id_t)  ← 移至 executor._execute_async 内
+                    # [fix] 价格触发时 flush：缓冲区里「进入监控 + 价格触发」两行合并成一条消息发出
+                    #   后续 executor 开仓成交 / 预检拒绝都继续 card_append 到这张已发出的卡片
+                    flush_signal(_sig_id_t)
             except Exception as _tc_e:
                 logger.debug(f"[signal_watcher] 触发卡片追加失败: {_tc_e}")
 
