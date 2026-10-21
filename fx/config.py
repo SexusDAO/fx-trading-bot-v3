@@ -1048,3 +1048,9 @@ TRIGGER_TOKEN_RATE             = 20
 TRIGGER_TOKEN_CAPACITY         = 60
 TRIGGER_TOKEN_TTL              = 300
 TRIGGER_TOKEN_STRATEGY_MAX_PCT = 0.40
+
+# ── 阶段5：触发器驱动真实分析（会真实下单）──────────────────────────────────────
+TRIGGER_DISPATCH_ENABLED = False  # 需同时 TRIGGER_DETECTOR_ENABLED=True；True 时触发 → 预取 → analyze_one → 第四步 → 注册下单
+SCAN_INTERVAL_PASSIVE    = 1800   # 两个开关都为 True 时的兜底扫描间隔（秒）；否则保持 300s / 周末 900s
+TRIGGER_DISPATCH_TIMEOUT = 30     # 单个分析任务超时（预取 + analyze_one + 第四步）
+TRIGGER_DISPATCH_WORKERS = 2      # 分析协程数

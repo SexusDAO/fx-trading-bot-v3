@@ -187,7 +187,7 @@ class TriggerDetector:
                  oi_reader: Callable = _default_oi, pool_reader: Callable = _default_pool,
                  exinfo_reader: Callable = _default_exinfo, positions_reader: Callable = _default_positions,
                  signal_watcher=None, trigger_log: Path = TRIGGER_LOG, scan_log: Path = SCAN_SIGNALS_LOG,
-                 state_file: Path = STATE_FILE):
+                 state_file: Path = STATE_FILE, analyzer: Optional[Callable] = None):
         self._hub = hub
         self._clock = clock
         self._oi = oi_reader
@@ -226,6 +226,10 @@ class TriggerDetector:
         self._post = []
         self.stats = {"miss": 0, "fp": 0, "oi_miss": 0, "oi_fp": 0, "suppressed": 0, "expired": 0}
         self.gate_open = False
+        self._analyzer = analyzer          # 测试注入；默认 scanner.dispatch_trigger_analysis
+        self._dispatch_q: Optional[asyncio.Queue] = None
+        self._dispatch_tasks = []
+        self.dispatch_stats = {"queued": 0, "signal": 0, "rejected": 0, "error": 0, "skipped": 0}
 
     # ── 公共接口 ─────────────────────────────────────────────────────────
     def hub(self):
@@ -297,6 +301,7 @@ class TriggerDetector:
     async def run(self):
         self.load_state()
         post = asyncio.create_task(self._post_loop(), name="trigger_post_price")
+        self.start_dispatch_workers()
         last_save = self._clock()
         try:
             while True:
@@ -310,6 +315,8 @@ class TriggerDetector:
                 await asyncio.sleep(1.0)
         finally:
             post.cancel()
+            for t in self._dispatch_tasks:
+                t.cancel()
             self.save_state()
 
     async def _post_loop(self):
@@ -786,6 +793,92 @@ class TriggerDetector:
         self._triggers.append((now, rec["symbol"], rec["strategy"]))
         self._post.append({"id": rec["trigger_id"], "sym": rec["symbol"], "dir": rec["direction"],
                            "p0": rec["price"], "t0": now, "vals": {}, "fav": 0.0, "adv": 0.0})
+        self._enqueue_dispatch(rec)
+
+    # ── 阶段5：触发 → 真实分析 → 共用第四步注册 ───────────────────────────
+    @staticmethod
+    def dispatch_enabled() -> bool:
+        return bool(_cfg("TRIGGER_DETECTOR_ENABLED", False) and _cfg("TRIGGER_DISPATCH_ENABLED", False))
+
+    def start_dispatch_workers(self):
+        if self._dispatch_q is None:
+            self._dispatch_q = asyncio.Queue()
+        if not self._dispatch_tasks:
+            for i in range(int(_cfg("TRIGGER_DISPATCH_WORKERS", 2))):
+                self._dispatch_tasks.append(asyncio.create_task(self._dispatch_worker(), name=f"trigger_dispatch_{i}"))
+
+    def _enqueue_dispatch(self, rec):
+        if not self.dispatch_enabled():
+            return
+        sym = rec["symbol"]
+        if self.is_analyzing(sym):
+            self._dispatch_done(rec, "skipped", None, "analyzing")
+            return
+        if self._watcher is not None:
+            try:
+                if sym in set(self._watcher.pending_symbols()):
+                    self._dispatch_done(rec, "skipped", None, "pending_signal")
+                    return
+            except Exception:
+                pass
+        if self._dispatch_q is None:
+            self._dispatch_q = asyncio.Queue()
+        self.mark_analyzing(sym)              # 入队即占位，同标的不会并发分析
+        self.dispatch_stats["queued"] += 1
+        self._dispatch_q.put_nowait(rec)
+
+    async def _dispatch_worker(self):
+        while True:
+            rec = await self._dispatch_q.get()
+            try:
+                await self._dispatch_one(rec)
+            finally:
+                self._dispatch_q.task_done()
+
+    async def _dispatch_one(self, rec):
+        sym = rec["symbol"]
+        timeout = float(_cfg("TRIGGER_DISPATCH_TIMEOUT", 30))
+        try:
+            r = await asyncio.wait_for(asyncio.to_thread(self._dispatch_analysis, sym, [rec["strategy"]]), timeout)
+            self._dispatch_done(rec, r.get("analysis_result", "error"), r.get("signal_strategy"), r.get("error"))
+        except asyncio.TimeoutError:
+            self._dispatch_done(rec, "error", None, "timeout")
+        except Exception as e:
+            self._dispatch_done(rec, "error", None, f"{type(e).__name__}: {e}")
+        finally:
+            self.clear_analyzing(sym)
+
+    def _dispatch_analysis(self, symbol, strategy_hints=None) -> dict:
+        """线程内运行：hub 快照（零 REST）→ scanner.dispatch_trigger_analysis（预取补 REST → analyze_one → 第四步）。"""
+        hub = self.hub()
+        if hub is None:
+            return {"analysis_result": "error", "error": "no_hub"}
+        kl = tuple(hub.get_klines(symbol, iv, 100) for iv in ("15m", "1h", "4h"))
+        tk = hub.get_ticker(symbol)
+        mp = hub.get_mark_price(symbol)
+        if not all(kl) or not tk:
+            return {"analysis_result": "error", "error": "hub_snapshot_incomplete"}
+        fn = self._analyzer
+        if fn is None:
+            import scanner as _sc
+            fn = _sc.dispatch_trigger_analysis
+        return fn(symbol, tk, mp, kl, signal_watcher=self._watcher,
+                  max_ctx_age=float(_cfg("SCAN_INTERVAL_PASSIVE", 1800)))
+
+    def _dispatch_done(self, rec, result, strategy, err):
+        key = result if result in self.dispatch_stats else "error"
+        self.dispatch_stats[key] += 1
+        line = {"type": "analysis", "trigger_id": rec["trigger_id"], "ts": int(self._clock() * 1000),
+                "symbol": rec["symbol"], "strategy": rec["strategy"], "analysis_result": result,
+                "signal_strategy": strategy, "error": err}
+        self._writer.put(self._tlog, line)
+        lvl = logging.WARNING if result == "error" else logging.INFO
+        logger.log(lvl, f"[trigger-dispatch] {rec['symbol']} {rec['strategy']} → {result}"
+                        + (f" signal={strategy}" if strategy else "") + (f" err={err}" if err else ""))
+
+    async def drain_dispatch(self):
+        if self._dispatch_q is not None:
+            await self._dispatch_q.join()
 
     def update_post_prices(self):
         """定义2：触发后 15m/1h/4h 价格与期间最大有利/不利波动（比例，按方向）。到点追加一行，原行不改。"""

@@ -213,6 +213,13 @@ async def _loop_scan(interval: int = 300, signal_watcher=None, ws_listener=None)
         from scanner import _is_weekend_period as _iwp
         from datetime import datetime, timezone as _tz
         _eff_interval = 900 if _iwp(datetime.now(_tz.utc)) else interval
+        # 阶段5：触发器为主路径时（两个开关都 True）扫描降为兜底，其余情况保持原逻辑
+        try:
+            import config as _cfg_ps
+            if getattr(_cfg_ps, "TRIGGER_DETECTOR_ENABLED", False) and getattr(_cfg_ps, "TRIGGER_DISPATCH_ENABLED", False):
+                _eff_interval = int(getattr(_cfg_ps, "SCAN_INTERVAL_PASSIVE", 1800))
+        except Exception:
+            pass
         if _eff_interval != interval:
             logger.debug(f"[main] 周末模式：扫描间隔降频 {interval}s → {_eff_interval}s")
         # ── 6小时心跳推送 ────────────────────────────────────────────

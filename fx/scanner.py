@@ -1502,7 +1502,8 @@ def _prefetch_symbol(symbol: str, ticker: dict,
                      loss_blacklist: set | None = None,
                      deadline: float | None = None,
                      mark_price_map: dict | None = None,
-                     with_liq: bool = False) -> dict | None:
+                     with_liq: bool = False,
+                     klines: tuple | None = None) -> dict | None:
     """
     单标的全部 IO（REST、state 读取、时钟），打包成 {"k15","k1h","k4h","prefetch"}；
     预筛淘汰 / 超时 / 数据不足时返回 None。线程池路径和进程池路径共用。
@@ -1540,10 +1541,11 @@ def _prefetch_symbol(symbol: str, ticker: dict,
         # ── A. 拉取数据（4H 现在对所有通过预筛的标的预取）──
         if _over_budget("15m K线"):
             return None
-        k15 = _get_klines_cached(symbol, "15m", 100)
+        # 阶段5：klines=(k15, k1h, k4h) 由触发器传入 hub 快照时跳过 K 线 REST；不传时行为不变
+        k15 = klines[0] if klines else _get_klines_cached(symbol, "15m", 100)
         if _over_budget("1h K线"):
             return None
-        k1h = _get_klines_cached(symbol, "1h",  100)
+        k1h = klines[1] if klines else _get_klines_cached(symbol, "1h",  100)
         if not k1h or len(k1h) < 25:
             return None
 
@@ -1601,7 +1603,7 @@ def _prefetch_symbol(symbol: str, ticker: dict,
         # 4H K 线（预取）
         if _over_budget("4h K线"):
             return None
-        k4h = _get_klines_cached(symbol, "4h", 100)
+        k4h = klines[2] if klines else _get_klines_cached(symbol, "4h", 100)
 
         # judge 内部 _funding_rate_velocity 的 HTTP（60s 缓存）在主进程预取
         funding_velocity: dict = {}
@@ -2118,422 +2120,47 @@ def _run_parallel_with_deadline(fn, jobs: dict, max_workers: int, total_timeout_
     return results, unfinished
 
 
-def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
-    t0  = time.time()
-    now = datetime.now(timezone.utc)
-    # [v3.89 SHADOW] 每轮扫描重置影子记录计数
-    try:
-        from shared import shadow_trace as _st0
-        _st0.new_round()
-    except Exception:
-        pass
-    result = {
-        "ts": now.isoformat(), "scanned": 0,
-        "class_counts": {"reversal": 0, "breakout": 0, "pullback": 0},
-        "signals_raw": 0, "signals_final": 0, "placed": 0,
-        "rejected": [], "dry_run": dry_run,
-    }
-
-    # ── 第一步：前置状态检查 ───────────────────────────────────────────────────
-    if is_circuit_open():
-        logger.info("[scanner] 日交易熔断中，跳过扫描")
-        return result
-
-    # ── 宏观日历检查（v3.63）────────────────────────────────────────────────
-    # 读取 macro_calendar.json，判断当前是否在重大宏观事件的保守窗口内。
-    # 保守模式：仓位上限减半 + 停止 reversal/breakout + 评分门槛 +10
-    # 日历由用户手动维护，系统自动读取，无需改代码。
-    _macro_conservative = False   # 是否进入宏观保守模式
-    _macro_event_desc   = ""      # 事件描述，用于日志
-    try:
-        import json as _mjson
-        from pathlib import Path as _mPath
-        _cal_file = _mPath(__file__).parent / "macro_calendar.json"
-        if _cal_file.exists():
-            _cal = _mjson.loads(_cal_file.read_text(encoding="utf-8"))
-            _now_utc = datetime.now(timezone.utc)
-            for _ev in _cal.get("events", []):
-                if _ev.get("_example"):
-                    continue   # 跳过示例条目
-                _ev_date = _ev.get("date", "")
-                if not _ev_date:
-                    continue
-                try:
-                    _ev_dt = datetime.strptime(_ev_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                except ValueError:
-                    continue
-                _hours = int(_ev.get("conservative_hours", 24))
-                # 窗口设计：事件当天 UTC 00:00 开始，持续 conservative_hours 小时
-                # conservative_hours=24 → 覆盖整个事件日（UTC 全天）
-                # conservative_hours=48 → 覆盖事件日 + 次日（跨日事件或影响持续）
-                # conservative_hours=0  → 等同于 24（全天）
-                _win_hours  = _hours if _hours > 0 else 24
-                _win_start  = _ev_dt   # 当天 UTC 00:00
-                _win_end    = _ev_dt + __import__("datetime").timedelta(hours=_win_hours)
-                if _win_start <= _now_utc <= _win_end:
-                    _macro_conservative = True
-                    _macro_event_desc   = _ev.get("event", _ev_date)
-                    break
-    except Exception as _me:
-        logger.debug(f"[scanner] 宏观日历读取跳过: {_me}")
-
-    if _macro_conservative:
-        logger.info(f"[scanner] ⚠️ 宏观保守模式激活：{_macro_event_desc}（仓位减半/停reversal+breakout/评分+10）")
-
-    # 功能一：大行情熔断检测（v3.1）
-    try:
-        from shared.notifier import send as _notify_fn
-    except Exception:
-        _notify_fn = None
-    if check_market_shock(notifier_fn=_notify_fn):
-        logger.info("[scanner] 大行情熔断激活，跳过本轮扫描")
-        return result
-
-    # ── 系统性风险检测（USDT脱锚 / API异常 / 极端费率）──────────────────────
-    try:
-        from shared.risk_manager import check_systemic_risk
-        _sys_ok, _sys_reason = check_systemic_risk()
-        if not _sys_ok:
-            logger.warning(f"[scanner] 系统性风险检测触发：{_sys_reason}，本轮跳过开仓")
-            try:
-                from shared.notifier import notify as _sn
-                _sn(f"🚨 系统性风险：{_sys_reason}")
-            except Exception:
-                pass
-            return result
-    except Exception as _sre:
-        logger.debug(f"[scanner] check_systemic_risk 跳过: {_sre}")
-
-    # ── v3.31 大行情恢复窗口检测 ──────────────────────────────────────────────
-    # 熔断解除后10分钟内（约2轮扫描），ATR/EMA/RSI 处于失真状态，信号质量偏差。
-    # 此期间：position_size_cap × 0.5，final_score -10（在评分层应用）
-    _post_shock = is_post_shock_recovery()
-    if _post_shock:
-        logger.info("[scanner] 大行情恢复窗口：本轮信号将降级处理（仓位×0.5 / 评分-10）")
-
-    # 问题一修复：_dyn_max_long/_dyn_max_short 先用静态默认值，
-    # 等 BTC 趋势计算完成后再动态更新。避免 BTC 拉取失败时 NameError。
-    import config as _cfg_early
-    _dyn_max_long  = _cfg_early.RISK_MAX_LONG
-    _dyn_max_short = _cfg_early.RISK_MAX_SHORT
-
-    positions = get_all_positions()
-    # v3.53: 槽位只计 open（已成交持仓），pending 挂单不占槽位
-    # 原逻辑把 pending 也算槽位，导致挂单中的标的把槽位占满、后续高分信号全被拒
-    long_cnt  = sum(1 for p in positions if p.get("direction") == "LONG"
-                    and p.get("status") == "open")
-    short_cnt = sum(1 for p in positions if p.get("direction") == "SHORT"
-                    and p.get("status") == "open")
-
-    if long_cnt >= _dyn_max_long and short_cnt >= _dyn_max_short:
-        logger.info(f"[scanner] 持仓已满（多{long_cnt} 空{short_cnt}），跳过扫描")
-        # 仓位满时撤销所有 SignalWatcher 里的入场挂单（避免持仓超限）
-        if signal_watcher is not None and signal_watcher.pending_count() > 0:
-            import asyncio as _asw
-            main_loop = getattr(signal_watcher, "_main_loop", None)
-            if main_loop and main_loop.is_running():
-                _f = _asw.run_coroutine_threadsafe(
-                    signal_watcher.cancel_all("仓位已满"),
-                    main_loop,
-                )
-                try:
-                    n = _f.result(timeout=5)
-                    if n:
-                        logger.info(f"[scanner] 仓位满，已撤销 {n} 个入场监控/挂单")
-                except Exception:
-                    pass
-        return result
-
-    # 全局资金费率结算窗口检查（用 BTC 资金费率代表市场费率水平）
-    btc_mp   = api.get_mark_price("BTCUSDT")
-    btc_fr   = abs(float(btc_mp.get("lastFundingRate", 0)))
-    in_win, win_reason = _in_funding_window(btc_fr)
-    # [v3.85 OPT-6] 启用逐标的窗口后，不再因 BTC 一个值整轮停扫；8H 标的仍会在 analyze_symbol 里被逐个拦截
-    try:
-        from config import OPT_FUNDING_WINDOW_PER_SYMBOL as _OPT_FW_G
-    except Exception:
-        _OPT_FW_G = False
-    if in_win and _OPT_FW_G:
-        logger.info(f"[scanner] {win_reason}：已启用逐标的窗口，不整轮跳过")
-        in_win = False
-    if in_win:
-        logger.info(f"[scanner] {win_reason}，跳过扫描")
-        return result
-
-    # ── 第二步完成后：获取市场模式（统一调用 risk_manager.get_market_mode）────
-    # v3.6 修订：原内联 EMA9/20/50 排列判断改为复用 risk_manager.get_market_mode()，
-    # 确保 scanner 槽位和 executor._precheck 用同一套 BTC 趋势判断，消除两套逻辑不一致。
-    import config as _cfg
-    try:
-        from shared.risk_manager import get_market_mode as _get_mkt_mode
-        _mkt_mode = _get_mkt_mode()   # "bull" / "bear" / "range"，自带 5min 缓存
-    except Exception as _be:
-        _mkt_mode = "range"
-        logger.debug(f"[scanner] get_market_mode 失败，降级 range: {_be}")
-
-    # 持久化 market_mode 到文件（供自检脚本读取）
-    try:
-        import time as _mt
-        _mm_path = ROOT / "logs" / "market_mode.json"
-        _mm_path.write_text(
-            __import__("json").dumps({"mode": _mkt_mode, "ts": int(_mt.time() * 1000)}),
-            encoding="utf-8"
-        )
-    except Exception:
-        pass
-
-    # ── v3.5 市场方向感知：根据市场模式动态调整多空单槽位──────────────────────
-    if _mkt_mode == "bear":
-        # 熊市：多2空3
-        _effective_max_long  = max(1, _cfg.MAX_POSITIONS_LONG_BEAR)
-        _effective_max_short = _cfg.MAX_POSITIONS_SHORT_BEAR
-        logger.info(f"[scanner] 熊市模式：多单上限{_effective_max_long} 空单上限{_effective_max_short}")
-    elif _mkt_mode == "bull":
-        # 牛市：多3空2
-        _effective_max_long  = _cfg.MAX_POSITIONS_LONG_BULL
-        _effective_max_short = _cfg.MAX_POSITIONS_SHORT_BULL
-        logger.info(f"[scanner] 牛市模式：多单上限{_effective_max_long} 空单上限{_effective_max_short}")
-    else:
-        # 震荡/range：多2空2
-        _effective_max_long  = _cfg.MAX_POSITIONS_LONG_RANGE
-        _effective_max_short = _cfg.MAX_POSITIONS_SHORT_RANGE
-        logger.info(f"[scanner] 震荡模式：多单上限{_effective_max_long} 空单上限{_effective_max_short}")
-    # 实际槽位使用市场感知后的值
-    _dyn_max_long  = _effective_max_long
-    _dyn_max_short = _effective_max_short
-    # 兼容后续代码使用 _btc_trend（"up"/"down"/"neutral"）
-    _btc_trend = {"bull": "up", "bear": "down"}.get(_mkt_mode, "neutral")
-
-    # ── 第二步：读取候选池 ────────────────────────────────────────────────────
-    _perf_t = time.perf_counter()
-    pool = _load_pool()
-    _perf_pool = time.perf_counter() - _perf_t
-    if not pool:
-        logger.warning("[scanner] 候选池为空")
-        return result
-
-    # 当前持仓/挂单标的集合（用于方向冲突和挂单维护判断）
-    # active_syms: (symbol, direction) 二元组集合，只排除同向，允许反向信号进入 judge
-    active_syms  = {(p["symbol"], p.get("direction","").upper())
-                    for p in positions if p.get("status") == "open"}
-    # 兼容：active_sym_set 纯标的集合，用于 _patrol_funding_arb 和 scan_pool 过滤
-    active_sym_set = {p["symbol"] for p in positions if p.get("status") == "open"}
-    # patching 也排除：正在补挂止损止盈，不允许再次开仓
-    pending_syms = {p["symbol"] for p in positions
-                   if p.get("status") in ("pending", "patching")}
-
-    # 对已有挂单的标的执行维护
-    pending_positions = [p for p in positions if p.get("status") == "pending"]
-    for pos in pending_positions:
-        sym = pos["symbol"]
-        if sym not in pool:
-            continue
-        pool_ticker = {}  # maintain_pending_order 内部实际未使用 ticker，传空字典即可
-        action = maintain_pending_order(pos, pool_ticker)
-        if action in ("cancel", "reorder"):
-            try:
-                # 撤销该标的所有挂单（cancel_all_orders 返回撤销数量）
-                cancelled = api.cancel_all_orders(sym)
-                logger.info(f"[scanner] {sym} 撤单 {cancelled} 笔")
-                if action == "reorder":
-                    # reorder 逻辑：撤单后让下一轮扫描重新评估开仓
-                    # 不立刻重挂，避免在不合适的价格补挂
-                    logger.info(f"[scanner] {sym} reorder: 已撤单，等待下轮扫描重新评估")
-            except Exception as e:
-                logger.warning(f"[scanner] {sym} 撤单失败: {e}")
-
-    # ── 实时注入：涨跌幅超过10%但不在候选池的标的 ──────────────────────────────
-    # 使用已有的 ticker 缓存（不重新拉取），限时3秒，注入本轮不写回缓存
-    try:
-        inject_start = time.time()
-        ticker_all = _get_ticker_24h_cached(300) or {}   # 5分钟内的缓存
-        pool_set = set(pool)
-        injected = []
-        for sym2, tk in ticker_all.items():
-            if time.time() - inject_start > 3:   # 超过3秒强制停止
-                break
-            if sym2 in pool_set:
-                continue
-            chg2 = float(tk.get("priceChangePercent", 0))
-            vol2 = float(tk.get("quoteVolume", 0))
-            if abs(chg2) >= 10 and vol2 >= POOL_MIN_VOLUME_USD:
-                injected.append(sym2)
-                pool_set.add(sym2)
-        if injected:
-            pool = pool + injected   # 只影响本轮，不写回缓存
-            logger.info(f"[scanner] 实时注入 {len(injected)} 个大幅波动标的: {injected[:5]}{'...' if len(injected)>5 else ''}")
-    except Exception as inj_err:
-        logger.debug(f"[scanner] 实时注入跳过: {inj_err}")
-
-    # v3.53 竞争开仓：pending 挂单不排除出候选池（允许同时给多个候选挂单）
-    # 同标的同方向冲突由 analyze_symbol 内部的 active_syms 精细过滤
-    # pending_syms 仍用于 analyze_symbol 内部判断，不在此处整体排除
-    scan_pool = [s for s in pool if s not in active_sym_set]   # 只排除 open 持仓标的
-    result["scanned"] = len(scan_pool)
-    # 持仓标的和 BTCUSDT 也订阅（patrol / 挂单维护读它们的 K 线），放最前：hub 对重复标的去重，超出 KLINE_HUB_SYMBOLS_MAX 时按顺序截断
-    _hub_subscribe_klines(["BTCUSDT"] + sorted(active_sym_set) + list(scan_pool))
-
-    # 方向约束：对应方向槽位已满时只扫描另一个方向（v3.53: 基于 open-only 计数）
-    allowed_dirs: set | None = None
-    if long_cnt >= _dyn_max_long and short_cnt < _dyn_max_short:
-        allowed_dirs = {"SHORT"}
-        logger.info(f"[scanner] 多单已满({long_cnt}/{_dyn_max_long})，本轮仅扫描空单信号")
-    elif short_cnt >= _dyn_max_short and long_cnt < _dyn_max_long:
-        allowed_dirs = {"LONG"}
-        logger.info(f"[scanner] 空单已满({short_cnt}/{_dyn_max_short})，本轮仅扫描多单信号")
-
-    # ── 累计亏损黑名单（提前到并行扫描前计算，作为零成本预筛传给 analyze_symbol）─
-    # 同一标的近期累计亏损 > 15U 时，跳过该标的（避免反复踩雷）
-    _loss_blacklist: set[str] = set()
-    try:
-        import json as _json
-        _LOSS_THRESHOLD = 15.0
-        from pathlib import Path as _Path
-        _log_dir = _Path(__file__).parent / "logs"
-        _trade_log_files = [str(_log_dir / "trade_log.jsonl")]
-        import glob as _glob
-        _trade_log_files += _glob.glob(str(_log_dir / "archive" / "trade_log_*.jsonl"))
-        _sym_loss: dict[str, float] = {}
-        for _tf in _trade_log_files:
-            try:
-                with open(_tf, encoding="utf-8") as _fh:
-                    for _line in _fh:
-                        _line = _line.strip()
-                        if not _line:
-                            continue
-                        _rec = _json.loads(_line)
-                        import time as _bk_tm
-                        _cutoff_ms = (_bk_tm.time() - 7 * 86400) * 1000
-                        _ct = _rec.get("close_time", _rec.get("open_time", 0))
-                        if _ct and float(_ct) < _cutoff_ms:
-                            continue
-                        _s   = _rec.get("symbol", "")
-                        _pnl = float(_rec.get("pnl_usdt", _rec.get("pnl_u", 0)) or 0)
-                        if _pnl < 0:
-                            _sym_loss[_s] = _sym_loss.get(_s, 0) + abs(_pnl)
-            except Exception:
-                pass
-        for _s, _loss in _sym_loss.items():
-            if _loss >= _LOSS_THRESHOLD:
-                _loss_blacklist.add(_s)
-    except Exception:
-        pass
-    if _loss_blacklist:
-        logger.info(f"[scanner] 累计亏损黑名单（预筛）: {_loss_blacklist}")
-
-        # ── 第三步：并行分析（单标的 SCAN_SYMBOL_TIMEOUT_SEC，整轮 SCAN_TOTAL_TIMEOUT_SEC）─
-    # [fix] 全市场标记价格/资金费率批量拉一次（1 次请求），供所有并行任务复用；失败则为空 map，各标的降级走 REST
-    _mark_price_map: dict = {}
-    _perf_t = time.perf_counter()
-    try:
-        for _m in (_get_all_mark_prices_list() or []):
-            _ms = _m.get("symbol", "")
-            if _ms:
-                _mark_price_map[_ms] = _m
-    except Exception as _mpe:
-        logger.warning(f"[scanner] 批量标记价格获取失败，各标的降级单独请求: {_mpe}")
-    _perf_mark = time.perf_counter() - _perf_t
-    _mark_price_map_ts = time.monotonic()   # 批量数据的取数时间；注册入场价时用它判断是否仍足够新
-    # 拉取一次 ticker 数据供所有并行任务复用（修复 vol24_usd 永远为 0 的 bug）
-    try:
-        _ticker_all = _get_ticker_24h_cached(120) or {}
-    except Exception as _te:
-        logger.warning(f"[scanner] ticker 缓存获取失败，vol24 将退化为 0: {_te}")
-        _ticker_all = {}
-    # ── #2 市场情绪快照：全市场下跌比例 ──────────────────────────────────────
-    from config import MARKET_SENTIMENT_BEAR_THRESH, MARKET_SENTIMENT_BULL_THRESH, MARKET_SENTIMENT_SCALE_DOWN
-    _declining_pct = 0.5  # 默认中性
-    try:
-        if _ticker_all:
-            _chg_list = [float(v.get("priceChangePercent", 0)) for v in _ticker_all.values() if v]
-            _declining_pct = sum(1 for c in _chg_list if c < 0) / len(_chg_list) if _chg_list else 0.5
-    except Exception:
-        pass
-    # 全局仓位系数：大多数在跌→做多降仓，大多数在涨→做空降仓
-    _global_long_scale  = MARKET_SENTIMENT_SCALE_DOWN if _declining_pct > MARKET_SENTIMENT_BEAR_THRESH else 1.0
-    _global_short_scale = MARKET_SENTIMENT_SCALE_DOWN if _declining_pct < MARKET_SENTIMENT_BULL_THRESH else 1.0
-    if _global_long_scale < 1.0:
-        logger.info(f"[scanner] 市场情绪偏空: {_declining_pct*100:.0f}%标的下跌>70%，做多仓位×{_global_long_scale}")
-    if _global_short_scale < 1.0:
-        logger.info(f"[scanner] 市场情绪偏多: {(1-_declining_pct)*100:.0f}%标的上涨>70%，做空仓位×{_global_short_scale}")
-
-    # ── 全市场资金费率情绪感知（v3.71）──────────────────────────────────────
-    _funding_sentiment = {}
-    try:
-        from shared.clawby_adapter import get_market_funding_sentiment as _gfs
-        from config import MARKET_FUNDING_SCALE
-        _funding_sentiment = _gfs()
-        _fs_val = _funding_sentiment.get("sentiment", "neutral")
-        if _fs_val == "long_crowded":
-            # 多头拥挤：LONG 信号仓位额外降权
-            _old_long = _global_long_scale
-            _global_long_scale = round(_global_long_scale * MARKET_FUNDING_SCALE, 3)
-            logger.info(
-                f"[scanner] 全市场费率情绪多头拥挤 "
-                f"(pct_pos={_funding_sentiment.get('pct_positive',0):.0%})，"
-                f"LONG仓位系数 {_old_long:.2f}→{_global_long_scale:.2f}"
-            )
-        elif _fs_val == "short_crowded":
-            _old_short = _global_short_scale
-            _global_short_scale = round(_global_short_scale * MARKET_FUNDING_SCALE, 3)
-            logger.info(
-                f"[scanner] 全市场费率情绪空头拥挤 "
-                f"(pct_pos={_funding_sentiment.get('pct_positive',0):.0%})，"
-                f"SHORT仓位系数 {_old_short:.2f}→{_global_short_scale:.2f}"
-            )
-    except Exception as _fse:
-        logger.debug(f"[scanner] 全市场资金费率情绪获取失败（降级忽略）: {_fse}")
-
-    signals_raw = []
-    _ROUTE_QUALITY.clear()
-    _kline_round_reset()
-    _jobs = {
-        sym: (sym, _ticker_all.get(sym, {}), active_syms, pending_syms, allowed_dirs, _loss_blacklist, _btc_trend, _mkt_mode)
-        for sym in scan_pool
-    }
-    # [fix] mark_price_map 用 partial 以关键字绑定：analyze_symbol 的第 9 个位置参数是 deadline，
-    # _run_parallel_with_deadline 又以关键字传 deadline，位置传 map 会 TypeError(multiple values for 'deadline')
-    # 阶段3：主进程标记「分析中」，仅供影子触发器读取；scanner 不因此跳过任何标的
-    try:
-        from shared import trigger_detector as _tdm
-        _tdm.mark_analyzing_many(_jobs.keys())
-    except Exception:
-        _tdm = None
-    _perf_t = time.perf_counter()
-    import config as _cfg_pp
-    if getattr(_cfg_pp, "SCAN_USE_PROCESS_POOL", False):
-        _par_results, _unfinished = _run_parallel_process_pool(
-            _jobs, _mark_price_map, SCAN_MAX_WORKERS, SCAN_TOTAL_TIMEOUT_SEC
-        )
-    else:
-        _par_results, _unfinished = _run_parallel_with_deadline(
-            _functools.partial(analyze_symbol, mark_price_map=_mark_price_map), _jobs, SCAN_MAX_WORKERS, SCAN_TOTAL_TIMEOUT_SEC
-        )
-    _perf_analysis = time.perf_counter() - _perf_t
-    _perf_post_t0 = time.perf_counter()
-    if _tdm is not None:
-        try:
-            _tdm.clear_analyzing_many(_jobs.keys())
-        except Exception:
-            pass
-    result["scan_unfinished"] = len(_unfinished)
-    for sym, res in _par_results:
-        if res:
-            signals_raw.append(res)
-            result["class_counts"][res["sig_type"]] = \
-                result["class_counts"].get(res["sig_type"], 0) + 1
-
-    result["signals_raw"] = len(signals_raw)
-    # 阶段3：judge 通过的原始信号落盘，供影子触发器对账（无信号也写一行；失败不影响扫描）
-    try:
-        from shared.trigger_detector import write_scan_signals as _wss
-        _wss([{"symbol": r.get("symbol"), "sig_type": r.get("sig_type"), "direction": r.get("direction"),
-               "route_quality": _ROUTE_QUALITY.get(r.get("symbol"))} for r in signals_raw])
-    except Exception:
-        pass
-    for _kl_line in _kline_round_summary():
-        logger.info(_kl_line)
-
+def _filter_and_register_signals(
+    signals_raw: list,
+    active_syms: set,
+    pending_syms: set,
+    market_mode: str,
+    btc_trend: str,
+    budget_info: dict,
+    source: str,
+    signal_watcher=None,
+    dry_run: bool = False,
+    result: dict | None = None,
+) -> tuple:
+    """第四步（阶段5 从 run_scan 原样抽出，判定逻辑逐行未改）：相关性/BTC 协同/黑名单/新闻/评分/门槛/
+    槽位过滤 → 仓位缩放 → 入场区间 → signal_watcher.add_signal（或无 watcher 时直接下单）。
+    扫描和触发器共用。budget_info 打包 run_scan 前置计算的上下文；result 就地更新计数。
+    返回 (本次注册/下单成功数, avail_signals)。source 写入每条信号的 "source" 字段。"""
+    if result is None:
+        result = {"signals_final": 0, "placed": 0, "rejected": []}
+    _bi = dict(budget_info or {})
+    _bi.setdefault("_btc_trend", btc_trend)
+    _bi.setdefault("_mkt_mode", market_mode)
+    _btc_trend = _bi["_btc_trend"]
+    _mkt_mode = _bi["_mkt_mode"]
+    long_cnt = _bi["long_cnt"]
+    short_cnt = _bi["short_cnt"]
+    _dyn_max_long = _bi["_dyn_max_long"]
+    _dyn_max_short = _bi["_dyn_max_short"]
+    _global_long_scale = _bi["_global_long_scale"]
+    _global_short_scale = _bi["_global_short_scale"]
+    _macro_conservative = _bi["_macro_conservative"]
+    _macro_event_desc = _bi["_macro_event_desc"]
+    _post_shock = _bi["_post_shock"]
+    _mark_price_map_ts = _bi["_mark_price_map_ts"]
+    now = _bi["now"]
+    _loss_blacklist = _bi["_loss_blacklist"]
+    _LOSS_THRESHOLD = _bi["_LOSS_THRESHOLD"]
+    _mark_price_map = _bi["_mark_price_map"]
+    for _s in signals_raw:
+        if isinstance(_s, dict):
+            _s["source"] = source
+    _placed0 = result.get("placed", 0)
     # ── 第四步：信号汇总与排序 ────────────────────────────────────────────────
     # v3.34: 槽位过滤已后移到评分过滤之后，先将 signals_raw 赋给 avail_signals
     avail_signals = list(signals_raw)
@@ -3190,6 +2817,10 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
             logger.debug(f"[scanner] {_sig['symbol']} 市场情绪做空降仓 cap {_cur_cap}→{_sig['position_size_cap']}")
 
     # ── 第五步：输出给 executor（通过 SignalWatcher 或直接调用）───────────────────
+    if source == "trigger" and not dry_run:
+        for _ts in avail_signals:
+            logger.warning(f"[TRIGGER-DISPATCH] 触发器信号即将下单 symbol={_ts.get('symbol')} "
+                           f"strategy={_ts.get('sig_type')} direction={_ts.get('direction')}")
     if not dry_run and avail_signals:
         if signal_watcher is not None:
             # 新路径：注册到 SignalWatcher，由实时价格驱动触发
@@ -3464,6 +3095,510 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
                         result["placed"] += 1
                 except Exception as e:
                     logger.warning(f"[scanner] {sig['symbol']} 开仓失败: {e}")
+
+    return result.get("placed", 0) - _placed0, avail_signals
+
+
+# ── 阶段5：触发器复用的扫描上下文缓存（每轮扫描第四步前写入）────────────────────────
+_TRIGGER_CTX: dict = {"ts": 0.0, "budget_info": None, "active_syms": set(), "pending_syms": set()}
+_TRIGGER_CTX_LOCK = _threading.Lock()
+
+
+def _set_trigger_context(budget_info: dict, active_syms, pending_syms) -> None:
+    with _TRIGGER_CTX_LOCK:
+        _TRIGGER_CTX.update(ts=time.time(), budget_info=dict(budget_info),
+                            active_syms=set(active_syms or ()), pending_syms=set(pending_syms or ()))
+
+
+def dispatch_trigger_analysis(symbol: str, ticker: dict, mark: dict | None, klines: tuple,
+                              signal_watcher=None, dry_run: bool = False, max_ctx_age: float = 1800.0) -> dict:
+    """阶段5 触发器入口（在线程里运行）：hub 快照 → _prefetch_symbol(klines) → analyze_one → 第四步共用函数。
+    返回 {"analysis_result": "signal"/"rejected"/"error", "signal_strategy", "registered", "error"}。"""
+    out = {"analysis_result": "rejected", "signal_strategy": None, "registered": 0, "error": None}
+    ctx = get_trigger_context()
+    if not ctx["budget_info"]:
+        out.update(analysis_result="error", error="no_context")
+        return out
+    if time.time() - ctx["ts"] > max_ctx_age:
+        out.update(analysis_result="error", error="stale_context")
+        return out
+    bi = ctx["budget_info"]
+    positions = get_all_positions()
+    bi["long_cnt"] = sum(1 for p in positions if p.get("direction") == "LONG" and p.get("status") == "open")
+    bi["short_cnt"] = sum(1 for p in positions if p.get("direction") == "SHORT" and p.get("status") == "open")
+    active_syms = {(p["symbol"], p.get("direction", "").upper()) for p in positions if p.get("status") == "open"}
+    pending_syms = {p["symbol"] for p in positions if p.get("status") in ("pending", "patching")}
+    mpm = {symbol: mark} if mark else {}
+    bi["_mark_price_map"] = mpm
+    bi["_mark_price_map_ts"] = time.monotonic()
+    b = _prefetch_symbol(symbol, ticker, bi.get("_loss_blacklist"), None, mpm, klines=klines)
+    if b is None:
+        return out
+    events: list = []
+    sig = analyze_one(symbol, ticker, b["k15"], b["k1h"], b["k4h"], active_syms, pending_syms,
+                      bi.get("_allowed_dirs"), bi.get("_loss_blacklist"), bi["_btc_trend"], bi["_mkt_mode"],
+                      mpm, b["prefetch"], events)
+    sig = _apply_post_events(sig, events)
+    if not sig:
+        return out
+    result = {"signals_final": 0, "placed": 0, "rejected": []}
+    n, avail = _filter_and_register_signals([sig], active_syms, pending_syms, bi["_mkt_mode"], bi["_btc_trend"],
+                                            bi, "trigger", signal_watcher=signal_watcher, dry_run=dry_run,
+                                            result=result)
+    if avail:
+        out.update(analysis_result="signal", signal_strategy=avail[0].get("sig_type"), registered=n)
+    return out
+
+
+def get_trigger_context() -> dict:
+    """返回 {"ts", "budget_info", "active_syms", "pending_syms"} 的拷贝；首轮扫描前 budget_info 为 None。"""
+    with _TRIGGER_CTX_LOCK:
+        return {"ts": _TRIGGER_CTX["ts"],
+                "budget_info": dict(_TRIGGER_CTX["budget_info"]) if _TRIGGER_CTX["budget_info"] else None,
+                "active_syms": set(_TRIGGER_CTX["active_syms"]), "pending_syms": set(_TRIGGER_CTX["pending_syms"])}
+
+
+def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
+    t0  = time.time()
+    now = datetime.now(timezone.utc)
+    # [v3.89 SHADOW] 每轮扫描重置影子记录计数
+    try:
+        from shared import shadow_trace as _st0
+        _st0.new_round()
+    except Exception:
+        pass
+    result = {
+        "ts": now.isoformat(), "scanned": 0,
+        "class_counts": {"reversal": 0, "breakout": 0, "pullback": 0},
+        "signals_raw": 0, "signals_final": 0, "placed": 0,
+        "rejected": [], "dry_run": dry_run,
+    }
+
+    # ── 第一步：前置状态检查 ───────────────────────────────────────────────────
+    if is_circuit_open():
+        logger.info("[scanner] 日交易熔断中，跳过扫描")
+        return result
+
+    # ── 宏观日历检查（v3.63）────────────────────────────────────────────────
+    # 读取 macro_calendar.json，判断当前是否在重大宏观事件的保守窗口内。
+    # 保守模式：仓位上限减半 + 停止 reversal/breakout + 评分门槛 +10
+    # 日历由用户手动维护，系统自动读取，无需改代码。
+    _macro_conservative = False   # 是否进入宏观保守模式
+    _macro_event_desc   = ""      # 事件描述，用于日志
+    try:
+        import json as _mjson
+        from pathlib import Path as _mPath
+        _cal_file = _mPath(__file__).parent / "macro_calendar.json"
+        if _cal_file.exists():
+            _cal = _mjson.loads(_cal_file.read_text(encoding="utf-8"))
+            _now_utc = datetime.now(timezone.utc)
+            for _ev in _cal.get("events", []):
+                if _ev.get("_example"):
+                    continue   # 跳过示例条目
+                _ev_date = _ev.get("date", "")
+                if not _ev_date:
+                    continue
+                try:
+                    _ev_dt = datetime.strptime(_ev_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                except ValueError:
+                    continue
+                _hours = int(_ev.get("conservative_hours", 24))
+                # 窗口设计：事件当天 UTC 00:00 开始，持续 conservative_hours 小时
+                # conservative_hours=24 → 覆盖整个事件日（UTC 全天）
+                # conservative_hours=48 → 覆盖事件日 + 次日（跨日事件或影响持续）
+                # conservative_hours=0  → 等同于 24（全天）
+                _win_hours  = _hours if _hours > 0 else 24
+                _win_start  = _ev_dt   # 当天 UTC 00:00
+                _win_end    = _ev_dt + __import__("datetime").timedelta(hours=_win_hours)
+                if _win_start <= _now_utc <= _win_end:
+                    _macro_conservative = True
+                    _macro_event_desc   = _ev.get("event", _ev_date)
+                    break
+    except Exception as _me:
+        logger.debug(f"[scanner] 宏观日历读取跳过: {_me}")
+
+    if _macro_conservative:
+        logger.info(f"[scanner] ⚠️ 宏观保守模式激活：{_macro_event_desc}（仓位减半/停reversal+breakout/评分+10）")
+
+    # 功能一：大行情熔断检测（v3.1）
+    try:
+        from shared.notifier import send as _notify_fn
+    except Exception:
+        _notify_fn = None
+    if check_market_shock(notifier_fn=_notify_fn):
+        logger.info("[scanner] 大行情熔断激活，跳过本轮扫描")
+        return result
+
+    # ── 系统性风险检测（USDT脱锚 / API异常 / 极端费率）──────────────────────
+    try:
+        from shared.risk_manager import check_systemic_risk
+        _sys_ok, _sys_reason = check_systemic_risk()
+        if not _sys_ok:
+            logger.warning(f"[scanner] 系统性风险检测触发：{_sys_reason}，本轮跳过开仓")
+            try:
+                from shared.notifier import notify as _sn
+                _sn(f"🚨 系统性风险：{_sys_reason}")
+            except Exception:
+                pass
+            return result
+    except Exception as _sre:
+        logger.debug(f"[scanner] check_systemic_risk 跳过: {_sre}")
+
+    # ── v3.31 大行情恢复窗口检测 ──────────────────────────────────────────────
+    # 熔断解除后10分钟内（约2轮扫描），ATR/EMA/RSI 处于失真状态，信号质量偏差。
+    # 此期间：position_size_cap × 0.5，final_score -10（在评分层应用）
+    _post_shock = is_post_shock_recovery()
+    if _post_shock:
+        logger.info("[scanner] 大行情恢复窗口：本轮信号将降级处理（仓位×0.5 / 评分-10）")
+
+    # 问题一修复：_dyn_max_long/_dyn_max_short 先用静态默认值，
+    # 等 BTC 趋势计算完成后再动态更新。避免 BTC 拉取失败时 NameError。
+    import config as _cfg_early
+    _dyn_max_long  = _cfg_early.RISK_MAX_LONG
+    _dyn_max_short = _cfg_early.RISK_MAX_SHORT
+
+    positions = get_all_positions()
+    # v3.53: 槽位只计 open（已成交持仓），pending 挂单不占槽位
+    # 原逻辑把 pending 也算槽位，导致挂单中的标的把槽位占满、后续高分信号全被拒
+    long_cnt  = sum(1 for p in positions if p.get("direction") == "LONG"
+                    and p.get("status") == "open")
+    short_cnt = sum(1 for p in positions if p.get("direction") == "SHORT"
+                    and p.get("status") == "open")
+
+    if long_cnt >= _dyn_max_long and short_cnt >= _dyn_max_short:
+        logger.info(f"[scanner] 持仓已满（多{long_cnt} 空{short_cnt}），跳过扫描")
+        # 仓位满时撤销所有 SignalWatcher 里的入场挂单（避免持仓超限）
+        if signal_watcher is not None and signal_watcher.pending_count() > 0:
+            import asyncio as _asw
+            main_loop = getattr(signal_watcher, "_main_loop", None)
+            if main_loop and main_loop.is_running():
+                _f = _asw.run_coroutine_threadsafe(
+                    signal_watcher.cancel_all("仓位已满"),
+                    main_loop,
+                )
+                try:
+                    n = _f.result(timeout=5)
+                    if n:
+                        logger.info(f"[scanner] 仓位满，已撤销 {n} 个入场监控/挂单")
+                except Exception:
+                    pass
+        return result
+
+    # 全局资金费率结算窗口检查（用 BTC 资金费率代表市场费率水平）
+    btc_mp   = api.get_mark_price("BTCUSDT")
+    btc_fr   = abs(float(btc_mp.get("lastFundingRate", 0)))
+    in_win, win_reason = _in_funding_window(btc_fr)
+    # [v3.85 OPT-6] 启用逐标的窗口后，不再因 BTC 一个值整轮停扫；8H 标的仍会在 analyze_symbol 里被逐个拦截
+    try:
+        from config import OPT_FUNDING_WINDOW_PER_SYMBOL as _OPT_FW_G
+    except Exception:
+        _OPT_FW_G = False
+    if in_win and _OPT_FW_G:
+        logger.info(f"[scanner] {win_reason}：已启用逐标的窗口，不整轮跳过")
+        in_win = False
+    if in_win:
+        logger.info(f"[scanner] {win_reason}，跳过扫描")
+        return result
+
+    # ── 第二步完成后：获取市场模式（统一调用 risk_manager.get_market_mode）────
+    # v3.6 修订：原内联 EMA9/20/50 排列判断改为复用 risk_manager.get_market_mode()，
+    # 确保 scanner 槽位和 executor._precheck 用同一套 BTC 趋势判断，消除两套逻辑不一致。
+    import config as _cfg
+    try:
+        from shared.risk_manager import get_market_mode as _get_mkt_mode
+        _mkt_mode = _get_mkt_mode()   # "bull" / "bear" / "range"，自带 5min 缓存
+    except Exception as _be:
+        _mkt_mode = "range"
+        logger.debug(f"[scanner] get_market_mode 失败，降级 range: {_be}")
+
+    # 持久化 market_mode 到文件（供自检脚本读取）
+    try:
+        import time as _mt
+        _mm_path = ROOT / "logs" / "market_mode.json"
+        _mm_path.write_text(
+            __import__("json").dumps({"mode": _mkt_mode, "ts": int(_mt.time() * 1000)}),
+            encoding="utf-8"
+        )
+    except Exception:
+        pass
+
+    # ── v3.5 市场方向感知：根据市场模式动态调整多空单槽位──────────────────────
+    if _mkt_mode == "bear":
+        # 熊市：多2空3
+        _effective_max_long  = max(1, _cfg.MAX_POSITIONS_LONG_BEAR)
+        _effective_max_short = _cfg.MAX_POSITIONS_SHORT_BEAR
+        logger.info(f"[scanner] 熊市模式：多单上限{_effective_max_long} 空单上限{_effective_max_short}")
+    elif _mkt_mode == "bull":
+        # 牛市：多3空2
+        _effective_max_long  = _cfg.MAX_POSITIONS_LONG_BULL
+        _effective_max_short = _cfg.MAX_POSITIONS_SHORT_BULL
+        logger.info(f"[scanner] 牛市模式：多单上限{_effective_max_long} 空单上限{_effective_max_short}")
+    else:
+        # 震荡/range：多2空2
+        _effective_max_long  = _cfg.MAX_POSITIONS_LONG_RANGE
+        _effective_max_short = _cfg.MAX_POSITIONS_SHORT_RANGE
+        logger.info(f"[scanner] 震荡模式：多单上限{_effective_max_long} 空单上限{_effective_max_short}")
+    # 实际槽位使用市场感知后的值
+    _dyn_max_long  = _effective_max_long
+    _dyn_max_short = _effective_max_short
+    # 兼容后续代码使用 _btc_trend（"up"/"down"/"neutral"）
+    _btc_trend = {"bull": "up", "bear": "down"}.get(_mkt_mode, "neutral")
+
+    # ── 第二步：读取候选池 ────────────────────────────────────────────────────
+    _perf_t = time.perf_counter()
+    pool = _load_pool()
+    _perf_pool = time.perf_counter() - _perf_t
+    if not pool:
+        logger.warning("[scanner] 候选池为空")
+        return result
+
+    # 当前持仓/挂单标的集合（用于方向冲突和挂单维护判断）
+    # active_syms: (symbol, direction) 二元组集合，只排除同向，允许反向信号进入 judge
+    active_syms  = {(p["symbol"], p.get("direction","").upper())
+                    for p in positions if p.get("status") == "open"}
+    # 兼容：active_sym_set 纯标的集合，用于 _patrol_funding_arb 和 scan_pool 过滤
+    active_sym_set = {p["symbol"] for p in positions if p.get("status") == "open"}
+    # patching 也排除：正在补挂止损止盈，不允许再次开仓
+    pending_syms = {p["symbol"] for p in positions
+                   if p.get("status") in ("pending", "patching")}
+
+    # 对已有挂单的标的执行维护
+    pending_positions = [p for p in positions if p.get("status") == "pending"]
+    for pos in pending_positions:
+        sym = pos["symbol"]
+        if sym not in pool:
+            continue
+        pool_ticker = {}  # maintain_pending_order 内部实际未使用 ticker，传空字典即可
+        action = maintain_pending_order(pos, pool_ticker)
+        if action in ("cancel", "reorder"):
+            try:
+                # 撤销该标的所有挂单（cancel_all_orders 返回撤销数量）
+                cancelled = api.cancel_all_orders(sym)
+                logger.info(f"[scanner] {sym} 撤单 {cancelled} 笔")
+                if action == "reorder":
+                    # reorder 逻辑：撤单后让下一轮扫描重新评估开仓
+                    # 不立刻重挂，避免在不合适的价格补挂
+                    logger.info(f"[scanner] {sym} reorder: 已撤单，等待下轮扫描重新评估")
+            except Exception as e:
+                logger.warning(f"[scanner] {sym} 撤单失败: {e}")
+
+    # ── 实时注入：涨跌幅超过10%但不在候选池的标的 ──────────────────────────────
+    # 使用已有的 ticker 缓存（不重新拉取），限时3秒，注入本轮不写回缓存
+    try:
+        inject_start = time.time()
+        ticker_all = _get_ticker_24h_cached(300) or {}   # 5分钟内的缓存
+        pool_set = set(pool)
+        injected = []
+        for sym2, tk in ticker_all.items():
+            if time.time() - inject_start > 3:   # 超过3秒强制停止
+                break
+            if sym2 in pool_set:
+                continue
+            chg2 = float(tk.get("priceChangePercent", 0))
+            vol2 = float(tk.get("quoteVolume", 0))
+            if abs(chg2) >= 10 and vol2 >= POOL_MIN_VOLUME_USD:
+                injected.append(sym2)
+                pool_set.add(sym2)
+        if injected:
+            pool = pool + injected   # 只影响本轮，不写回缓存
+            logger.info(f"[scanner] 实时注入 {len(injected)} 个大幅波动标的: {injected[:5]}{'...' if len(injected)>5 else ''}")
+    except Exception as inj_err:
+        logger.debug(f"[scanner] 实时注入跳过: {inj_err}")
+
+    # v3.53 竞争开仓：pending 挂单不排除出候选池（允许同时给多个候选挂单）
+    # 同标的同方向冲突由 analyze_symbol 内部的 active_syms 精细过滤
+    # pending_syms 仍用于 analyze_symbol 内部判断，不在此处整体排除
+    scan_pool = [s for s in pool if s not in active_sym_set]   # 只排除 open 持仓标的
+    result["scanned"] = len(scan_pool)
+    # 持仓标的和 BTCUSDT 也订阅（patrol / 挂单维护读它们的 K 线），放最前：hub 对重复标的去重，超出 KLINE_HUB_SYMBOLS_MAX 时按顺序截断
+    _hub_subscribe_klines(["BTCUSDT"] + sorted(active_sym_set) + list(scan_pool))
+
+    # 方向约束：对应方向槽位已满时只扫描另一个方向（v3.53: 基于 open-only 计数）
+    allowed_dirs: set | None = None
+    if long_cnt >= _dyn_max_long and short_cnt < _dyn_max_short:
+        allowed_dirs = {"SHORT"}
+        logger.info(f"[scanner] 多单已满({long_cnt}/{_dyn_max_long})，本轮仅扫描空单信号")
+    elif short_cnt >= _dyn_max_short and long_cnt < _dyn_max_long:
+        allowed_dirs = {"LONG"}
+        logger.info(f"[scanner] 空单已满({short_cnt}/{_dyn_max_short})，本轮仅扫描多单信号")
+
+    # ── 累计亏损黑名单（提前到并行扫描前计算，作为零成本预筛传给 analyze_symbol）─
+    # 同一标的近期累计亏损 > 15U 时，跳过该标的（避免反复踩雷）
+    _loss_blacklist: set[str] = set()
+    try:
+        import json as _json
+        _LOSS_THRESHOLD = 15.0
+        from pathlib import Path as _Path
+        _log_dir = _Path(__file__).parent / "logs"
+        _trade_log_files = [str(_log_dir / "trade_log.jsonl")]
+        import glob as _glob
+        _trade_log_files += _glob.glob(str(_log_dir / "archive" / "trade_log_*.jsonl"))
+        _sym_loss: dict[str, float] = {}
+        for _tf in _trade_log_files:
+            try:
+                with open(_tf, encoding="utf-8") as _fh:
+                    for _line in _fh:
+                        _line = _line.strip()
+                        if not _line:
+                            continue
+                        _rec = _json.loads(_line)
+                        import time as _bk_tm
+                        _cutoff_ms = (_bk_tm.time() - 7 * 86400) * 1000
+                        _ct = _rec.get("close_time", _rec.get("open_time", 0))
+                        if _ct and float(_ct) < _cutoff_ms:
+                            continue
+                        _s   = _rec.get("symbol", "")
+                        _pnl = float(_rec.get("pnl_usdt", _rec.get("pnl_u", 0)) or 0)
+                        if _pnl < 0:
+                            _sym_loss[_s] = _sym_loss.get(_s, 0) + abs(_pnl)
+            except Exception:
+                pass
+        for _s, _loss in _sym_loss.items():
+            if _loss >= _LOSS_THRESHOLD:
+                _loss_blacklist.add(_s)
+    except Exception:
+        pass
+    if _loss_blacklist:
+        logger.info(f"[scanner] 累计亏损黑名单（预筛）: {_loss_blacklist}")
+
+        # ── 第三步：并行分析（单标的 SCAN_SYMBOL_TIMEOUT_SEC，整轮 SCAN_TOTAL_TIMEOUT_SEC）─
+    # [fix] 全市场标记价格/资金费率批量拉一次（1 次请求），供所有并行任务复用；失败则为空 map，各标的降级走 REST
+    _mark_price_map: dict = {}
+    _perf_t = time.perf_counter()
+    try:
+        for _m in (_get_all_mark_prices_list() or []):
+            _ms = _m.get("symbol", "")
+            if _ms:
+                _mark_price_map[_ms] = _m
+    except Exception as _mpe:
+        logger.warning(f"[scanner] 批量标记价格获取失败，各标的降级单独请求: {_mpe}")
+    _perf_mark = time.perf_counter() - _perf_t
+    _mark_price_map_ts = time.monotonic()   # 批量数据的取数时间；注册入场价时用它判断是否仍足够新
+    # 拉取一次 ticker 数据供所有并行任务复用（修复 vol24_usd 永远为 0 的 bug）
+    try:
+        _ticker_all = _get_ticker_24h_cached(120) or {}
+    except Exception as _te:
+        logger.warning(f"[scanner] ticker 缓存获取失败，vol24 将退化为 0: {_te}")
+        _ticker_all = {}
+    # ── #2 市场情绪快照：全市场下跌比例 ──────────────────────────────────────
+    from config import MARKET_SENTIMENT_BEAR_THRESH, MARKET_SENTIMENT_BULL_THRESH, MARKET_SENTIMENT_SCALE_DOWN
+    _declining_pct = 0.5  # 默认中性
+    try:
+        if _ticker_all:
+            _chg_list = [float(v.get("priceChangePercent", 0)) for v in _ticker_all.values() if v]
+            _declining_pct = sum(1 for c in _chg_list if c < 0) / len(_chg_list) if _chg_list else 0.5
+    except Exception:
+        pass
+    # 全局仓位系数：大多数在跌→做多降仓，大多数在涨→做空降仓
+    _global_long_scale  = MARKET_SENTIMENT_SCALE_DOWN if _declining_pct > MARKET_SENTIMENT_BEAR_THRESH else 1.0
+    _global_short_scale = MARKET_SENTIMENT_SCALE_DOWN if _declining_pct < MARKET_SENTIMENT_BULL_THRESH else 1.0
+    if _global_long_scale < 1.0:
+        logger.info(f"[scanner] 市场情绪偏空: {_declining_pct*100:.0f}%标的下跌>70%，做多仓位×{_global_long_scale}")
+    if _global_short_scale < 1.0:
+        logger.info(f"[scanner] 市场情绪偏多: {(1-_declining_pct)*100:.0f}%标的上涨>70%，做空仓位×{_global_short_scale}")
+
+    # ── 全市场资金费率情绪感知（v3.71）──────────────────────────────────────
+    _funding_sentiment = {}
+    try:
+        from shared.clawby_adapter import get_market_funding_sentiment as _gfs
+        from config import MARKET_FUNDING_SCALE
+        _funding_sentiment = _gfs()
+        _fs_val = _funding_sentiment.get("sentiment", "neutral")
+        if _fs_val == "long_crowded":
+            # 多头拥挤：LONG 信号仓位额外降权
+            _old_long = _global_long_scale
+            _global_long_scale = round(_global_long_scale * MARKET_FUNDING_SCALE, 3)
+            logger.info(
+                f"[scanner] 全市场费率情绪多头拥挤 "
+                f"(pct_pos={_funding_sentiment.get('pct_positive',0):.0%})，"
+                f"LONG仓位系数 {_old_long:.2f}→{_global_long_scale:.2f}"
+            )
+        elif _fs_val == "short_crowded":
+            _old_short = _global_short_scale
+            _global_short_scale = round(_global_short_scale * MARKET_FUNDING_SCALE, 3)
+            logger.info(
+                f"[scanner] 全市场费率情绪空头拥挤 "
+                f"(pct_pos={_funding_sentiment.get('pct_positive',0):.0%})，"
+                f"SHORT仓位系数 {_old_short:.2f}→{_global_short_scale:.2f}"
+            )
+    except Exception as _fse:
+        logger.debug(f"[scanner] 全市场资金费率情绪获取失败（降级忽略）: {_fse}")
+
+    signals_raw = []
+    _ROUTE_QUALITY.clear()
+    _kline_round_reset()
+    _jobs = {
+        sym: (sym, _ticker_all.get(sym, {}), active_syms, pending_syms, allowed_dirs, _loss_blacklist, _btc_trend, _mkt_mode)
+        for sym in scan_pool
+    }
+    # [fix] mark_price_map 用 partial 以关键字绑定：analyze_symbol 的第 9 个位置参数是 deadline，
+    # _run_parallel_with_deadline 又以关键字传 deadline，位置传 map 会 TypeError(multiple values for 'deadline')
+    # 阶段3：主进程标记「分析中」，仅供影子触发器读取；scanner 不因此跳过任何标的
+    try:
+        from shared import trigger_detector as _tdm
+        _tdm.mark_analyzing_many(_jobs.keys())
+    except Exception:
+        _tdm = None
+    _perf_t = time.perf_counter()
+    import config as _cfg_pp
+    if getattr(_cfg_pp, "SCAN_USE_PROCESS_POOL", False):
+        _par_results, _unfinished = _run_parallel_process_pool(
+            _jobs, _mark_price_map, SCAN_MAX_WORKERS, SCAN_TOTAL_TIMEOUT_SEC
+        )
+    else:
+        _par_results, _unfinished = _run_parallel_with_deadline(
+            _functools.partial(analyze_symbol, mark_price_map=_mark_price_map), _jobs, SCAN_MAX_WORKERS, SCAN_TOTAL_TIMEOUT_SEC
+        )
+    _perf_analysis = time.perf_counter() - _perf_t
+    _perf_post_t0 = time.perf_counter()
+    if _tdm is not None:
+        try:
+            _tdm.clear_analyzing_many(_jobs.keys())
+        except Exception:
+            pass
+    result["scan_unfinished"] = len(_unfinished)
+    for sym, res in _par_results:
+        if res:
+            signals_raw.append(res)
+            result["class_counts"][res["sig_type"]] = \
+                result["class_counts"].get(res["sig_type"], 0) + 1
+
+    result["signals_raw"] = len(signals_raw)
+    # 阶段3：judge 通过的原始信号落盘，供影子触发器对账（无信号也写一行；失败不影响扫描）
+    try:
+        from shared.trigger_detector import write_scan_signals as _wss
+        _wss([{"symbol": r.get("symbol"), "sig_type": r.get("sig_type"), "direction": r.get("direction"),
+               "route_quality": _ROUTE_QUALITY.get(r.get("symbol"))} for r in signals_raw])
+    except Exception:
+        pass
+    for _kl_line in _kline_round_summary():
+        logger.info(_kl_line)
+
+    # ── 第四步～第五步：共用函数（阶段5 抽取，扫描与触发器共用）──────────────────
+    _budget_info = {
+        "_btc_trend": _btc_trend,
+        "_mkt_mode": _mkt_mode,
+        "long_cnt": long_cnt,
+        "short_cnt": short_cnt,
+        "_dyn_max_long": _dyn_max_long,
+        "_dyn_max_short": _dyn_max_short,
+        "_global_long_scale": _global_long_scale,
+        "_global_short_scale": _global_short_scale,
+        "_macro_conservative": _macro_conservative,
+        "_macro_event_desc": _macro_event_desc,
+        "_post_shock": _post_shock,
+        "_mark_price_map_ts": _mark_price_map_ts,
+        "now": now,
+        "_loss_blacklist": _loss_blacklist,
+        "_LOSS_THRESHOLD": locals().get("_LOSS_THRESHOLD", 15.0),  # 原值在 try 内赋值，异常时黑名单为空、不会被读到
+        "_mark_price_map": _mark_price_map,
+    }
+    _budget_info["_allowed_dirs"] = allowed_dirs
+    _set_trigger_context(_budget_info, active_syms, pending_syms)
+    _n_reg, avail_signals = _filter_and_register_signals(
+        signals_raw, active_syms, pending_syms, _mkt_mode, _btc_trend, _budget_info, "scan",
+        signal_watcher=signal_watcher, dry_run=dry_run, result=result,
+    )
 
     result["elapsed"] = round(time.time() - t0, 2)
 
