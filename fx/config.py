@@ -321,6 +321,9 @@ SCAN_MAX_WORKERS          = 10    # 并行分析线程数；v3.82: 25→10，控
 SCAN_KLINE_TIMING       = True  # 是否统计 K 线请求耗时（每轮 info 一条汇总），生产环境建议开启
 KLINE_CACHE_ENABLED     = True  # 是否启用 K 线 REST 缓存（按收盘时间失效；False 时每轮直接 REST）
 KLINE_CACHE_INTERVALS   = ["1h", "4h", "15m"]  # 缓存哪些周期
+KLINE_REQUEST_TIMEOUT   = (3, 5)  # (connect_s, read_s)：K 线单次 HTTP 请求超时
+KLINE_REQUEST_MAX_RETRY = 1       # K 线请求最多重试次数（总尝试 = 1 + 此值）
+KLINE_REQUEST_TOTAL_SEC = 8.0     # 单次 get_klines 调用总时限（秒，含重试、重试间隔、直连失败后改走代理）
 ORDER_TIMEOUT_BREAKOUT    = 1800  # 秒  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 ORDER_TIMEOUT_NORMAL      = 14400 # 秒  # [v3.85 DOC-2] 代码未引用此常量，修改无效
 
