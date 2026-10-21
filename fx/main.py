@@ -276,11 +276,22 @@ def _classify_loop_latency(actual: float, warn: float = 0.5, err: float = 2.0):
 
 
 async def _loop_event_latency_monitor(interval: float = 5.0, probe: float = 0.1) -> None:
-    """事件循环延迟监控：每 interval 秒 sleep(probe)，实际耗时远大于 probe 说明循环被阻塞
-    （GIL 竞争 / 同步调用占用事件循环线程），用来判断是否需要把扫描移到进程池。"""
+    """事件循环心跳延迟监控：每 interval 秒一次心跳，相邻两次心跳的实际间隔减去 interval = 事件循环延迟
+    （GIL 竞争 / 同步调用占用事件循环线程）。延迟 >1s 打 WARNING，>5s 打 ERROR。
+    同时保留原有的 sleep(probe) 探针（>0.5s warn / >2s error），两种口径互补。"""
     import time as _t
+    from shared.observability import heartbeat_delay, heartbeat_level
+    prev = _t.monotonic()
     while True:
         await asyncio.sleep(interval)
+        now = _t.monotonic()
+        delay = heartbeat_delay(prev, now, interval)
+        prev = now
+        hl = heartbeat_level(delay)
+        if hl == "error":
+            logger.error(f"[loop] 心跳延迟 {delay:.2f}s（事件循环严重阻塞）")
+        elif hl == "warn":
+            logger.warning(f"[loop] 心跳延迟 {delay:.2f}s")
         t0 = _t.monotonic()
         await asyncio.sleep(probe)
         actual = _t.monotonic() - t0
@@ -289,6 +300,7 @@ async def _loop_event_latency_monitor(interval: float = 5.0, probe: float = 0.1)
             logger.error(f"[loop] 事件循环严重阻塞 {actual:.2f}s")
         elif lvl == "warn":
             logger.warning(f"[loop] 事件循环延迟 {actual:.2f}s")
+        prev = _t.monotonic()          # probe 自身的 0.1s 不计入下一次心跳间隔
 
 
 async def _loop_patrol(interval: int = 300, offset: int = 30) -> None:
