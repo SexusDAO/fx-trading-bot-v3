@@ -321,7 +321,7 @@ ORDER_EXPIRE_PULLBACK_MIN = 240   # 回踩/反转挂单超时，分钟
 # 扫描超时保护
 SCAN_SYMBOL_TIMEOUT_SEC   = 10    # 单标的分析超时（秒），超时跳过
 SCAN_TOTAL_TIMEOUT_SEC    = 240   # 整轮扫描总超时（秒）；120→240，给扫描更多时间减少 unfinished
-SCAN_MAX_WORKERS          = 6     # 并行分析线程数（4→6：折中方案，提高并行度但避免回到10的阻塞问题）；v3.82: 25→10，控制并发内存峰值
+SCAN_MAX_WORKERS          = 4     # 并行分析线程数（6→4：回退，降低 GIL 竞争导致事件循环阻塞）；v3.82: 25→10，控制并发内存峰值
 SCAN_KLINE_TIMING       = True  # 是否统计 K 线请求耗时（每轮 info 一条汇总），生产环境建议开启
 KLINE_CACHE_ENABLED     = True  # 是否启用 K 线 REST 缓存（按收盘时间失效；False 时每轮直接 REST）
 KLINE_CACHE_INTERVALS   = ["1h", "4h", "15m"]  # 缓存哪些周期
