@@ -56,6 +56,17 @@ logger = logging.getLogger("ws_listener")
 # 常量（可在 config.py 覆盖）
 # ═══════════════════════════════════════════════════════════════════════════════
 KEEPALIVE_INTERVAL   = getattr(config, "WS_KEEPALIVE_INTERVAL",   20 * 60)  # 秒
+# [fix v3.91] max_queue：websockets 15.x（纯 Python asyncio 实现）的 max_queue 是接收缓冲高水位，
+#   超过后会暂停读 socket（TCP 背压），并不会丢帧；低水位 = 高水位 // 4 时恢复读取。默认 16。
+#   markPrice 的「丢旧帧」由下面的有限并发分发实现（_MP_MAX_INFLIGHT），不依赖 max_queue。
+try:
+    from config import WS_MARK_PRICE_MAX_QUEUE as _MP_MAX_QUEUE
+except ImportError:
+    _MP_MAX_QUEUE = 256
+
+_MP_MAX_INFLIGHT = 32          # markPrice 同时在途的 dispatch 任务上限，超出直接丢帧
+_MP_DROP_LOG_SEC = 60.0        # 丢帧统计 warning 的输出间隔
+
 RECONNECT_BASE       = getattr(config, "WS_RECONNECT_BASE",        3)        # 秒
 RECONNECT_MAX        = getattr(config, "WS_RECONNECT_MAX",         60)       # 秒
 COMPENSATION_TIMEOUT = getattr(config, "WS_COMPENSATION_TIMEOUT",  30)       # [v3.89 #3] 断线 REST 补偿任务最长运行秒数
@@ -96,6 +107,14 @@ class WsOrderListener:
         self._keepalive_task:   Optional[asyncio.Task] = None
         self._force_order_task: Optional[asyncio.Task] = None
         self._rebuild_event:    asyncio.Event = asyncio.Event()
+
+        # [fix v3.91] markPrice 有限并发分发：在途任务计数 + 丢帧统计（仅事件循环线程访问，无需加锁）
+        #   不用 Semaphore._value 判断：接收循环在缓冲有帧时可能不让出控制权，
+        #   连续创建的任务尚未开始执行、还没 acquire，会绕过上限；计数器在创建时同步 +1，才是真上限。
+        self._mp_inflight:      int   = 0
+        self._mp_drop_count:    int   = 0
+        self._mp_drop_last_log: float = time.monotonic()
+        self._mp_tasks:         set   = set()   # 持有任务引用，避免被 GC 提前回收
 
         # listenKey 缓存
         self._listen_key: Optional[str] = None
@@ -288,7 +307,13 @@ class WsOrderListener:
                 url = USER_DATA_URL_TPL.format(listen_key=self._listen_key)
                 logger.info(f"[ws] userData 连接: {url[:60]}…")
 
-                async with websockets.connect(url, ping_interval=20, ping_timeout=10, proxy=_WS_PROXY_URL) as ws:
+                async with websockets.connect(
+                    url,
+                    ping_interval=20,
+                    ping_timeout=10,
+                    proxy=_WS_PROXY_URL,
+                    max_queue=_MP_MAX_QUEUE,   # [fix] 限制接收队列，防止消息堆积导致内存泄漏
+                ) as ws:
                     delay = RECONNECT_BASE  # 连接成功后重置退避
                     self._user_ws = ws                # [v3.89 #7]
                     self._user_connected = True       # [v3.89 #3] 补偿任务见此状态后不再发起下一轮
@@ -372,8 +397,13 @@ class WsOrderListener:
             logger.info(f"[ws] markPrice 连接: {len(self._subscribed)} 个标的")
 
             try:
-                async with websockets.connect(url, ping_interval=20, ping_timeout=10,
-                                              proxy=_WS_PROXY_URL) as ws:
+                async with websockets.connect(
+                    url,
+                    ping_interval=20,
+                    ping_timeout=10,
+                    proxy=_WS_PROXY_URL,
+                    max_queue=_MP_MAX_QUEUE,   # [fix] 限制接收队列，防止消息堆积导致内存泄漏
+                ) as ws:
                     ws_conn = ws
                     delay = RECONNECT_BASE
 
@@ -384,7 +414,9 @@ class WsOrderListener:
                         if self._rebuild_event.is_set():
                             self._rebuild_event.clear()
                             break  # 退出内层循环，重新连接
-                        await self._dispatch_mark_price(raw)
+                        # [fix] 有限并发分发：最多 _MP_MAX_INFLIGHT 个 dispatch 同时在途，超出直接丢弃（只保留最新价）
+                        # 避免回调慢时任务无限堆积，同时不阻塞接收循环
+                        self._mp_try_dispatch(raw)
 
             except asyncio.CancelledError:
                 return
@@ -398,6 +430,35 @@ class WsOrderListener:
                 delay = min(delay * 2, RECONNECT_MAX)
             finally:
                 ws_conn = None
+
+    def _mp_try_dispatch(self, raw: str) -> None:
+        """有空余槽位才创建 dispatch 任务；槽位满则丢弃该帧（markPrice 高频流，下一帧很快就来）。"""
+        if self._mp_inflight >= _MP_MAX_INFLIGHT:
+            self._mp_drop_count += 1
+            logger.debug("[ws] markPrice 分发槽位满，丢弃帧")
+            self._mp_log_drops()
+            return
+        self._mp_inflight += 1                      # 创建前同步占位
+        task = asyncio.ensure_future(self._mp_dispatch_sem_wrap(raw))
+        self._mp_tasks.add(task)
+        task.add_done_callback(self._mp_tasks.discard)
+
+    async def _mp_dispatch_sem_wrap(self, raw: str) -> None:
+        try:
+            await self._dispatch_mark_price(raw)
+        finally:
+            self._mp_inflight -= 1
+
+    def _mp_log_drops(self, now: Optional[float] = None) -> None:
+        """每 _MP_DROP_LOG_SEC 秒汇总一次丢帧数（warning），汇总后清零。"""
+        now = time.monotonic() if now is None else now
+        if now - self._mp_drop_last_log >= _MP_DROP_LOG_SEC and self._mp_drop_count > 0:
+            logger.warning(
+                f"[ws] markPrice 过去{int(now - self._mp_drop_last_log)}秒丢弃 {self._mp_drop_count} 帧"
+                f"（并发槽位不足），当前活跃任务={self._mp_inflight}"
+            )
+            self._mp_drop_count = 0
+            self._mp_drop_last_log = now
 
     async def _dispatch_mark_price(self, raw: str) -> None:
         """
@@ -445,6 +506,7 @@ class WsOrderListener:
                     ping_interval=20,
                     ping_timeout=10,
                     proxy=_WS_PROXY_URL,
+                    max_queue=_MP_MAX_QUEUE,
                 ) as ws:
                     delay = RECONNECT_BASE
                     logger.info("[ws] 强平事件流已连接")

@@ -36,6 +36,9 @@ BINANCE_WS_URL     = "wss://fstream.binance.com"
 WS_KEEPALIVE_INTERVAL = 20 * 60   # listenKey 续期间隔，秒（20 分钟）
 WS_RECONNECT_BASE     = 3         # 断线重连初始等待，秒
 WS_RECONNECT_MAX      = 60        # 断线重连最大等待，秒
+# websockets 15.x 默认 max_queue=16；此处 32 略大于默认值，给突发帧少量缓冲。
+# 注意：队列满后 websockets 是暂停读 socket（TCP 背压），不是丢帧；markPrice 丢旧帧由 ws_listener 的有限并发分发实现。
+WS_MARK_PRICE_MAX_QUEUE = 32   # 三条 WS 连接共用的接收队列高水位
 # USE_TESTNET 已删除 —— 代码从未引用此常量，保留会造成"改了就切测试网"的错觉。
 # 如需切测试网，请修改 BINANCE_BASE_URL 和 BINANCE_WS_BASE_URL。
 
