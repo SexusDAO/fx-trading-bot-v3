@@ -245,13 +245,57 @@ def _signed_get(path, params: dict):
 
 # ── 公开接口 ──────────────────────────────────────────────────────────────────
 
+def _kline_cfg():
+    try:
+        import config as _c
+        to = tuple(getattr(_c, "KLINE_REQUEST_TIMEOUT", (3, 5)))
+        return (float(to[0]), float(to[1])), int(getattr(_c, "KLINE_REQUEST_MAX_RETRY", 1)), \
+            float(getattr(_c, "KLINE_REQUEST_TOTAL_SEC", 8.0))
+    except Exception:
+        return (3.0, 5.0), 1, 8.0
+
+
+_KLINE_RETRY_SLEEP = 0.5   # 重试间隔（秒）
+
+
 def get_klines(symbol: str, interval: str, limit: int = 100) -> list:
-    """拉 K 线，返回 list[list]，失败返回 []"""
-    def _call():
-        d = _get("/fapi/v1/klines", {"symbol": symbol, "interval": interval, "limit": limit})
-        return d if isinstance(d, list) else []
-    result = _retry(_call)
-    return result or []
+    """拉 K 线，返回 list[list]，失败返回 []。
+
+    单次调用总耗时有上限（KLINE_REQUEST_TOTAL_SEC，含重试与重试间隔）：
+    每次 HTTP 请求用 (connect, read) 超时，并被剩余预算截断；重试最多 KLINE_REQUEST_MAX_RETRY 次，间隔 0.5s。
+    其他接口仍走 _retry / _get，不受影响。
+    """
+    global _DIRECT_DISABLED
+    (t_conn, t_read), max_retry, total = _kline_cfg()
+    deadline = time.monotonic() + total
+    params = {"symbol": symbol, "interval": interval, "limit": limit}
+    url = f"{BASE_URL}/fapi/v1/klines"
+    last_err = None
+    for attempt in range(max_retry + 1):
+        # 本次尝试内：直连失败后再试代理，同样受剩余预算约束
+        for use_direct in ((True, False) if not _DIRECT_DISABLED else (False,)):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.05:
+                break
+            tmo = (min(t_conn, remaining), min(t_read, remaining))
+            try:
+                r = (_SESSION_DIRECT if use_direct else _SESSION).get(url, params=params, timeout=tmo)
+                r.raise_for_status()
+                d = r.json()
+                _record_api_outcome(True)
+                return d if isinstance(d, list) else []
+            except Exception as e:
+                last_err = e
+                if use_direct:
+                    logger.debug(f"[api] K线直连失败，本进程内切换为全代理模式: {e}")
+                    _DIRECT_DISABLED = True
+        if attempt < max_retry and deadline - time.monotonic() > _KLINE_RETRY_SLEEP + 0.05:
+            time.sleep(_KLINE_RETRY_SLEEP)
+        else:
+            break
+    _record_api_outcome(False)
+    logger.warning(f"[api] get_klines {symbol} {interval} 失败/超时(总时限{total}s): {last_err}")
+    return []
 
 def get_ticker(symbol: str) -> dict:
     """拉单标的 24H ticker，失败返回 {}"""
