@@ -124,6 +124,7 @@ async def _loop_scan(interval: int = 300, signal_watcher=None, ws_listener=None)
     _hb_raw        = 0    # 计数：原始信号
     _hb_watched    = 0    # 计数：进入监控
     _hb_placed     = 0    # 计数：成交开仓
+    _scan_future   = None # 上一轮 run_in_executor 返回的 asyncio future（用于防重叠/防排队堆积）
     while True:
         try:
             from scanner import run_scan
@@ -134,13 +135,24 @@ async def _loop_scan(interval: int = 300, signal_watcher=None, ws_listener=None)
                 _hb_f.write_text(_hb_j.dumps({"ts": _hb_t.time()}))
             except Exception:
                 pass
+            # [fix] 上一轮线程还没结束（wait_for 超时只放弃等待，线程取消不了）→ 直接跳过本轮，
+            #   不再往只有 1 个 worker 的 _SCAN_POOL 里排队，避免僵尸线程结束后连续补跑过期的扫描
+            if _scan_future is not None and not _scan_future.done():
+                logger.warning("[scanner] 上一轮仍在运行，跳过本轮")
+                await asyncio.sleep(interval)
+                continue
             loop = asyncio.get_event_loop()
             # v3.33 复用共享线程池（替代每轮 with ThreadPoolExecutor）
             import functools
             _scan_fn = functools.partial(run_scan, signal_watcher=signal_watcher)
             future = loop.run_in_executor(_SCAN_POOL, _scan_fn)
+            _scan_future = future
+            # 取走（可能晚到的）异常，避免 "exception was never retrieved"
+            future.add_done_callback(lambda f: f.cancelled() or f.exception())
             try:
-                result = await asyncio.wait_for(future, timeout=300)
+                # shield：wait_for 超时会取消传入的 future，取消后 done() 为 True，会让上面的防重叠检查误判；
+                # 用 shield 保证超时只放弃等待，_scan_future 在线程真正结束前一直是未完成状态
+                result = await asyncio.wait_for(asyncio.shield(future), timeout=300)
                 placed = (result or {}).get("placed", 0)
                 # ── 心跳计数器更新 ────────────────────────────────────────────
                 _r = result or {}
@@ -159,7 +171,7 @@ async def _loop_scan(interval: int = 300, signal_watcher=None, ws_listener=None)
                     if pending:
                         logger.info(f"[main] SignalWatcher 监控中: {pending} 个信号 {signal_watcher.pending_symbols()}")
             except asyncio.TimeoutError:
-                logger.error("[main] task_scan 超时（300s），跳过本轮")
+                logger.error("[main] task_scan 超时（300s），跳过本轮（扫描线程仍在后台，结束前后续轮次会被跳过）")
             except Exception as e:
                 logger.error(f"[main] task_scan 子线程异常: {e}", exc_info=True)
         except Exception as e:
