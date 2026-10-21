@@ -56,6 +56,14 @@ logger = logging.getLogger("ws_listener")
 # 常量（可在 config.py 覆盖）
 # ═══════════════════════════════════════════════════════════════════════════════
 KEEPALIVE_INTERVAL   = getattr(config, "WS_KEEPALIVE_INTERVAL",   20 * 60)  # 秒
+# [fix v3.91] max_queue：限制 websockets 接收缓冲，防止高频 markPrice 流堆积
+#   websockets 15.x 默认 max_queue=16（旧版无限），
+#   此处设 256 给突发消息缓冲空间，同时防止无限增长
+try:
+    from config import WS_MARK_PRICE_MAX_QUEUE as _MP_MAX_QUEUE
+except ImportError:
+    _MP_MAX_QUEUE = 256
+
 RECONNECT_BASE       = getattr(config, "WS_RECONNECT_BASE",        3)        # 秒
 RECONNECT_MAX        = getattr(config, "WS_RECONNECT_MAX",         60)       # 秒
 COMPENSATION_TIMEOUT = getattr(config, "WS_COMPENSATION_TIMEOUT",  30)       # [v3.89 #3] 断线 REST 补偿任务最长运行秒数
@@ -288,7 +296,13 @@ class WsOrderListener:
                 url = USER_DATA_URL_TPL.format(listen_key=self._listen_key)
                 logger.info(f"[ws] userData 连接: {url[:60]}…")
 
-                async with websockets.connect(url, ping_interval=20, ping_timeout=10, proxy=_WS_PROXY_URL) as ws:
+                async with websockets.connect(
+                    url,
+                    ping_interval=20,
+                    ping_timeout=10,
+                    proxy=_WS_PROXY_URL,
+                    max_queue=_MP_MAX_QUEUE,   # [fix] 限制接收队列，防止消息堆积导致内存泄漏
+                ) as ws:
                     delay = RECONNECT_BASE  # 连接成功后重置退避
                     self._user_ws = ws                # [v3.89 #7]
                     self._user_connected = True       # [v3.89 #3] 补偿任务见此状态后不再发起下一轮
@@ -372,8 +386,13 @@ class WsOrderListener:
             logger.info(f"[ws] markPrice 连接: {len(self._subscribed)} 个标的")
 
             try:
-                async with websockets.connect(url, ping_interval=20, ping_timeout=10,
-                                              proxy=_WS_PROXY_URL) as ws:
+                async with websockets.connect(
+                    url,
+                    ping_interval=20,
+                    ping_timeout=10,
+                    proxy=_WS_PROXY_URL,
+                    max_queue=_MP_MAX_QUEUE,   # [fix] 限制接收队列，防止消息堆积导致内存泄漏
+                ) as ws:
                     ws_conn = ws
                     delay = RECONNECT_BASE
 
@@ -384,7 +403,9 @@ class WsOrderListener:
                         if self._rebuild_event.is_set():
                             self._rebuild_event.clear()
                             break  # 退出内层循环，重新连接
-                        await self._dispatch_mark_price(raw)
+                        # [fix] 非阻塞分发：不等回调完成，立刻消费下一条消息
+                        # 避免回调耗时（signal_watcher 逻辑）导致接收队列积压
+                        asyncio.ensure_future(self._dispatch_mark_price(raw))
 
             except asyncio.CancelledError:
                 return
@@ -445,6 +466,7 @@ class WsOrderListener:
                     ping_interval=20,
                     ping_timeout=10,
                     proxy=_WS_PROXY_URL,
+                    max_queue=_MP_MAX_QUEUE,
                 ) as ws:
                     delay = RECONNECT_BASE
                     logger.info("[ws] 强平事件流已连接")

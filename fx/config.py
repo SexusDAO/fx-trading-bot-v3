@@ -36,6 +36,7 @@ BINANCE_WS_URL     = "wss://fstream.binance.com"
 WS_KEEPALIVE_INTERVAL = 20 * 60   # listenKey 续期间隔，秒（20 分钟）
 WS_RECONNECT_BASE     = 3         # 断线重连初始等待，秒
 WS_RECONNECT_MAX      = 60        # 断线重连最大等待，秒
+WS_MARK_PRICE_MAX_QUEUE = 256   # markPrice 流接收队列上限，防内存泄漏（三条 WS 连接共用）
 # USE_TESTNET 已删除 —— 代码从未引用此常量，保留会造成"改了就切测试网"的错觉。
 # 如需切测试网，请修改 BINANCE_BASE_URL 和 BINANCE_WS_BASE_URL。
 
