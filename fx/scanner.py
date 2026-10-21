@@ -70,6 +70,9 @@ SCANNER_LOG_FILE  = ROOT / "logs" / "scanner.log"
 SIGNAL_ANALYTICS_FILE = ROOT / "logs" / "signal_analytics.jsonl"
 
 # ── 路径质量评分（v3.81 质量择优）──────────────────────────────────────────────
+_MARK_MAP_MAX_AGE_SEC = 30.0   # 批量标记价格用于「注册入场价」的最大允许年龄（秒），超过则单标的重取
+
+
 def _calc_route_quality(route: str, reason: dict, ind: dict, direction: str) -> int:
     """
     同一标的多条路径都通过 judge 时，用此函数评估相对质量，取分最高的路径输出。
@@ -1770,6 +1773,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
                 _mark_price_map[_ms] = _m
     except Exception as _mpe:
         logger.warning(f"[scanner] 批量标记价格获取失败，各标的降级单独请求: {_mpe}")
+    _mark_price_map_ts = time.monotonic()   # 批量数据的取数时间；注册入场价时用它判断是否仍足够新
     # 拉取一次 ticker 数据供所有并行任务复用（修复 vol24_usd 永远为 0 的 bug）
     try:
         from shared.binance_api import get_ticker_24h_cached
@@ -2462,7 +2466,8 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
 
     # ── 市场环境快照：注入所有信号（用于 trade_log 标注）─────────────────────
     try:
-        _all_mp = api.get_all_mark_prices() or []
+        # [fix] 复用本轮批量拉好的 _mark_price_map（资金费率均值不需要最新一刻的数据）；批量失败导致 map 为空时才再请求一次
+        _all_mp = list(_mark_price_map.values()) or (api.get_all_mark_prices() or [])
         _avg_fr = (sum(abs(float(x.get("lastFundingRate", 0))) for x in _all_mp) / len(_all_mp)
                    if _all_mp else 0.0)
     except Exception:
@@ -2526,7 +2531,12 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
                 mode = sig.get("sig_type", "pullback")
                 sig["mode"] = mode
                 try:
-                    mp     = api.get_mark_price(sym)
+                    # [fix] 优先复用本轮批量标记价格；但这里的 markPrice 会成为 pre_entry_price（入场价基准），
+                    #   批量数据取自扫描开始时，超过 _MARK_MAP_MAX_AGE_SEC 就视为过旧，改走单标的 REST 取最新价
+                    mp = None
+                    if time.monotonic() - _mark_price_map_ts <= _MARK_MAP_MAX_AGE_SEC:
+                        mp = _mark_price_map.get(sym)
+                    mp     = mp or api.get_mark_price(sym)
                     mark_p = float(mp.get("markPrice", 0))
                     sig["pre_entry_price"] = mark_p
 
