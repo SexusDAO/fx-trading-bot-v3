@@ -488,6 +488,35 @@ def _is_weekend_period(now: datetime) -> bool:
     return False
 
 
+def _vol_ratio_closed(k1hc: list) -> float:
+    """最后一根已收盘 1H 量 ÷ 其前 20 根已收盘 1H 均量；数据不足返回 1.0。"""
+    try:
+        if len(k1hc) < 21:
+            return 1.0
+        base = [float(k[5]) for k in k1hc[-21:-1]]
+        ma = sum(base) / len(base)
+        return float(k1hc[-1][5]) / ma if ma > 0 else 1.0
+    except Exception:
+        return 1.0
+
+
+_BTC_1H_DROP_PCT = 0.0   # [opt-5] 每轮扫描更新；触发器路径复用上轮值
+
+
+def _update_btc_1h_drop() -> float:
+    """BTC 1H 跌幅% = (当前价 - 上一根已收盘 1H 收盘价) / 后者 × 100；失败保留旧值。"""
+    global _BTC_1H_DROP_PCT
+    try:
+        k = api.get_klines("BTCUSDT", "1h", 3) or []
+        if len(k) >= 2:
+            cur, prev = float(k[-1][4]), float(k[-2][4])
+            if prev > 0:
+                _BTC_1H_DROP_PCT = (cur - prev) / prev * 100
+    except Exception as e:
+        logger.debug(f"[scanner] BTC 1H 跌幅计算失败，沿用旧值: {e}")
+    return _BTC_1H_DROP_PCT
+
+
 def calc_indicators(k15: list, k1h: list, k4h: list) -> dict:
     """
     基于已闭合 K 线计算全部技术指标。
@@ -576,6 +605,7 @@ def calc_indicators(k15: list, k1h: list, k4h: list) -> dict:
         "vol_ma20":  vol_ma20,
         "vol_now":   vol_now,
         "vol_ratio": vol_ratio,
+        "vol_ratio_closed": _vol_ratio_closed(k1hc),   # [opt-1] 最后一根已收盘 / 前 20 根已收盘均量
         # v3.58: 主动买入比（Taker Buy Volume）
         "taker_buy_ratio":     round(taker_buy_ratio, 4),      # 近20根均值买卖比
         "taker_buy_ratio_now": round(taker_buy_ratio_now, 4),  # 当前K线买卖比
@@ -1167,6 +1197,11 @@ def analyze_one(symbol: str, ticker: dict,
         ind["oi_slope"] = round(oi_slope, 4)
         ind["oi_now"]    = oi_now
         ind["oi_1h_ago"] = float(prefetch.get("oi_1h_ago") or 0.0)
+        # [opt-2/5] 基差与 BTC 急跌字段（纯计算：来自 mark_price_map / prefetch）
+        _mpi = prefetch.get("mp") or (mark_price_map or {}).get(symbol) or {}   # 与上方 mp 同一来源
+        ind["markPrice"]  = float(_mpi.get("markPrice") or 0.0)
+        ind["indexPrice"] = float(_mpi.get("indexPrice") or 0.0)
+        ind["btc_1h_drop_pct"] = float(prefetch.get("btc_1h_drop_pct") or 0.0)
 
         # ── C. 标的分类 ────────────────────────────────────────────────────────
         # v3.38: 股票代币休市检查提前到路由之前，防止 range_bounce 绕过休市保护
@@ -1628,6 +1663,7 @@ def _prefetch_symbol(symbol: str, ticker: dict,
 
         prefetch = {
             "oi_now": oi_now, "oi_1h_ago": oi_1h_ago, "oi_24h_ago": oi_24h_ago,
+            "btc_1h_drop_pct": _BTC_1H_DROP_PCT,
             "oi_hist_6": oi_hist_6, "funding_velocity": funding_velocity, "mp": mp,
             "is_weekend": is_weekend, "stock_closed": stock_closed,
             "dir_cooldown_long": cd_long, "dir_cooldown_short": cd_short,
@@ -3343,6 +3379,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     _dyn_max_short = _effective_max_short
     # 兼容后续代码使用 _btc_trend（"up"/"down"/"neutral"）
     _btc_trend = {"bull": "up", "bear": "down"}.get(_mkt_mode, "neutral")
+    _update_btc_1h_drop()
 
     # ── 第二步：读取候选池 ────────────────────────────────────────────────────
     _perf_t = time.perf_counter()
