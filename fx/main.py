@@ -667,7 +667,18 @@ async def main() -> None:
                 logger.warning("[main] market_data_hub 10 秒内未就绪，scanner 将回落 REST（不阻塞启动）")
         except Exception as e:
             logger.warning(f"[main] market_data_hub 启动失败（忽略，回落 REST）: {e}")
+
             hub = None
+
+    # ── 分析进程池预热（SCAN_USE_PROCESS_POOL=True 时；失败不影响启动，扫描时会回落线程池）──
+    try:
+        import config as _cfg_pp
+        if getattr(_cfg_pp, "SCAN_USE_PROCESS_POOL", False):
+            from shared import analysis_worker as _aw
+            _ok = await asyncio.get_running_loop().run_in_executor(None, _aw.warmup)
+            logger.info(f"[main] 分析进程池预热{'完成' if _ok else '失败（扫描时回落线程池）'}")
+    except Exception as e:
+        logger.warning(f"[main] 分析进程池预热异常（忽略）: {e}")
 
     # ── 1.5 启动时对齐持仓状态 ─────────────────────────────────────────────
     await _sync_positions_on_startup()
@@ -827,6 +838,11 @@ async def main() -> None:
             hub.stop()
         except Exception as e:
             logger.warning(f"[main] market_data_hub 停止异常: {e}")
+        try:
+            from shared import analysis_worker as _aw_stop
+            _aw_stop.shutdown()
+        except Exception:
+            pass
     logger.info("[main] fx 系统已安全停止")
 
 

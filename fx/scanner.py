@@ -1397,6 +1397,12 @@ def _apply_post_events(sig: dict | None, events: list) -> dict | None:
                 _st1.record_judge_rejection(**ev["kwargs"])
             except Exception:
                 pass
+        elif k == "cooldown":      # 进程池 worker 不写 state，冷却写入由主进程统一做
+            try:
+                from shared.state import set_cooldown as _sc
+                _sc(ev["symbol"], ev["hours"], ev["reason"])
+            except Exception as _e:
+                logger.warning(f"[scanner] 冷却写入失败，冷却可能未生效 {ev.get('symbol')}: {_e}")
         elif k == "llm":
             llm_ev = ev
         elif k == "analytics_pass":
@@ -1457,10 +1463,46 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
                    market_mode: str = "",
                    deadline: float | None = None,
                    mark_price_map: dict | None = None) -> dict | None:
+    """完整分析一个标的（线程池路径）：_prefetch_symbol 做全部 IO，analyze_one 纯计算，再处理落盘/LLM 事件。"""
+    b = _prefetch_symbol(symbol, ticker, loss_blacklist, deadline, mark_price_map)
+    if b is None:
+        return None
+    try:
+        events: list = []
+        sig = analyze_one(symbol, ticker, b["k15"], b["k1h"], b["k4h"], active_syms, pending_syms,
+                          allowed_directions, loss_blacklist, btc_trend, market_mode,
+                          mark_price_map or {}, b["prefetch"], events)
+        return _apply_post_events(sig, events)
+    except Exception as e:
+        logger.debug(f"[scanner] {symbol} analyze 失败: {e}")
+        return None
+
+
+def _prefetch_liq(symbol: str, price: float) -> dict:
+    """进程池路径：主进程读一次清算区（缓存命中直接用，未命中才实时拉取），随 prefetch 序列化给 worker。"""
+    out: dict = {}
+    try:
+        from shared.liq_cache import get_liq_zones_cached as _g
+    except Exception:
+        return out
+    for key, (d, r) in (("long", ("LONG", "3d")), ("short", ("SHORT", "3d")),
+                        ("long_24h", ("LONG", "24h")), ("short_24h", ("SHORT", "24h"))):
+        try:
+            out[key] = list(_g(symbol, d, price, range_=r) or [])
+        except Exception:
+            out[key] = []
+    return out
+
+
+def _prefetch_symbol(symbol: str, ticker: dict,
+                     loss_blacklist: set | None = None,
+                     deadline: float | None = None,
+                     mark_price_map: dict | None = None,
+                     with_liq: bool = False) -> dict | None:
     """
-    完整分析一个标的，返回信号 dict 或 None。
-    本函数负责全部 IO（REST、state 读取、时钟）并打包成 prefetch，纯计算交给 analyze_one，
-    随后在这里处理 analyze_one 产生的落盘/LLM 事件。
+    单标的全部 IO（REST、state 读取、时钟），打包成 {"k15","k1h","k4h","prefetch"}；
+    预筛淘汰 / 超时 / 数据不足时返回 None。线程池路径和进程池路径共用。
+    with_liq=True（进程池路径）时额外在 prefetch["liq_zones"] 放入清算区快照。
     deadline:          整轮截止时间（time.monotonic() 基准）；单标的另有 SCAN_SYMBOL_TIMEOUT_SEC 总时限，
                        两者取先到者。每次发起 HTTP 请求前检查，超时直接 return None（不再发新请求）。
     mark_price_map:    {symbol: premiumIndex 单项}（run_scan 每轮批量拉一次）；未命中降级为单标的 REST。
@@ -1585,14 +1627,12 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
             "dir_cooldown_long": cd_long, "dir_cooldown_short": cd_short,
             "now_ms": int(time.time() * 1000),
         }
-        events: list = []
-        sig = analyze_one(symbol, ticker, k15, k1h, k4h, active_syms, pending_syms,
-                          allowed_directions, loss_blacklist, btc_trend, market_mode,
-                          mark_price_map or {}, prefetch, events)
-        return _apply_post_events(sig, events)
+        if with_liq:
+            prefetch["liq_zones"] = _prefetch_liq(symbol, float(k1h[-1][4]))
+        return {"k15": k15, "k1h": k1h, "k4h": k4h, "prefetch": prefetch}
 
     except Exception as e:
-        logger.debug(f"[scanner] {symbol} analyze 失败: {e}")
+        logger.debug(f"[scanner] {symbol} prefetch 失败: {e}")
         return None
 
 
@@ -1948,6 +1988,95 @@ def _load_pool() -> list:
         return refresh_pool()
 
 # ── 主扫描函数 ────────────────────────────────────────────────────────────────
+def prefetch_symbol(*args, **kwargs):
+    """_prefetch_symbol 的统计外壳（与 analyze_symbol 相同：累计本标的 K 线请求次数/耗时并入本轮汇总）。"""
+    symbol = args[0] if args else kwargs.get("symbol", "")
+    acc = [0, 0.0]
+    _KL_TLS.acc = acc
+    try:
+        return _prefetch_symbol(*args, **kwargs)
+    finally:
+        _KL_TLS.acc = None
+        if acc[0]:
+            logger.debug(f"[scanner] {symbol} K线请求: 次数={acc[0]} 总耗时={acc[1]:.0f}ms")
+            with _KL_ROUND_LOCK:
+                _KL_ROUND["calls"] += acc[0]
+                _KL_ROUND["ms"] += acc[1]
+                _KL_ROUND["per_sym"][symbol] = (acc[0], acc[1])
+
+
+def _run_parallel_process_pool(jobs: dict, mark_price_map: dict, max_workers: int, total_timeout_sec: float):
+    """SCAN_USE_PROCESS_POOL=True 时的并行分析：线程池并发预取（_prefetch_symbol）→ 每个标的预取完立刻提交给
+    进程池 worker（analyze_one）→ 主进程收到 (signal, events) 后调 _apply_post_events。
+    返回值与 _run_parallel_with_deadline 一致：(results, unfinished)。进程池不可用时本轮回落线程池路径。
+    jobs: {标的: (sym, ticker, active_syms, pending_syms, allowed_dirs, loss_blacklist, btc_trend, market_mode)}"""
+    from shared import analysis_worker as _aw
+    deadline = time.monotonic() + total_timeout_sec
+    try:
+        pool = _aw.get_healthy_pool()
+    except Exception as e:
+        logger.warning(f"[scanner] 分析进程池不可用，本轮回落线程池: {e}")
+        return _run_parallel_with_deadline(
+            _functools.partial(analyze_symbol, mark_price_map=mark_price_map), jobs, max_workers, total_timeout_sec)
+
+    pre_exe = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="scan-pre")
+    pending: dict = {}        # future -> (sym, "pre" | "proc")
+    results: list = []
+    broken = False
+    for sym, a in jobs.items():
+        f = pre_exe.submit(prefetch_symbol, a[0], a[1], a[5], deadline=deadline,
+                           mark_price_map=mark_price_map, with_liq=True)
+        pending[f] = (sym, "pre", a)
+    try:
+        while pending:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            done, _ = concurrent.futures.wait(list(pending), timeout=remaining,
+                                              return_when=concurrent.futures.FIRST_COMPLETED)
+            for f in done:
+                sym, stage, a = pending.pop(f)
+                try:
+                    res = f.result()
+                except Exception as e:
+                    if stage == "proc" and type(e).__name__ == "BrokenProcessPool":
+                        broken = True
+                    logger.debug(f"[scanner] {sym} future 异常({stage}): {e!r}")
+                    continue
+                if stage == "pre":
+                    if res is None:
+                        results.append((sym, None))
+                        continue
+                    ticker = a[1]
+                    try:
+                        pf = pool.submit(_aw.analyze_task, sym, ticker, res["k15"], res["k1h"], res["k4h"],
+                                         res["prefetch"], a[2], a[3], a[4], a[5], a[6], a[7],
+                                         {sym: (mark_price_map or {}).get(sym) or res["prefetch"].get("mp")})
+                        pending[pf] = (sym, "proc", a)
+                    except Exception as e:
+                        broken = True
+                        logger.warning(f"[scanner] {sym} 提交进程池失败: {e!r}")
+                else:
+                    sig, events = res
+                    try:
+                        results.append((sym, _apply_post_events(sig, events)))
+                    except Exception as e:
+                        logger.debug(f"[scanner] {sym} 后置处理异常: {e!r}")
+    finally:
+        unfinished = [v[0] for v in pending.values()]
+        pre_exe.shutdown(wait=False, cancel_futures=True)
+        if any(v[1] == "proc" for v in pending.values()):
+            _aw.reset_pool(kill=True)          # 有 worker 还在跑（卡住）：强制终止，下一轮重建
+        elif broken:
+            _aw.reset_pool(kill=True)
+    if unfinished:
+        logger.warning(
+            f"[scanner] 整轮超时({total_timeout_sec}s)：{len(unfinished)}/{len(jobs)} 个标的未完成已放弃，"
+            f"已采集 {len(results)} 个结果；未完成示例: {unfinished[:10]}"
+        )
+    return results, unfinished
+
+
 def _run_parallel_with_deadline(fn, jobs: dict, max_workers: int, total_timeout_sec: float):
     """并行执行 jobs 并在整轮 deadline 到点后真正放弃剩余任务。
 
@@ -2360,9 +2489,15 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     # [fix] mark_price_map 用 partial 以关键字绑定：analyze_symbol 的第 9 个位置参数是 deadline，
     # _run_parallel_with_deadline 又以关键字传 deadline，位置传 map 会 TypeError(multiple values for 'deadline')
     _perf_t = time.perf_counter()
-    _par_results, _unfinished = _run_parallel_with_deadline(
-        _functools.partial(analyze_symbol, mark_price_map=_mark_price_map), _jobs, SCAN_MAX_WORKERS, SCAN_TOTAL_TIMEOUT_SEC
-    )
+    import config as _cfg_pp
+    if getattr(_cfg_pp, "SCAN_USE_PROCESS_POOL", False):
+        _par_results, _unfinished = _run_parallel_process_pool(
+            _jobs, _mark_price_map, SCAN_MAX_WORKERS, SCAN_TOTAL_TIMEOUT_SEC
+        )
+    else:
+        _par_results, _unfinished = _run_parallel_with_deadline(
+            _functools.partial(analyze_symbol, mark_price_map=_mark_price_map), _jobs, SCAN_MAX_WORKERS, SCAN_TOTAL_TIMEOUT_SEC
+        )
     _perf_analysis = time.perf_counter() - _perf_t
     _perf_post_t0 = time.perf_counter()
     result["scan_unfinished"] = len(_unfinished)
