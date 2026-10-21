@@ -283,7 +283,7 @@ TP2_CLOSE_RATIO = 0.40   # TP2 平仓 40%
 MARGIN_BUFFER = 1.1   # 保证金需求 × 1.1 留手续费空间
 
 # ── USDC 交易对支持 ─────────────────────────────────────────────────────────
-ENABLE_USDC_PAIRS = True   # 是否扫描 USDC 保证金交易对（False 时只认 USDT）
+ENABLE_USDC_PAIRS = False  # 是否扫描 USDC 保证金交易对（False 时只认 USDT）
 
 # ── 流动性 Gate（v3.57）──────────────────────────────────────────────────────
 LIQUIDITY_GATE_MIN_U      = 3_000    # 最小深度硬底 3000U（相对化后降低，OI×0.1% 为动态主阈值）
@@ -505,6 +505,9 @@ POOL_LOSERS_N               = UNIVERSE_LOSS_TOP
 POOL_FUNDING_EXTREME_N      = UNIVERSE_FUNDING_TOP
 POOL_LIQ_TOP_N              = 30          # CG 清算量 Top N（新来源）
 POOL_FUNDING_EXTREME_MIN    = UNIVERSE_FUNDING_MIN_ABS
+SCAN_POOL_MAX               = 200          # 候选池上限（评分降序截断）
+SCAN_POOL_MIN_OI_U          = 1_000_000    # OI 下限（U）；查询失败视为通过
+SCAN_POOL_EXCLUDE_VOLATILE  = True         # True 时排除 24h 涨跌幅绝对值 > 50% 的标的（False 时沿用 UNIVERSE_MAX_CHANGE_24H=60%）
 # JUDGE_PULLBACK_PARAMS — 已废弃，judges 直接使用 config 参数
 # JUDGE_PULLBACK_PARAMS = {}
 # JUDGE_BREAKOUT_PARAMS — 已废弃

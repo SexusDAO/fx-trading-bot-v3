@@ -150,7 +150,9 @@ def test_sync_subscribes_in_batches_loads_history_and_merges_pending():
     asyncio.run(go())
 
 
-def test_sync_batches_large_subscription():
+def test_sync_batches_large_subscription(monkeypatch):
+    import config
+    monkeypatch.setattr(config, "KLINE_HUB_SYMBOLS_MAX", 100, raising=False)   # 不依赖线上配置值（现为 60）
     async def go():
         h = make_hub(lambda *a: [])
         h._sync_lock, h._fetch_sem = asyncio.Lock(), asyncio.Semaphore(6)

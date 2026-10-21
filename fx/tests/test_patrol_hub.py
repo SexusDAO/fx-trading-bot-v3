@@ -100,7 +100,7 @@ def test_money_paths_untouched(fn, needle):
 
 def test_scanner_subscribes_positions_and_btc_too():
     s = (Path(__file__).parent.parent / "scanner.py").read_text()
-    assert '_hub_subscribe_klines(list(scan_pool) + sorted(active_sym_set) + ["BTCUSDT"])' in s
+    assert '_hub_subscribe_klines(["BTCUSDT"] + sorted(active_sym_set) + list(scan_pool))' in s
 
 
 # ── 行为：_check_exit_signal 在 hub 有数据时不发 K 线 REST ─────────────────

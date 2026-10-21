@@ -1600,11 +1600,75 @@ def maintain_pending_order(pos: dict, ticker: dict) -> str:
         return "keep"
 
 # ── 候选池刷新（每30分钟） ────────────────────────────────────────────────────
+_POOL_SCORE_VOL_TOP = 80          # 成交额排名前 N 加分
+_POOL_SCORE_VOL = 40
+_POOL_SCORE_MOVER = 20            # 涨幅 Top / 跌幅 Top
+_POOL_SCORE_FUNDING = 20          # 资金费率绝对值 > POOL_FUNDING_EXTREME_MIN
+_POOL_SCORE_LIQ = 20              # CG 清算量 Top
+_POOL_OI_WORKERS = 6
+_POOL_OI_TOTAL_TIMEOUT_SEC = 90.0
+
+
+def _pool_scores(qualified: list, vol_top: set, mover_syms: set, liq_syms: set) -> dict:
+    """候选池评分（0~100，各项独立加分可叠加）。qualified 为通过粗筛的 ticker 列表（带 _fr_abs）。"""
+    out = {}
+    for t in qualified:
+        sym = t["symbol"]
+        sc_ = 0
+        if sym in vol_top:
+            sc_ += _POOL_SCORE_VOL
+        if sym in mover_syms:
+            sc_ += _POOL_SCORE_MOVER
+        if t.get("_fr_abs", 0) > POOL_FUNDING_EXTREME_MIN:
+            sc_ += _POOL_SCORE_FUNDING
+        if sym in liq_syms:
+            sc_ += _POOL_SCORE_LIQ
+        out[sym] = sc_
+    return out
+
+
+def _pool_filter_by_oi(candidates: list, min_oi_u: float):
+    """对候选逐一查 OI（张数×价格≈U），OI < min_oi_u 的剔除；查询失败/超时视为通过。
+    并发 _POOL_OI_WORKERS，同一次调用内每个标的只查一次。返回 (通过列表, {'excluded':n,'failed':n})。"""
+    oi_usd: dict = {}
+
+    def _one(t):
+        sym = t["symbol"]
+        try:
+            d = api.get_open_interest(sym)
+            return sym, float(d["openInterest"]) * float(t.get("_px") or 0)
+        except Exception:
+            return sym, None
+
+    ex = concurrent.futures.ThreadPoolExecutor(max_workers=_POOL_OI_WORKERS, thread_name_prefix="pool-oi")
+    try:
+        futs = [ex.submit(_one, t) for t in candidates]
+        try:
+            for f in concurrent.futures.as_completed(futs, timeout=_POOL_OI_TOTAL_TIMEOUT_SEC):
+                sym, val = f.result()
+                oi_usd[sym] = val
+        except concurrent.futures.TimeoutError:
+            logger.warning("[scanner] 候选池 OI 查询整体超时，未完成的标的视为通过")
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
+    passed, excluded, failed = [], 0, 0
+    for t in candidates:
+        v = oi_usd.get(t["symbol"])
+        if v is None:
+            failed += 1
+            passed.append(t)
+        elif v >= min_oi_u:
+            passed.append(t)
+        else:
+            excluded += 1
+    return passed, {"excluded": excluded, "failed": failed}
+
+
 def refresh_pool() -> list:
     """
     刷新候选池并写入缓存文件。
-    组成：成交量Top N + 涨幅Top N + 跌幅Top N + 资金费率极端Top N（N 由 config 的 UNIVERSE_* 经 POOL_* 别名决定，当前成交量榜 50）
-    + CG 清算量Top30（第五来源，Clawby/Coinglass，失败静默跳过），去重后总池规模随当日行情变化。
+    粗筛（USDT、非稳定币、成交额/涨跌幅/振幅/OI 门槛）后按评分排序取前 SCAN_POOL_MAX：
+    成交额前80 +40，涨幅/跌幅 Top +20，资金费率极端 +20，CG 清算量 Top +20；同分按成交额降序。
     [v3.87 DOC] 原文档写「Top30 / 目标 70~80」与实际配置不符，已更正。
     """
     try:
@@ -1618,10 +1682,24 @@ def refresh_pool() -> list:
             if sym:
                 fr_map[sym] = abs(float(mp.get("lastFundingRate", 0)))
 
-        usdt = []
+        from config import ENABLE_USDC_PAIRS
+        try:
+            from config import SCAN_POOL_MAX, SCAN_POOL_MIN_OI_U, SCAN_POOL_EXCLUDE_VOLATILE
+        except ImportError:
+            SCAN_POOL_MAX, SCAN_POOL_MIN_OI_U, SCAN_POOL_EXCLUDE_VOLATILE = 200, 1_000_000, True
+        _max_chg = 50.0 if SCAN_POOL_EXCLUDE_VOLATILE else POOL_MAX_CHG24_PCT
+        _mark_px = {}
+        for mp in (mp_list or []):
+            try:
+                _mark_px[mp.get("symbol", "")] = float(mp.get("markPrice", 0))
+            except (TypeError, ValueError):
+                pass
+
+        # ── 第一步：粗筛 ──────────────────────────────────────────────────────
+        _all_vol = []     # 全市场（USDT 后缀、非稳定币对）的 (symbol, 成交额)，用于成交额排名
+        coarse = []
         for t in tickers:
             sym = t.get("symbol", "")
-            from config import ENABLE_USDC_PAIRS
             _allow_usdc = ENABLE_USDC_PAIRS
             if not (sym.endswith("USDT") or (_allow_usdc and sym.endswith("USDC"))):
                 continue
@@ -1629,9 +1707,10 @@ def refresh_pool() -> list:
                 continue
             vol  = float(t.get("quoteVolume", 0))
             chg  = abs(float(t.get("priceChangePercent", 0)))
+            _all_vol.append((sym, vol))
             if vol < POOL_MIN_VOLUME_USD:
                 continue
-            if chg > POOL_MAX_CHG24_PCT:
+            if chg > _max_chg:
                 continue
             # ── v3.3.6: 波动率预筛：用日内振幅（highPrice-lowPrice）代替涨跌幅，避免误杀「大涨后回踩」的 pullback 场景 ──
             # chg24 在回踩日可能只有 0.5%，但 ATR 仍然很高；highPrice/lowPrice 更准确反映真实波动
@@ -1643,24 +1722,19 @@ def refresh_pool() -> list:
             if _intraday_range < _pool_amp_thresh:
                 continue  # v3.46: 日内振幅低于门槛（工作日1.0%/周末0.8%），不进候选池
             t["_fr_abs"] = fr_map.get(sym, 0)
-            usdt.append(t)
+            t["_px"] = _mark_px.get(sym) or _price_now
+            coarse.append(t)
 
-        seen, pool = set(), []
+        # OI 门槛：逐一查询（并发 6，本次调用内每个标的只查一次），查询失败视为通过
+        usdt, _oi_stat = _pool_filter_by_oi(coarse, SCAN_POOL_MIN_OI_U)
 
-        def _add(syms):
-            for s in syms:
-                if s not in seen:
-                    seen.add(s); pool.append(s)
+        # ── 第二步：评分（各项独立加分，可叠加，满分 100）────────────────────
+        _vol_top = {s_ for s_, _ in sorted(_all_vol, key=lambda x: x[1], reverse=True)[:_POOL_SCORE_VOL_TOP]}
+        _gain_syms = {t["symbol"] for t in sorted(usdt, key=lambda x: float(x.get("priceChangePercent", 0)), reverse=True)[:POOL_GAINERS_N]}
+        _loss_syms = {t["symbol"] for t in sorted(usdt, key=lambda x: float(x.get("priceChangePercent", 0)))[:POOL_LOSERS_N]}
+        _liq_syms = set()
 
-        _add(t["symbol"] for t in sorted(usdt, key=lambda x: float(x.get("quoteVolume", 0)), reverse=True)[:POOL_VOLUME_TOP_N])
-        _add(t["symbol"] for t in sorted(usdt, key=lambda x: float(x.get("priceChangePercent", 0)), reverse=True)[:POOL_GAINERS_N])
-        _add(t["symbol"] for t in sorted(usdt, key=lambda x: float(x.get("priceChangePercent", 0)))[:POOL_LOSERS_N])
-        _add(t["symbol"] for t in sorted(
-            [t for t in usdt if t.get("_fr_abs", 0) > POOL_FUNDING_EXTREME_MIN],
-            key=lambda x: x.get("_fr_abs", 0), reverse=True
-        )[:POOL_FUNDING_EXTREME_N])
-
-        # ── 第五来源：CG 清算量 Top N（15min 缓存，不额外增加频率压力）────────
+        # ── CG 清算量 Top N（15min 缓存，失败静默跳过）────────────────────────
         try:
             from shared.clawby_adapter import get_liq_coin_list as _get_liq_list
             _liq_items = _get_liq_list()
@@ -1675,7 +1749,7 @@ def refresh_pool() -> list:
                             except Exception: pass
                     return 0.0
                 _liq_sorted = sorted(_liq_items, key=_liq_val, reverse=True)[:POOL_LIQ_TOP_N]
-                _usdt_set = {t["symbol"] for t in usdt}  # 已过流动性门槛的 USDT 合约
+                _usdt_set = {t["symbol"] for t in usdt}  # 已过粗筛（含 OI）的合约
                 for _item in _liq_sorted:
                     # CG 返回 coin 名（BTC/ETH），需转成 BTCUSDT
                     _coin = (_item.get("symbol") or _item.get("coin") or "").upper().strip()
@@ -1683,10 +1757,19 @@ def refresh_pool() -> list:
                         continue
                     _sym_full = _coin if _coin.endswith("USDT") else f"{_coin}USDT"
                     if _sym_full in _usdt_set:
-                        _add([_sym_full])
-                logger.debug(f"[scanner] CG清算量来源 注入 ≤{POOL_LIQ_TOP_N} 个")
+                        _liq_syms.add(_sym_full)
+                logger.debug(f"[scanner] CG清算量来源 命中 {len(_liq_syms)} 个（≤{POOL_LIQ_TOP_N}）")
         except Exception as _liq_e:
             logger.debug(f"[scanner] CG清算量来源获取失败，跳过: {_liq_e}")
+
+        _scores = _pool_scores(usdt, _vol_top, _gain_syms | _loss_syms, _liq_syms)
+
+        # ── 第三步：按评分降序（同分按成交额降序），截断到 SCAN_POOL_MAX ───────
+        _ranked = sorted(usdt, key=lambda t: (-_scores[t["symbol"]], -float(t.get("quoteVolume", 0))))
+        pool = [t["symbol"] for t in _ranked[:int(SCAN_POOL_MAX)]]
+        logger.info(f"[scanner] 候选池评分: 粗筛通过 {len(coarse)}，OI 剔除 {_oi_stat['excluded']}，"
+                    f"OI 查询失败(放行) {_oi_stat['failed']}，合格 {len(usdt)}，入池 {len(pool)}，"
+                    f"其中评分>0 {sum(1 for t in _ranked[:int(SCAN_POOL_MAX)] if _scores[t['symbol']] > 0)} 个")
 
         POOL_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
         POOL_CACHE_FILE.write_text(json.dumps({
@@ -2017,8 +2100,8 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     # pending_syms 仍用于 analyze_symbol 内部判断，不在此处整体排除
     scan_pool = [s for s in pool if s not in active_sym_set]   # 只排除 open 持仓标的
     result["scanned"] = len(scan_pool)
-    # 持仓标的和 BTCUSDT 也订阅（patrol / 挂单维护读它们的 K 线）；hub 对重复标的去重并限制总数
-    _hub_subscribe_klines(list(scan_pool) + sorted(active_sym_set) + ["BTCUSDT"])
+    # 持仓标的和 BTCUSDT 也订阅（patrol / 挂单维护读它们的 K 线），放最前：hub 对重复标的去重，超出 KLINE_HUB_SYMBOLS_MAX 时按顺序截断
+    _hub_subscribe_klines(["BTCUSDT"] + sorted(active_sym_set) + list(scan_pool))
 
     # 方向约束：对应方向槽位已满时只扫描另一个方向（v3.53: 基于 open-only 计数）
     allowed_dirs: set | None = None
