@@ -42,7 +42,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT.parent))
 
 from config import (
-    RISK_MAX_POSITIONS, RISK_MAX_LONG, RISK_MAX_SHORT,
+    RISK_MAX_POSITIONS, RISK_MAX_LONG, RISK_MAX_SHORT, RISK_MAX_POSITIONS_FOR_SIZING,
     TP1_CLOSE_RATIO, TP2_CLOSE_RATIO,
     BREAKOUT_ORDER_EXPIRE_MIN,
     MIN_NOTIONAL_GUARD,
@@ -1600,7 +1600,7 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
         _risk_notional = (total_bal * _RISK_PCT) / _sl_dist_pct
     else:
         # 无止损距离时降级：保守公式
-        _risk_notional = total_bal * _effective_lev / max(RISK_MAX_POSITIONS, 1) * 0.3
+        _risk_notional = total_bal * _effective_lev / max(RISK_MAX_POSITIONS_FOR_SIZING, 1) * 0.3
         logger.warning(f"[executor] {symbol} 无止损距离，降级保守公式: {_risk_notional:.0f}U")
 
     # 2. 信号强度系数：用 final_score 线性映射（v3.36.4）
