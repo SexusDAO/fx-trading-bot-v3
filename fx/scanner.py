@@ -1347,7 +1347,9 @@ def refresh_pool() -> list:
         usdt = []
         for t in tickers:
             sym = t.get("symbol", "")
-            if not (sym.endswith("USDT") or sym.endswith("USDC")):
+            from config import ENABLE_USDC_PAIRS
+            _allow_usdc = ENABLE_USDC_PAIRS
+            if not (sym.endswith("USDT") or (_allow_usdc and sym.endswith("USDC"))):
                 continue
             if sym in POOL_STABLE_COINS:
                 continue
