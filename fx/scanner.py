@@ -2493,6 +2493,12 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     }
     # [fix] mark_price_map 用 partial 以关键字绑定：analyze_symbol 的第 9 个位置参数是 deadline，
     # _run_parallel_with_deadline 又以关键字传 deadline，位置传 map 会 TypeError(multiple values for 'deadline')
+    # 阶段3：主进程标记「分析中」，仅供影子触发器读取；scanner 不因此跳过任何标的
+    try:
+        from shared import trigger_detector as _tdm
+        _tdm.mark_analyzing_many(_jobs.keys())
+    except Exception:
+        _tdm = None
     _perf_t = time.perf_counter()
     import config as _cfg_pp
     if getattr(_cfg_pp, "SCAN_USE_PROCESS_POOL", False):
@@ -2505,6 +2511,11 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
         )
     _perf_analysis = time.perf_counter() - _perf_t
     _perf_post_t0 = time.perf_counter()
+    if _tdm is not None:
+        try:
+            _tdm.clear_analyzing_many(_jobs.keys())
+        except Exception:
+            pass
     result["scan_unfinished"] = len(_unfinished)
     for sym, res in _par_results:
         if res:

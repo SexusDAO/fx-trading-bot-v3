@@ -675,13 +675,13 @@ async def main() -> None:
         from config import TRIGGER_DETECTOR_ENABLED as _TD_ON
     except ImportError:
         _TD_ON = False
+    _trigger_det = None
     if _TD_ON and hub is not None:
         try:
-            from shared.trigger_detector import TriggerDetector
-            TriggerDetector(hub=hub).start()
-            logger.info("[main] trigger_detector 已启动（影子模式）")
+            from shared import trigger_detector as _td_mod
+            _trigger_det = _td_mod.create(hub=hub)
         except Exception as e:
-            logger.warning(f"[main] trigger_detector 启动失败（忽略）: {e}")
+            logger.warning(f"[main] trigger_detector 创建失败（忽略）: {e}")
 
     # ── 分析进程池预热（SCAN_USE_PROCESS_POOL=True 时；失败不影响启动，扫描时会回落线程池）──
     try:
@@ -769,6 +769,10 @@ async def main() -> None:
         # 内存快照：每 20 分钟输出 tracemalloc Top 15 + RSS + asyncio 任务数
         asyncio.create_task(_loop_mem_snapshot(1200),                          name="mem_snapshot"),
     ]
+    if _trigger_det is not None:
+        _trigger_det._watcher = signal_watcher
+        tasks.append(asyncio.create_task(_trigger_det.run(), name="trigger_detector"))
+        logger.info("[main] trigger_detector 已启动（影子模式，asyncio task）")
 
     # ── 5. 优雅退出 ─────────────────────────────────────────────────────────
     stop_event = asyncio.Event()
