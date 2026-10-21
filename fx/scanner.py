@@ -165,6 +165,44 @@ def _get_kline_cache():
     return _KLINE_CACHE
 
 
+def _hub_enabled() -> bool:
+    try:
+        import config as _c
+        return bool(getattr(_c, "MARKET_DATA_HUB_ENABLED", False))
+    except Exception:
+        return False
+
+
+def _get_mark_price(symbol: str) -> dict:
+    """单标的标记价：hub 开启且就绪且数据足够新时读 hub，否则回落 REST（开关关闭时与原来完全一致）。"""
+    if _hub_enabled():
+        try:
+            from shared import market_data_hub as _hub
+            if _hub.is_ready():
+                data = _hub.get_mark_price(symbol)
+                if data:
+                    logger.debug(f"[hub] {symbol} price={data.get('markPrice')} age={data.get('age_sec')}s")
+                    return data
+        except Exception as e:
+            logger.debug(f"[hub] 读取失败，回落 REST: {e}")
+    return api.get_mark_price(symbol)
+
+
+def _get_all_mark_prices_list() -> list:
+    """全市场标记价列表：hub 开启且就绪且快照非空时读 hub，否则回落 REST。"""
+    if _hub_enabled():
+        try:
+            from shared import market_data_hub as _hub
+            if _hub.is_ready():
+                snap = _hub.get_all_mark_prices()
+                if snap:
+                    logger.debug(f"[hub] 批量标记价 {len(snap)} 个标的（来自 WS 缓存）")
+                    return list(snap.values())
+        except Exception as e:
+            logger.debug(f"[hub] 批量读取失败，回落 REST: {e}")
+    return api.get_all_mark_prices()
+
+
 def _get_klines_cached(symbol: str, interval: str, limit: int) -> list:
     """优先读缓存（命中时只额外请求 1 根未收盘 K 线）；未命中/失效/未启用/模块不可用时走 REST 并写回。
     返回值与 api.get_klines 格式一致。"""
@@ -973,7 +1011,7 @@ def _analyze_symbol_impl(symbol: str, ticker: dict,
         # [fix] 优先复用 run_scan 批量拉好的标记价格/资金费率，省掉每个标的一次重复请求；无数据时降级为单标的 REST
         if _over_budget("标记价格"):
             return None
-        mp      = (mark_price_map or {}).get(symbol) or api.get_mark_price(symbol)
+        mp      = (mark_price_map or {}).get(symbol) or _get_mark_price(symbol)
         funding = float(mp.get("lastFundingRate", 0))
 
         # [v3.85 OPT-6] 逐标的资金费结算窗口（替代全局 BTC 整点判断），开关 OPT_FUNDING_WINDOW_PER_SYMBOL
@@ -1978,7 +2016,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     # [fix] 全市场标记价格/资金费率批量拉一次（1 次请求），供所有并行任务复用；失败则为空 map，各标的降级走 REST
     _mark_price_map: dict = {}
     try:
-        for _m in (api.get_all_mark_prices() or []):
+        for _m in (_get_all_mark_prices_list() or []):
             _ms = _m.get("symbol", "")
             if _ms:
                 _mark_price_map[_ms] = _m
@@ -2343,7 +2381,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
         cg_bonus = 0
         if _cg_import_ok:
             try:
-                mark = float(api.get_mark_price(sig["symbol"]).get("markPrice", 0))
+                mark = float(_get_mark_price(sig["symbol"]).get("markPrice", 0))
                 cg_bonus = _cg_bonus_fn(sig["symbol"], direction, mark, ind)
                 cg_bonus = max(-10, min(10, cg_bonus))  # v3.65: clip ±15→±10，CG数据不100%可靠，收窄防单源一票否决
             except Exception:

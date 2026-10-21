@@ -632,6 +632,29 @@ async def main() -> None:
     ws = WsOrderListener()
     await ws.start()
 
+    # ── 1.4 公共市场数据 hub（默认关闭；与 ws_listener 的 userData/forceOrder 连接完全隔离）──
+    hub = None
+    try:
+        from config import MARKET_DATA_HUB_ENABLED as _HUB_ON
+    except ImportError:
+        _HUB_ON = False
+    if _HUB_ON:
+        try:
+            from shared.market_data_hub import MarketDataHub
+            hub = MarketDataHub()
+            hub.start()
+            for _ in range(100):               # 最多等 10 秒，不阻塞启动
+                if hub.is_ready():
+                    break
+                await asyncio.sleep(0.1)
+            if hub.is_ready():
+                logger.info("[main] market_data_hub 已就绪")
+            else:
+                logger.warning("[main] market_data_hub 10 秒内未就绪，scanner 将回落 REST（不阻塞启动）")
+        except Exception as e:
+            logger.warning(f"[main] market_data_hub 启动失败（忽略，回落 REST）: {e}")
+            hub = None
+
     # ── 1.5 启动时对齐持仓状态 ─────────────────────────────────────────────
     await _sync_positions_on_startup()
 
@@ -785,6 +808,11 @@ async def main() -> None:
     except Exception:
         pass
     await ws.stop()
+    if hub is not None:
+        try:
+            hub.stop()
+        except Exception as e:
+            logger.warning(f"[main] market_data_hub 停止异常: {e}")
     logger.info("[main] fx 系统已安全停止")
 
 
