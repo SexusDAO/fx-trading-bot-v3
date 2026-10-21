@@ -755,9 +755,12 @@ def analyze_symbol(symbol: str, ticker: dict,
                    allowed_directions: set | None = None,
                    loss_blacklist: set | None = None,
                    btc_trend: str = "",
-                   market_mode: str = "") -> dict | None:
+                   market_mode: str = "",
+                   deadline: float | None = None) -> dict | None:
     """
     完整分析一个标的，返回信号 dict 或 None。
+    deadline:          整轮截止时间（time.monotonic() 基准）；单标的另有 SCAN_SYMBOL_TIMEOUT_SEC 总时限，
+                       两者取先到者。每次发起 HTTP 请求前检查，超时直接 return None（不再发新请求）。
     active_syms:       (symbol, direction) 二元组集合，只排除同向仓位
     pending_syms:      当前有挂单的标的集合
     allowed_directions: 允许的方向集合（{"LONG"} / {"SHORT"} / None=不限制）
@@ -810,9 +813,29 @@ def analyze_symbol(symbol: str, ticker: dict,
     # oi_divergence / stop_hunt / range_bounce 等所有路径。改为只在 reversal LONG 判定后拒绝。
     _bear_block_rev_long = (btc_trend == "down" and chg24_rough <= -8)
 
+    # [fix] 单标的总时限：以 monotonic 计时，发起每个 HTTP 请求前检查
+    #   （原先靠 as_completed 里对「已完成 future」调 result(timeout) 判断，永远不会触发）
+    _t_sym0  = time.monotonic()
+    _t_limit = _t_sym0 + SCAN_SYMBOL_TIMEOUT_SEC
+    if deadline is not None:
+        _t_limit = min(_t_limit, deadline)
+
+    def _over_budget(stage: str) -> bool:
+        if time.monotonic() > _t_limit:
+            logger.info(
+                f"[scanner] {symbol} 单标的超时(已用 {time.monotonic() - _t_sym0:.1f}s，"
+                f"限 {SCAN_SYMBOL_TIMEOUT_SEC}s/整轮截止)，在「{stage}」前放弃"
+            )
+            return True
+        return False
+
     try:
         # ── A. 拉取数据（4H 懒加载：pullback 不拉 4H，减少约 1/3 HTTP 请求）──
+        if _over_budget("15m K线"):
+            return None
         k15 = api.get_klines(symbol, "15m", 100)
+        if _over_budget("1h K线"):
+            return None
         k1h = api.get_klines(symbol, "1h",  100)
         if not k1h or len(k1h) < 25:
             return None
@@ -821,6 +844,8 @@ def analyze_symbol(symbol: str, ticker: dict,
         p24     = float(k1h[-25][4]) if len(k1h) >= 25 else float(k1h[0][4])
         chg24   = (price - p24) / p24 * 100
 
+        if _over_budget("标记价格"):
+            return None
         mp      = api.get_mark_price(symbol)
         funding = float(mp.get("lastFundingRate", 0))
 
@@ -846,6 +871,8 @@ def analyze_symbol(symbol: str, ticker: dict,
         # OI（尽力获取，失败不阻塞）
         oi_now = 0.0
         try:
+            if _over_budget("持仓量"):
+                return None
             oi_data = api.get_open_interest(symbol)
             oi_now  = float(oi_data.get("openInterest", 0))
         except Exception:
@@ -855,6 +882,8 @@ def analyze_symbol(symbol: str, ticker: dict,
         oi_trend  = "neutral"   # rising / falling / neutral
         oi_slope  = 0.0         # 每小时变化率（%）
         try:
+            if _over_budget("OI 历史(6)"):
+                return None
             _oi_hist = api.get_oi_history(symbol, period="1h", limit=6)
             if _oi_hist and len(_oi_hist) >= 3:
                 _oi_vals = [float(h["sumOpenInterest"]) for h in _oi_hist]
@@ -874,6 +903,8 @@ def analyze_symbol(symbol: str, ticker: dict,
         # oi_1h_ago: 取 oi_history 的第一条（直接扦3根，-2 是 1H 前的历史实汉关K）
         _oi_1h_ago = 0.0
         try:
+            if _over_budget("OI 历史(3)"):
+                return None
             _oi_hist_3 = api.get_oi_history(symbol, period="1h", limit=3)
             if _oi_hist_3 and len(_oi_hist_3) >= 2:
                 _oi_1h_ago = float(_oi_hist_3[0].get("sumOpenInterest", 0))
@@ -935,6 +966,8 @@ def analyze_symbol(symbol: str, ticker: dict,
         for _route in _candidate_routes:
             # 按需补拉 4H（只拉一次，后续路径复用）
             if _route in _NEED_4H and not _4h_loaded:
+                if _over_budget("4h K线"):
+                    return None
                 k4h = api.get_klines(symbol, "4h", 100)
                 _4h_loaded = True
                 if k4h:
@@ -1456,6 +1489,43 @@ def _load_pool() -> list:
         return refresh_pool()
 
 # ── 主扫描函数 ────────────────────────────────────────────────────────────────
+def _run_parallel_with_deadline(fn, jobs: dict, max_workers: int, total_timeout_sec: float):
+    """并行执行 jobs 并在整轮 deadline 到点后真正放弃剩余任务。
+
+    jobs: {标的: 位置参数元组}；fn 以 fn(*args, deadline=<monotonic 截止时间>) 调用。
+    返回 (results, unfinished)：results 为 [(标的, 返回值)]（完成顺序，异常的标的不在内），
+    unfinished 为到点时仍未完成的标的列表。
+
+    [fix] 不用 `with ThreadPoolExecutor`：其退出时 shutdown(wait=True) 会等所有线程结束，
+    一个标的卡住就拖到外层 300s 超时。这里到点后 shutdown(wait=False, cancel_futures=True)，
+    未开始的任务被取消；已在跑的线程无法强杀，只能放弃等待（由 fn 内的 deadline 检查让其尽快自行退出）。
+    """
+    deadline = time.monotonic() + total_timeout_sec
+    exe = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="scan-sym")
+    futures = {exe.submit(fn, *args, deadline=deadline): sym for sym, args in jobs.items()}
+    results: list = []
+    try:
+        for fut in concurrent.futures.as_completed(futures, timeout=total_timeout_sec):
+            sym = futures[fut]
+            try:
+                results.append((sym, fut.result()))
+            except Exception as e:
+                logger.debug(f"[scanner] {sym} future 异常: {e}")
+            if time.monotonic() > deadline:
+                break
+    except concurrent.futures.TimeoutError:
+        pass
+    finally:
+        unfinished = [sym for fut, sym in futures.items() if not fut.done()]
+        exe.shutdown(wait=False, cancel_futures=True)
+    if unfinished:
+        logger.warning(
+            f"[scanner] 整轮超时({total_timeout_sec}s)：{len(unfinished)}/{len(futures)} 个标的未完成已放弃，"
+            f"已采集 {len(results)} 个结果；未完成示例: {unfinished[:10]}"
+        )
+    return results, unfinished
+
+
 def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     t0  = time.time()
     now = datetime.now(timezone.utc)
@@ -1809,36 +1879,19 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
         logger.debug(f"[scanner] 全市场资金费率情绪获取失败（降级忽略）: {_fse}")
 
     signals_raw = []
-    scan_deadline = time.time() + SCAN_TOTAL_TIMEOUT_SEC
-    with concurrent.futures.ThreadPoolExecutor(max_workers=SCAN_MAX_WORKERS) as exe:
-        futures = {
-            exe.submit(analyze_symbol, sym, _ticker_all.get(sym, {}), active_syms, pending_syms, allowed_dirs, _loss_blacklist, _btc_trend, _mkt_mode): sym
-            for sym in scan_pool
-        }
-        try:
-            for fut in concurrent.futures.as_completed(futures, timeout=SCAN_TOTAL_TIMEOUT_SEC):
-                sym = futures[fut]
-                if time.time() > scan_deadline:
-                    logger.warning(
-                        f"[scanner] 整轮超时({SCAN_TOTAL_TIMEOUT_SEC}s)，"
-                        f"已采集 {len(signals_raw)} 个信号，强制结束本轮"
-                    )
-                    break
-                try:
-                    res = fut.result(timeout=SCAN_SYMBOL_TIMEOUT_SEC)
-                    if res:
-                        signals_raw.append(res)
-                        result["class_counts"][res["sig_type"]] = \
-                            result["class_counts"].get(res["sig_type"], 0) + 1
-                except concurrent.futures.TimeoutError:
-                    logger.info(f"[scanner] {sym} 分析超时({SCAN_SYMBOL_TIMEOUT_SEC}s)，跳过")
-                except Exception as e:
-                    logger.debug(f"[scanner] {sym} future 异常: {e}")
-        except concurrent.futures.TimeoutError:
-            logger.warning(
-                f"[scanner] as_completed 整轮超时({SCAN_TOTAL_TIMEOUT_SEC}s)，"
-                f"已采集 {len(signals_raw)} 个信号，提前结束"
-            )
+    _jobs = {
+        sym: (sym, _ticker_all.get(sym, {}), active_syms, pending_syms, allowed_dirs, _loss_blacklist, _btc_trend, _mkt_mode)
+        for sym in scan_pool
+    }
+    _par_results, _unfinished = _run_parallel_with_deadline(
+        analyze_symbol, _jobs, SCAN_MAX_WORKERS, SCAN_TOTAL_TIMEOUT_SEC
+    )
+    result["scan_unfinished"] = len(_unfinished)
+    for sym, res in _par_results:
+        if res:
+            signals_raw.append(res)
+            result["class_counts"][res["sig_type"]] = \
+                result["class_counts"].get(res["sig_type"], 0) + 1
 
     result["signals_raw"] = len(signals_raw)
 
