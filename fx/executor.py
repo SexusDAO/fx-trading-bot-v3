@@ -58,7 +58,7 @@ from shared.state import (
 )
 from shared.notifier import (
     notify, notify_async, card_append, card_append_async, card_remove,
-    flush_signal, discard_signal, buffer_signal,
+    flush_signal, buffer_signal,
     _hhmm, _CLOSE_REASON_CN, fmt_hold_time,
     fmt_node_immediate_close, fmt_node_open, fmt_node_close,
 )
@@ -1464,7 +1464,7 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
                 #   此处必须本地 import，否则 UnboundLocalError 被下面的 except 吞掉，卡片追加不出去
                 from shared.notifier import card_append, card_remove, _hhmm
                 # 卡片已在价格触发时 flush 发出：追加预检拒绝原因并清理卡片缓存
-                #（此时再 discard_signal 已无缓冲内容可丢，不再调用）
+                #（卡片已发出，缓冲区无内容，无需丢弃）
                 card_append(_sig_id_pre, f"\n❌ {_hhmm()} 预检拒绝\n {reason}")
                 card_remove(_sig_id_pre)
             except Exception:

@@ -108,7 +108,8 @@ def test_executor_precheck_path_does_not_call_discard(tg, monkeypatch):
     import executor
     monkeypatch.setattr(executor, "_precheck", lambda s: (False, "余额不足"))
     called = []
-    monkeypatch.setattr(executor, "discard_signal", lambda sid: called.append(sid))
+    assert not hasattr(executor, "discard_signal")                      # executor 已不再持有 discard_signal
+    monkeypatch.setattr(N, "discard_signal", lambda sid: called.append(sid))
     sig = _sig(); sig["_sig_id"] = "XUSDT_1"
     N._card_cache["XUSDT_1"] = {"message_id": 7, "text": "H", "ts": time.time()}
     assert asyncio.run(executor._execute_async(sig, None)) is False
