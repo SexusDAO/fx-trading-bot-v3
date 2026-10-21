@@ -2043,7 +2043,9 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     _btc_trend = {"bull": "up", "bear": "down"}.get(_mkt_mode, "neutral")
 
     # ── 第二步：读取候选池 ────────────────────────────────────────────────────
+    _perf_t = time.perf_counter()
     pool = _load_pool()
+    _perf_pool = time.perf_counter() - _perf_t
     if not pool:
         logger.warning("[scanner] 候选池为空")
         return result
@@ -2160,6 +2162,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
         # ── 第三步：并行分析（单标的 SCAN_SYMBOL_TIMEOUT_SEC，整轮 SCAN_TOTAL_TIMEOUT_SEC）─
     # [fix] 全市场标记价格/资金费率批量拉一次（1 次请求），供所有并行任务复用；失败则为空 map，各标的降级走 REST
     _mark_price_map: dict = {}
+    _perf_t = time.perf_counter()
     try:
         for _m in (_get_all_mark_prices_list() or []):
             _ms = _m.get("symbol", "")
@@ -2167,6 +2170,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
                 _mark_price_map[_ms] = _m
     except Exception as _mpe:
         logger.warning(f"[scanner] 批量标记价格获取失败，各标的降级单独请求: {_mpe}")
+    _perf_mark = time.perf_counter() - _perf_t
     _mark_price_map_ts = time.monotonic()   # 批量数据的取数时间；注册入场价时用它判断是否仍足够新
     # 拉取一次 ticker 数据供所有并行任务复用（修复 vol24_usd 永远为 0 的 bug）
     try:
@@ -2226,9 +2230,12 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     }
     # [fix] mark_price_map 用 partial 以关键字绑定：analyze_symbol 的第 9 个位置参数是 deadline，
     # _run_parallel_with_deadline 又以关键字传 deadline，位置传 map 会 TypeError(multiple values for 'deadline')
+    _perf_t = time.perf_counter()
     _par_results, _unfinished = _run_parallel_with_deadline(
         _functools.partial(analyze_symbol, mark_price_map=_mark_price_map), _jobs, SCAN_MAX_WORKERS, SCAN_TOTAL_TIMEOUT_SEC
     )
+    _perf_analysis = time.perf_counter() - _perf_t
+    _perf_post_t0 = time.perf_counter()
     result["scan_unfinished"] = len(_unfinished)
     for sym, res in _par_results:
         if res:
@@ -3185,6 +3192,12 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     except Exception:
         pass
 
+    try:
+        from shared.observability import format_scan_perf as _fmt_perf
+        logger.info(_fmt_perf(_perf_pool, _perf_mark, _perf_analysis, time.perf_counter() - _perf_post_t0,
+                              len(_unfinished), len(scan_pool)))
+    except Exception:
+        pass
     _write_scan_log(result, avail_signals)
     # [v3.89 SHADOW] 影子穿透追踪：扫描后处理被拒的信号写入 rejected_log.jsonl（只记录）
     try:

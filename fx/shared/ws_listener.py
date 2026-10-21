@@ -126,6 +126,10 @@ class WsOrderListener:
         # 停止标志
         self._stop_flag = False
 
+        # [阶段0] 各 WS 流最后一次收到消息的 monotonic 时间（0 = 从未收到）；每 5 分钟输出一次存活状态
+        self._stream_last_msg: Dict[str, float] = {"userData": 0.0, "markPrice": 0.0, "forceOrder": 0.0}
+        self._health_task: Optional[asyncio.Task] = None
+
         # [v3.89 #3] userData 断线即时 REST 补偿：状态与回调
         self._disconnect_callbacks: list = []
         self._user_connected: bool = False
@@ -238,9 +242,30 @@ class WsOrderListener:
         except asyncio.CancelledError:
             return
 
+    def get_stream_health(self) -> list:
+        """[(流名, 距最后一条消息的秒数|None, ok/stale/never)]。"""
+        from shared.observability import stream_health
+        return stream_health(dict(self._stream_last_msg), time.monotonic())
+
+    async def _health_loop(self, interval: float = 300.0) -> None:
+        """每 5 分钟输出各 WS 流的存活状态（有 stale/never 时用 WARNING）。"""
+        from shared.observability import format_stream_health
+        while not self._stop_flag:
+            await asyncio.sleep(interval)
+            try:
+                rows = self.get_stream_health()
+                msg = format_stream_health(rows)
+                if any(st != "ok" for _, _, st in rows):
+                    logger.warning(msg)
+                else:
+                    logger.info(msg)
+            except Exception as e:
+                logger.debug(f"[ws-health] 输出失败: {e}")
+
     async def start(self) -> None:
         """启动所有后台任务，不阻塞调用方。"""
         self._stop_flag = False
+        self._health_task = asyncio.create_task(self._health_loop(), name="ws_health")
         self._user_data_task   = asyncio.create_task(self._user_data_loop(),    name="ws_user_data")
         self._mark_price_task  = asyncio.create_task(self._mark_price_loop(),   name="ws_mark_price")
         self._keepalive_task   = asyncio.create_task(self._keepalive_loop(),    name="ws_keepalive")
@@ -254,6 +279,7 @@ class WsOrderListener:
             self._user_data_task, self._mark_price_task,
             self._keepalive_task, self._force_order_task,
             self._compensation_task,   # [v3.89 #3]
+            self._health_task,
         ):
             if task and not task.done():
                 task.cancel()
@@ -335,6 +361,7 @@ class WsOrderListener:
                             except Exception as _cbe:
                                 logger.warning(f"[ws] 重连回调异常: {_cbe}")
                     async for raw in ws:
+                        self._stream_last_msg["userData"] = time.monotonic()
                         if self._stop_flag:
                             return
                         await self._dispatch_user_data(raw)
@@ -416,6 +443,7 @@ class WsOrderListener:
                     delay = RECONNECT_BASE
 
                     async for raw in ws:
+                        self._stream_last_msg["markPrice"] = time.monotonic()
                         if self._stop_flag:
                             return
                         # 检查是否需要重建（订阅列表变化）
@@ -519,6 +547,7 @@ class WsOrderListener:
                     delay = RECONNECT_BASE
                     logger.info("[ws] 强平事件流已连接")
                     async for raw in ws:
+                        self._stream_last_msg["forceOrder"] = time.monotonic()
                         if self._stop_flag:
                             return
                         await self._dispatch_force_order(raw)
