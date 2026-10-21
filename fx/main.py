@@ -212,6 +212,31 @@ async def _loop_scan(interval: int = 300, signal_watcher=None, ws_listener=None)
         await asyncio.sleep(_eff_interval)
 
 
+def _classify_loop_latency(actual: float, warn: float = 0.5, err: float = 2.0):
+    """事件循环延迟分级：返回 None / "warn" / "error"。"""
+    if actual > err:
+        return "error"
+    if actual > warn:
+        return "warn"
+    return None
+
+
+async def _loop_event_latency_monitor(interval: float = 5.0, probe: float = 0.1) -> None:
+    """事件循环延迟监控：每 interval 秒 sleep(probe)，实际耗时远大于 probe 说明循环被阻塞
+    （GIL 竞争 / 同步调用占用事件循环线程），用来判断是否需要把扫描移到进程池。"""
+    import time as _t
+    while True:
+        await asyncio.sleep(interval)
+        t0 = _t.monotonic()
+        await asyncio.sleep(probe)
+        actual = _t.monotonic() - t0
+        lvl = _classify_loop_latency(actual)
+        if lvl == "error":
+            logger.error(f"[loop] 事件循环严重阻塞 {actual:.2f}s")
+        elif lvl == "warn":
+            logger.warning(f"[loop] 事件循环延迟 {actual:.2f}s")
+
+
 async def _loop_patrol(interval: int = 300, offset: int = 30) -> None:
     """每 interval 秒执行一次巡检，与 scan 错开 offset 秒。"""
     await asyncio.sleep(offset)
@@ -652,6 +677,7 @@ async def main() -> None:
         # ── 基础支撑 ─────────────────────────────────────────────────────────────
         asyncio.create_task(_loop_refresh_pool(1800),                          name="refresh_pool"),
         asyncio.create_task(_loop_reset_circuit(),                             name="reset_circuit"),
+        asyncio.create_task(_loop_event_latency_monitor(),                     name="loop_latency"),
         asyncio.create_task(_loop_track_outcomes(3600),                        name="track_outcomes"),
         # ── 临时诊断：内存追踪（30分钟一次） ─────────────────────────────────────
         asyncio.create_task(_loop_mem_trace(1800),                             name="mem_trace"),
