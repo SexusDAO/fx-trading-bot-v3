@@ -7,6 +7,7 @@ fx/scanner.py — 扫描 + 分类 + 信号判断
 输出：信号列表（不含入场价/止损价，由 executor 实时计算）
 """
 
+import threading
 import sys
 import json
 import time
@@ -1234,6 +1235,7 @@ def analyze_one(symbol: str, ticker: dict,
         # pullback 作为最低优先级兜底，始终加入
         if "pullback" not in _candidate_routes:
             _candidate_routes.append("pullback")
+        events.append({"kind": "funnel_coarse", "routes": list(_candidate_routes)})   # 漏斗：初筛命中
 
         # ── C.5 + D. 全路径 judge + 质量择优（v3.81）────────────────────────────
         # 4H K 线：主进程已全部预取；与原先懒加载保持同样的可见性（第一次需要 4H 的路线才生效）
@@ -1417,6 +1419,128 @@ def analyze_one(symbol: str, ticker: dict,
 _ROUTE_QUALITY: dict = {}  # 阶段3：symbol -> 本轮 route_quality（仅供 scan_signals.jsonl）
 
 
+
+# ── 信号漏斗统计（每轮 run_scan 一条 → logs/funnel_log.jsonl）─────────────────
+_FUNNEL_LOG_FILE = Path(__file__).resolve().parent / "logs" / "funnel_log.jsonl"
+_FUNNEL_CATS = ("量能不足", "EMA结构", "波动率", "RSI条件", "OI条件", "形态条件", "其他")
+_FUNNEL_RULES = (
+    ("量能不足", ("vol_ratio", "量比", "量能")),
+    ("EMA结构", ("EMA", "ema")),
+    ("波动率", ("ATR", "波动")),
+    ("RSI条件", ("RSI",)),
+    ("OI条件", ("OI",)),
+    ("形态条件", ("形态", "K线")),
+)
+_FUNNEL_LOCK = threading.Lock()
+_FUNNEL_ROUND = 0
+_FUNNEL_ROUTES = ("pullback", "reversal", "breakout", "stop_hunt", "oi_divergence", "ema_trend", "range_bounce")
+
+
+def _funnel_empty() -> dict:
+    return {"judge_pass": 0, "reject": {c: 0 for c in _FUNNEL_CATS}, "queued_base": None,
+            "coarse": {r: 0 for r in _FUNNEL_ROUTES}, "reject_by_route": {}, "pass_by_route": {}}
+
+
+_FUNNEL = _funnel_empty()
+
+
+def _funnel_classify(reason) -> str:
+    """拒绝原因关键词归类：从上到下匹配，命中第一个即停；都不命中归「其他」。"""
+    t = str(reason or "")
+    for cat, kws in _FUNNEL_RULES:
+        if any(k in t for k in kws):
+            return cat
+    return "其他"
+
+
+def _funnel_queued():
+    try:
+        from shared import trigger_detector as _tdm
+        det = _tdm.get_detector()
+        return int(det.dispatch_stats.get("queued", 0)) if det is not None else None
+    except Exception:
+        return None
+
+
+def _funnel_begin() -> None:
+    global _FUNNEL_ROUND
+    with _FUNNEL_LOCK:
+        _FUNNEL_ROUND += 1
+        _FUNNEL.clear()
+        _FUNNEL.update(_funnel_empty())
+        _FUNNEL["queued_base"] = _funnel_queued()
+
+
+def _funnel_count(kw: dict) -> None:
+    """处理 analytics / analytics_pass 事件时计数：judge_passed=True 记通过，False 按关键词归类；
+    同时按 mode（场景）分组。"""
+    try:
+        route = str(kw.get("mode") or "unknown")
+        with _FUNNEL_LOCK:
+            if kw.get("judge_passed"):
+                _FUNNEL["judge_pass"] += 1
+                _FUNNEL["pass_by_route"][route] = _FUNNEL["pass_by_route"].get(route, 0) + 1
+            else:
+                cat = _funnel_classify(kw.get("reject_reason"))
+                _FUNNEL["reject"][cat] += 1
+                rb = _FUNNEL["reject_by_route"].setdefault(route, {})
+                rb[cat] = rb.get(cat, 0) + 1
+    except Exception:
+        pass
+
+
+def _funnel_coarse(routes) -> None:
+    """初筛命中：analyze_one 的 _candidate_routes，每轮对所有标的累加。"""
+    try:
+        with _FUNNEL_LOCK:
+            for r in routes or ():
+                _FUNNEL["coarse"][r] = _FUNNEL["coarse"].get(r, 0) + 1
+    except Exception:
+        pass
+
+
+def _funnel_finish(result: dict) -> dict | None:
+    """写一行 funnel_log.jsonl + system.log 摘要；失败只记 WARNING，不影响扫描。"""
+    try:
+        try:
+            from config import TRIGGER_DETECTOR_ENABLED as _td_on
+        except Exception:
+            _td_on = False
+        with _FUNNEL_LOCK:
+            base, now_q = _FUNNEL["queued_base"], _funnel_queued()
+            triggered = (now_q - base) if (_td_on and base is not None and now_q is not None) else 0
+            if not _td_on:
+                note = "触发器未启用（TRIGGER_DETECTOR_ENABLED=False），triggered=0 为正常"
+            elif base is None or now_q is None:
+                note = "触发器实例不可用，triggered 记 0"
+            else:
+                note = ""
+            rec = {
+                "ts": int(time.time() * 1000),
+                "scan_round": _FUNNEL_ROUND,
+                "trigger_enabled": bool(_td_on),
+                "triggered": int(max(triggered, 0)),
+                "triggered_note": note,
+                "粗筛通过": int(result.get("scanned", 0) or 0),
+                "judge通过": int(_FUNNEL["judge_pass"]),
+                "信号产出": int(result.get("signals_final", 0) or 0),
+                "拒绝分布": dict(_FUNNEL["reject"]),
+                "coarse_by_route": dict(_FUNNEL["coarse"]),
+                "reject_by_route": {k: dict(v) for k, v in _FUNNEL["reject_by_route"].items()},
+                "pass_by_route": dict(_FUNNEL["pass_by_route"]),
+            }
+        top3 = sorted(rec["拒绝分布"].items(), key=lambda kv: -kv[1])[:3]
+        logger.info(f"[funnel] 触发={rec['triggered']} 粗筛通过={rec['粗筛通过']} judge通过={rec['judge通过']} "
+                    f"信号产出={rec['信号产出']} 拒绝TOP3: " + " ".join(f"{k}={v}" for k, v in top3))
+        _FUNNEL_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(_FUNNEL_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        return rec
+    except Exception as e:
+        logger.warning(f"[funnel] 漏斗统计写入失败（不影响扫描）: {e}")
+        return None
+
+
 def _apply_post_events(sig: dict | None, events: list) -> dict | None:
     """主进程后置处理：按顺序落盘 analytics / shadow 记录，再处理妖币 LLM，最后写通过记录。
     返回最终信号（LLM 可能改写为 range_bounce LONG，或否决返回 None）。"""
@@ -1424,6 +1548,11 @@ def _apply_post_events(sig: dict | None, events: list) -> dict | None:
     pass_ev = None
     for ev in events:
         k = ev.get("kind")
+        if k == "funnel_coarse":
+            _funnel_coarse(ev.get("routes"))
+            continue
+        if k in ("analytics", "analytics_pass"):
+            _funnel_count(ev.get("kwargs") or {})
         if k == "analytics":
             try:
                 _write_signal_analytics(**ev["kwargs"])
@@ -3211,6 +3340,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
         "signals_raw": 0, "signals_final": 0, "placed": 0,
         "rejected": [], "dry_run": dry_run,
     }
+    _funnel_begin()
 
     # ── 第一步：前置状态检查 ───────────────────────────────────────────────────
     if is_circuit_open():
@@ -3660,6 +3790,7 @@ def run_scan(dry_run: bool = False, signal_watcher=None) -> dict:
     except Exception:
         pass
     _write_scan_log(result, avail_signals)
+    _funnel_finish(result)
     # [v3.89 SHADOW] 影子穿透追踪：扫描后处理被拒的信号写入 rejected_log.jsonl（只记录）
     try:
         from shared import shadow_trace as _st

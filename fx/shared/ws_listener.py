@@ -56,6 +56,9 @@ logger = logging.getLogger("ws_listener")
 # 常量（可在 config.py 覆盖）
 # ═══════════════════════════════════════════════════════════════════════════════
 KEEPALIVE_INTERVAL   = getattr(config, "WS_KEEPALIVE_INTERVAL",   20 * 60)  # 秒
+# userData 连接后超过此秒数没收到任何事件 → 用 PUT 验证 listenKey（账户安静时无事件属正常）
+USER_IDLE_VERIFY_SEC = float(getattr(config, "WS_USER_IDLE_VERIFY_SEC", 60))
+USER_IDLE_CHECK_SEC  = 10.0
 # [fix v3.91] max_queue：websockets 15.x（纯 Python asyncio 实现）的 max_queue 是接收缓冲高水位，
 #   超过后会暂停读 socket（TCP 背压），并不会丢帧；低水位 = 高水位 // 4 时恢复读取。默认 16。
 #   markPrice 的「丢旧帧」由下面的有限并发分发实现（_MP_MAX_INFLIGHT），不依赖 max_queue。
@@ -81,6 +84,25 @@ PriceCallback = Callable[[str, float, int], Awaitable[None]]
 LiqCallback   = Callable[[dict], Awaitable[None]]
 
 
+
+def _verify_listen_key(listen_key: str) -> str:
+    """PUT 验证 listenKey：ok（2xx）/ invalid（4xx，限流 418/429 除外）/ error（网络错误、5xx、限流）。
+    复用 binance_api 的 listenKey 请求入口（含主备代理切换），不改 binance_api。"""
+    try:
+        r = binance_api._listen_key_request(
+            "PUT", f"{binance_api.BASE_URL}/fapi/v1/listenKey",
+            params={"listenKey": listen_key}, headers={"X-MBX-APIKEY": binance_api.API_KEY},
+            timeout=binance_api._api_timeout())
+    except Exception as e:
+        logger.info(f"[userData] listenKey 验证请求失败: {type(e).__name__}: {e}")
+        return "error"
+    code = int(getattr(r, "status_code", 0) or 0)
+    if 200 <= code < 300:
+        return "ok"
+    if 400 <= code < 500 and code not in (418, 429):
+        return "invalid"
+    return "error"
+
 class WsOrderListener:
     """
     统一管理 userData + markPrice WebSocket 连接。
@@ -105,6 +127,9 @@ class WsOrderListener:
         self._user_data_task:   Optional[asyncio.Task] = None
         self._mark_price_task:  Optional[asyncio.Task] = None
         self._keepalive_task:   Optional[asyncio.Task] = None
+        self._user_idle_task:   Optional[asyncio.Task] = None
+        self._user_connected_at: float = 0.0
+        self._user_idle_verified_at: float = 0.0
         self._force_order_task: Optional[asyncio.Task] = None
         self._rebuild_event:    asyncio.Event = asyncio.Event()
 
@@ -269,6 +294,7 @@ class WsOrderListener:
         self._user_data_task   = asyncio.create_task(self._user_data_loop(),    name="ws_user_data")
         self._mark_price_task  = asyncio.create_task(self._mark_price_loop(),   name="ws_mark_price")
         self._keepalive_task   = asyncio.create_task(self._keepalive_loop(),    name="ws_keepalive")
+        self._user_idle_task   = asyncio.create_task(self._user_idle_loop(),    name="ws_user_idle")
         self._force_order_task = asyncio.create_task(self._force_order_loop(),  name="ws_force_order")
         logger.info("[ws] WsOrderListener 已启动（含强平事件流）")
 
@@ -277,7 +303,7 @@ class WsOrderListener:
         self._stop_flag = True
         for task in (
             self._user_data_task, self._mark_price_task,
-            self._keepalive_task, self._force_order_task,
+            self._keepalive_task, self._force_order_task, self._user_idle_task,
             self._compensation_task,   # [v3.89 #3]
             self._health_task,
         ):
@@ -351,6 +377,7 @@ class WsOrderListener:
                     delay = RECONNECT_BASE  # 连接成功后重置退避
                     self._user_ws = ws                # [v3.89 #7]
                     self._user_connected = True       # [v3.89 #3] 补偿任务见此状态后不再发起下一轮
+                    self._user_connected_at = time.monotonic()
                     # v3.33 重连回调：通知主进程触发持仓对齐
                     if self._reconnect_callbacks:
                         logger.info("[ws] userData 重连成功，触发重连回调")
@@ -652,6 +679,49 @@ class WsOrderListener:
             logger.info(f"[ws] 已主动关闭 userData 连接以重建: {reason}")
         except Exception as e:
             logger.warning(f"[ws] 主动关闭 userData 连接失败: {e}")
+
+    async def _user_idle_loop(self) -> None:
+        """userData 长时间无事件时验证 listenKey（不直接重连）。"""
+        while not self._stop_flag:
+            try:
+                await asyncio.sleep(USER_IDLE_CHECK_SEC)
+                if self._stop_flag:
+                    return
+                await self._user_idle_check_once()
+            except asyncio.CancelledError:
+                return
+            except Exception as e:
+                logger.warning(f"[userData] 无数据检查异常（忽略）: {e}")
+
+    async def _user_idle_check_once(self, now: Optional[float] = None) -> Optional[str]:
+        """返回 None（无需检查）/ ok / invalid / error / timeout。
+        ok：key 有效，账户安静属正常，不重连，至少再等 USER_IDLE_VERIFY_SEC 秒才再验证；
+        invalid：记 WARNING 并 _force_user_reconnect（重连循环会重新获取新 key）；
+        error / timeout：只记日志，不重连。"""
+        if not self._user_connected or not self._listen_key or self._user_ws is None:
+            return None
+        now = time.monotonic() if now is None else now
+        last = max(self._stream_last_msg.get("userData", 0.0), self._user_connected_at, self._user_idle_verified_at)
+        if now - last < USER_IDLE_VERIFY_SEC:
+            return None
+        self._user_idle_verified_at = now
+        key = self._listen_key
+        try:
+            res = await _run_sync(_verify_listen_key, key, timeout=15.0)
+        except RunSyncTimeout:
+            logger.info("[userData] listenKey 验证超过 15s 未返回，本轮不重连")
+            return "timeout"
+        if res == "ok":
+            logger.debug(f"[userData] {now - last:.0f}s 无事件，listenKey 验证有效，不重连")
+            return "ok"
+        if res == "invalid":
+            logger.warning("[userData] listenKey可能失效，已强制重新获取并重连")
+            if self._listen_key == key:
+                self._listen_key = None
+            await self._force_user_reconnect("userData 无数据且 listenKey 验证失败")
+            return "invalid"
+        logger.info("[userData] listenKey 验证网络错误，本轮不重连")
+        return "error"
 
     async def _keepalive_loop(self) -> None:
         """每 KEEPALIVE_INTERVAL 秒续期 listenKey，防止 userData stream 超时断开。"""

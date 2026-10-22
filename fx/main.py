@@ -740,6 +740,11 @@ async def main() -> None:
     # ── 4. 启动定时任务 ────────────────────────────────────────────────────
     # ── 3.5 启动 liq_cache 后台刷新线程（每15分钟批量预热清算区缓存）──────────────
     try:
+        try:
+            from shared import hot_config as _hot_cfg
+            _hot_cfg.start()
+        except Exception as _hc_e:
+            logger.warning(f"[main] hot_config 启动失败（忽略）: {_hc_e}")
         from shared.liq_cache import start_bg_refresh
         import scanner as _scanner_mod
         # 从 candidate_pool.json 读取当前候选池列表
@@ -854,6 +859,11 @@ async def main() -> None:
         await signal_watcher.stop_polling()
         await signal_watcher.stop_recheck()
         await signal_watcher.stop_btc_guard()
+        try:
+            from shared import hot_config as _hot_cfg
+            _hot_cfg.stop()
+        except Exception:
+            pass
     except Exception:
         pass
     await ws.stop()

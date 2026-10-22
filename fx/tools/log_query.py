@@ -146,7 +146,67 @@ def query_file(
     return result
 
 
+def _parse_hours(s: str) -> float:
+    s = (s or "").strip().lower()
+    if s.endswith("h"):
+        s = s[:-1]
+    v = float(s)
+    if v <= 0:
+        raise ValueError("--last 必须 > 0")
+    return v
+
+
+def funnel_report(log_dir: Path, last_hours: float | None, now_ms: int | None = None) -> list[str]:
+    """读 funnel_log.jsonl，按时间段过滤后按场景聚合，返回输出行。"""
+    import json as _json
+    import time as _time
+    fp = Path(log_dir) / "funnel_log.jsonl"
+    if not fp.exists():
+        return [f"[log_query] 未找到 {fp}"]
+    now_ms = int(_time.time() * 1000) if now_ms is None else now_ms
+    since = now_ms - int(last_hours * 3600 * 1000) if last_hours else 0
+    coarse, rej, pas, rounds = {}, {}, {}, 0
+    with open(fp, encoding="utf-8") as f:
+        for line in f:
+            try:
+                d = _json.loads(line)
+            except Exception:
+                continue
+            if int(d.get("ts", 0) or 0) < since:
+                continue
+            rounds += 1
+            for r, n in (d.get("coarse_by_route") or {}).items():
+                coarse[r] = coarse.get(r, 0) + int(n or 0)
+            for r, m in (d.get("reject_by_route") or {}).items():
+                tgt = rej.setdefault(r, {})
+                for c, n in (m or {}).items():
+                    tgt[c] = tgt.get(c, 0) + int(n or 0)
+            for r, n in (d.get("pass_by_route") or {}).items():
+                pas[r] = pas.get(r, 0) + int(n or 0)
+    span = f"最近 {last_hours:g}h" if last_hours else "全部"
+    out = [f"[funnel] {span} 共 {rounds} 轮扫描"]
+    order = ["pullback", "reversal", "breakout", "stop_hunt", "oi_divergence", "ema_trend", "range_bounce"]
+    routes = [r for r in order if r in coarse or r in rej or r in pas]
+    routes += sorted((set(coarse) | set(rej) | set(pas)) - set(order))
+    w = max([len(r) for r in routes] + [8]) + 2
+    for r in routes:
+        rj = sorted(rej.get(r, {}).items(), key=lambda kv: -kv[1])
+        rj_s = " ".join(f"{c}={n}" for c, n in rj if n) or "无"
+        out.append(f"{('[' + r + ']').ljust(w)}初筛命中={coarse.get(r, 0)}次  精筛拒绝: {rj_s}  精筛通过={pas.get(r, 0)}")
+    if not routes:
+        out.append("[log_query] 时间段内没有漏斗记录")
+    return out
+
+
 def run(args: argparse.Namespace) -> None:
+    if getattr(args, "funnel", False):
+        try:
+            hrs = _parse_hours(args.last) if args.last else None
+        except ValueError as e:
+            print(f"[log_query] --last 格式错误（例：--last 6h）: {e}", file=sys.stderr)
+            sys.exit(2)
+        print("\n".join(funnel_report(Path(args.log_dir), hrs)))
+        return
     log_dir = Path(args.log_dir)
     if not log_dir.exists():
         print(f"[log_query] 日志目录不存在: {log_dir}", file=sys.stderr)
@@ -226,6 +286,10 @@ def main() -> None:
                         help="只看最后 N 条匹配")
     parser.add_argument("--context", type=int, default=0,
                         help="匹配行上下各打印 N 行（默认 0）")
+    parser.add_argument("--funnel",  action="store_true",
+                        help="按场景聚合 logs/funnel_log.jsonl（配合 --last Nh）")
+    parser.add_argument("--last",    default="",
+                        help="与 --funnel 同用：最近 N 小时，如 6h")
     parser.add_argument("--log-dir", default=_default_log_dir,
                         help=f"日志目录（默认 {_default_log_dir}）")
     args = parser.parse_args()

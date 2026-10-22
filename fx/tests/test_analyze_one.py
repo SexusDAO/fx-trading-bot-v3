@@ -129,7 +129,9 @@ def test_reject_events_returned_even_when_none(monkeypatch):
     ev = []
     sig = _call(scn, _prefetch(scn), ev)
     assert sig is None and rec.analytics == [] and rec.shadow == []
-    assert ev and {e["kind"] for e in ev} <= {"analytics", "shadow_reject"}
+    # funnel_coarse：漏斗统计的初筛命中事件（只计数，不落盘）
+    assert ev and {e["kind"] for e in ev} <= {"analytics", "shadow_reject", "funnel_coarse"}
+    assert [e for e in ev if e["kind"] == "funnel_coarse"][0]["routes"]
     assert all(e["kwargs"]["judge_passed"] is False for e in ev if e["kind"] == "analytics")
 
 
