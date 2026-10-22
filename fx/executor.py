@@ -223,7 +223,12 @@ def _precheck(signal: dict) -> tuple[bool, str]:
     # 1-6: 冷却期
     in_cd, cd_reason = is_in_cooldown(symbol)
     if in_cd:
-        return False, f"{symbol} 冷却期: {cd_reason}"
+        # [fix-1] crash_guard_short 只拦 SHORT；crash_guard（崩盘）只拦 LONG
+        _cdr = str(cd_reason or "")
+        if _crash_cd_allows(_cdr, direction):
+            logger.info(f"[executor] {symbol} 冷却原因={_cdr} 与 {direction} 方向无关，放行")
+        else:
+            return False, f"{symbol} 冷却期: {cd_reason}"
 
     # 1-7: 相关性过滤（功能一 v3.3）
     # 待开仓标的与现有同方向持仓的皮尔逊系数 > 0.85 时拒绝，方向相反时跳过
@@ -2028,3 +2033,9 @@ except ImportError:
 
 # 由 main.py 在启动时注入全局监听器实例，供独立调用 execute_signal() 时使用
 _LISTENER: "WsOrderListener | None" = None
+
+
+def _crash_cd_allows(reason: str, direction: str) -> bool:
+    """[fix-1] crash_guard 冷却只拦对应方向：crash_guard_short 只拦 SHORT，crash_guard 只拦 LONG。"""
+    d = (direction or "").upper()
+    return (reason == "crash_guard_short" and d == "LONG") or (reason == "crash_guard" and d == "SHORT")

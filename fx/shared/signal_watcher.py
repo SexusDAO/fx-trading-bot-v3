@@ -821,7 +821,7 @@ class SignalWatcher:
     # [v3.89 #101] 价格事件新鲜度：事件年龄（接收时间 - 事件时间）超过上限、事件时间超前本地时钟超过容差，
     #   或事件时间早于该标的已处理过的最后事件（乱序/重连后的旧帧）都不得触发信号或更新 BTC 冲击基准。
     _EVT_MAX_AGE_MS = 10_000
-    _EVT_FUTURE_TOL_MS = 2_000
+    _EVT_FUTURE_TOL_MS = 15_000   # [fix-3] Binance 服务器时间可能比本机快约 13s
 
     @staticmethod
     def _normalize_event_ts(ts) -> Optional[int]:
@@ -1154,10 +1154,19 @@ class SignalWatcher:
                 from shared.notifier import card_append, flush_signal, fmt_node_trigger
                 _sig_id_t = entry.signal.get("_sig_id", "")
                 if _sig_id_t:
-                    card_append(_sig_id_t, fmt_node_trigger(price, entry.entry_price))
-                    # [fix] 价格触发时 flush：缓冲区里「进入监控 + 价格触发」两行合并成一条消息发出
-                    #   后续 executor 开仓成交 / 预检拒绝都继续 card_append 到这张已发出的卡片
-                    flush_signal(_sig_id_t)
+                    # [fix-2] 卡片追加/flush 放到后台线程，2s 超时静默丢弃，不阻塞触发链路
+                    _line_t = fmt_node_trigger(price, entry.entry_price)
+
+                    def _card_job(_sid=_sig_id_t, _ln=_line_t):
+                        card_append(_sid, _ln)
+                        flush_signal(_sid)
+
+                    async def _card_bg():
+                        try:
+                            await asyncio.wait_for(asyncio.to_thread(_card_job), timeout=2.0)
+                        except Exception:
+                            pass
+                    asyncio.get_running_loop().create_task(_card_bg())
             except Exception as _tc_e:
                 logger.debug(f"[signal_watcher] 触发卡片追加失败: {_tc_e}")
 
@@ -1208,7 +1217,8 @@ class SignalWatcher:
                     if _ws is not None and hasattr(_ws, "get_liquidation_volume"):
                         _atr_v = float(entry.signal.get("ind", {}).get("atr_1h", 0)) or price * 0.02
                         _liq_threshold = _atr_v * price * 20  # 动态阈值（约 40~60k USDT 量级）
-                        _liq_vol = await _ws.get_liquidation_volume(symbol, _liq_side, minutes=15)
+                        _liq_vol = await asyncio.wait_for(   # [fix-2] 2s 超时 → 走原降级逻辑
+                            _ws.get_liquidation_volume(symbol, _liq_side, minutes=15), timeout=2.0)
                         if _liq_vol < _liq_threshold:
                             logger.warning(
                                 f"[signal_watcher] {symbol} breakout {_direction_liq} "

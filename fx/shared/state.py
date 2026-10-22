@@ -422,18 +422,31 @@ def is_in_cooldown(symbol: str) -> tuple[bool, str]:
         return True, entry.get("reason", "")
 
 
+_CRASH_CD_MAX_MS = 8 * 3600 * 1000   # [fix-4] crash_guard 冷却绝对上限
+
+
 def add_cooldown(symbol: str, duration_seconds: int, reason: str) -> None:
-    until = int(time.time() * 1000) + duration_seconds * 1000
+    now_ms = int(time.time() * 1000)
+    until = now_ms + duration_seconds * 1000
     with _locks["cd"]:
         d = _load_cd()
         prev = d.get(symbol, {})
         existing = prev.get("cooldown_until", 0)
+        _first = None
+        if str(reason).startswith("crash_guard"):
+            # [fix-4] 首次触发记 first_trigger_ts；仍在冷却内的 crash_guard 刷新沿用原首次时间
+            _prev_first = prev.get("first_trigger_ts") if str(prev.get("reason", "")).startswith("crash_guard") \
+                and existing > now_ms else None
+            _first = int(_prev_first or now_ms)
+            until = min(until, _first + _CRASH_CD_MAX_MS)
         if until > existing:
             d[symbol] = {
                 "cooldown_until": until,
                 "reason":         reason,
-                "set_at":         int(time.time() * 1000),
+                "set_at":         now_ms,
             }
+            if _first is not None:
+                d[symbol]["first_trigger_ts"] = _first
             effective, kept = until, False
         else:
             # [v3.89 #97] 已有冷却更长：保留决定该期限的原因和设置时间，不让较短的新事件覆盖
