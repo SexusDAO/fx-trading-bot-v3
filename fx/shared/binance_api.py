@@ -854,22 +854,68 @@ def place_batch_orders(orders: list) -> list:
     return result if isinstance(result, list) else []
 
 
+def _listen_key_backup_proxies() -> dict:
+    """备用代理：config.PROXY_URL_BACKUP，为空返回 {}（不切换）；socks5:// 自动改为 socks5h://。"""
+    try:
+        from config import PROXY_URL_BACKUP as _bak
+    except Exception:
+        _bak = os.environ.get("PROXY_URL_BACKUP", "")
+    _bak = (_bak or "").strip()
+    if _bak.lower().startswith("socks5://"):
+        _bak = "socks5h://" + _bak[len("socks5://"):]   # 与主代理一致：由代理端解析域名
+    return {"http": _bak, "https": _bak} if _bak else {}
+
+
+def _listen_key_request(method: str, url: str, **kw):
+    """listenKey 专用：先走 _SESSION（主代理）；连接失败（SSL 断开 / SOCKS 失败 / 连接超时）
+    且配置了备用 → 同一 Session 按请求覆盖 proxies 重试一次。HTTP 错误不切换。
+    备用也失败 → 记 WARNING 并抛原异常。不粘滞：下次仍先走主代理。"""
+    try:
+        return _SESSION.request(method, url, **kw)
+    except _requests.exceptions.ConnectionError as e_main:   # SSLError / ProxyError / ConnectTimeout 均为其子类
+        bak = _listen_key_backup_proxies()
+        if not bak:
+            raise
+        logger.info(f"[api] listenKey 主代理连接失败，切换备用代理重试: {type(e_main).__name__}")
+        try:
+            return _SESSION.request(method, url, proxies=bak, **kw)
+        except _requests.exceptions.ConnectionError as e_bak:
+            logger.warning(f"[api] listenKey 主备代理均连接失败: 主={type(e_main).__name__} 备={e_bak}")
+            raise
+
+
 def get_listen_key() -> str | None:
     """获取 userData stream listenKey"""
+    import hmac, hashlib, urllib.parse
+
     def _call():
-        return _signed_post("/fapi/v1/listenKey", {})
+        # 与 _signed_post 相同的签名与错误处理，只是请求经 _listen_key_request（主备代理）
+        clean = {"timestamp": int(time.time() * 1000)}
+        qs = urllib.parse.urlencode(clean)
+        clean["signature"] = hmac.new(API_SECRET.encode(), qs.encode(), hashlib.sha256).hexdigest()
+        r = _listen_key_request("POST", f"{BASE_URL}/fapi/v1/listenKey", params=clean,
+                                headers={"X-MBX-APIKEY": API_KEY}, timeout=_api_timeout())
+        if not r.ok:
+            try:
+                body = r.json()
+                raise Exception(f"BinanceError code={body.get('code', '')} msg={body.get('msg', '')} "
+                                f"http={r.status_code}")
+            except Exception as e:
+                if "BinanceError" in str(e):
+                    raise
+                r.raise_for_status()
+        return r.json()
     result = _retry(_call)
     return (result or {}).get("listenKey")
 
 
 def keepalive_listen_key(listen_key: str) -> bool:
     """续期 listenKey（每 30 分钟调用一次）"""
-    import hmac, hashlib, urllib.parse
     headers = {"X-MBX-APIKEY": API_KEY}
     try:
-        r = _SESSION.put(f"{BASE_URL}/fapi/v1/listenKey",
-                         params={"listenKey": listen_key},
-                         headers=headers, timeout=_api_timeout())
+        r = _listen_key_request("PUT", f"{BASE_URL}/fapi/v1/listenKey",
+                                params={"listenKey": listen_key},
+                                headers=headers, timeout=_api_timeout())
         r.raise_for_status()
         return True
     except Exception as e:
