@@ -348,14 +348,10 @@ def prefetch_liq_cache(symbols: list) -> None:
     """
     logger.info(f"[liq_cache] 开始预热 {len(symbols)} 个标的的清算区缓存")
     updated_box = [0]  # 用列表做可变计数器（线程共享）
-    threads = []
-    for sym in symbols:
-        t = threading.Thread(target=_prefetch_one, args=(sym, updated_box),
-                             name=f"liq-warm-{sym}", daemon=True)
-        t.start()
-        threads.append(t)
-    for t in threads:
-        t.join()
+    # 固定 5 个工作线程（与 _PREFETCH_SEM 上限一致），不再每个标的开一个线程排队等信号量；
+    #   本函数只在 liq-cache-bg 后台线程中调用，等待完成不影响事件循环，且保证 save_snapshot 在预热后执行
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5, thread_name_prefix="liq-warm") as _pool:
+        list(_pool.map(lambda s: _prefetch_one(s, updated_box), symbols))
     logger.info(f"[liq_cache] 预热完成，更新 {updated_box[0]}/{len(symbols)} 个")
 
 

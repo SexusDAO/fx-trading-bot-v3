@@ -82,7 +82,8 @@ class KlineCache:
             if len(self._d) > self._max:
                 oldest = min(self._d, key=lambda k: self._d[k].access_ts)
                 self._d.pop(oldest, None)
-        logger.debug(f"[kline_cache] set 成功 {symbol} {interval} closed={len(entry.closed)} last_close={last_close}")
+        if logger.isEnabledFor(logging.DEBUG):   # 高频路径：未开 DEBUG 时不拼字符串
+            logger.debug(f"[kline_cache] set 成功 {symbol} {interval} closed={len(entry.closed)} last_close={last_close}")
 
     # ── 读取 ──────────────────────────────────────────────────────────────
     def get(self, symbol: str, interval: str, limit: int,
@@ -187,7 +188,8 @@ class KlineCache:
             else:
                 self._refresh_fail += 1
                 self._refresh_fail_ts[key] = time.time()
-        logger.debug(f"[kline_cache] 后台刷新{'成功' if ok else '失败（继续使用旧值）'} {key}")
+        if not ok or logger.isEnabledFor(logging.DEBUG):   # 刷新成功属高频，只在开 DEBUG 时记录
+            logger.debug(f"[kline_cache] 后台刷新{'成功' if ok else '失败（继续使用旧值）'} {key}")
 
     def swr_stats(self) -> dict:
         with self._lock:

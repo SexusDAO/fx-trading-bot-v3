@@ -136,8 +136,6 @@ logging.basicConfig(
 logger = logging.getLogger("fx.main")
 logging.getLogger("websockets").setLevel(logging.WARNING)  # 屏蔽 ws 心跳 DEBUG 日志
 logging.getLogger("urllib3").setLevel(logging.WARNING)
-logging.getLogger("fx.kline_cache").setLevel(logging.DEBUG)  # 临时诊断：K线缓存miss原因
-logging.getLogger("shared.kline_cache").setLevel(logging.DEBUG)  # 兼容 __name__ 方式
 
 
 # ───────────────────────────────────────────────────────────────────────────────
