@@ -982,6 +982,9 @@ OPT_BREAKOUT_RSI_STRONG_RELAX = False   # OPT-12 放量(量比≥强量阈值)�
 BREAKOUT_RSI_MAX_LONG_STRONG  = 75     # 强量突破做多 RSI1H 上限
 BREAKOUT_RSI_MIN_SHORT_STRONG = 25     # 强量突破做空 RSI1H 下限
 OPT_BREAKOUT_MOMENTUM_ENTRY   = False   # OPT-13 距突破位≤0.5ATR 时延续入场，不再强制等回踩  # [v3.87 合并决策] 默认 False：OPT-13 按评审：暂缓，待对比成交率与止损率
+BREAKOUT_LIQ_FILTER_ENABLED   = False   # 突破强平量过滤（signal_watcher._trigger）：breakout 触发时要求反向强平量 ≥ ATR×价格×20，
+                                        #   不足视为假突破放弃入场。默认 False：等实盘数据足够后再开（v3.49/v3.50）；
+                                        #   此前 config.py 未定义，signal_watcher 导入失败时同样回落为 False，行为不变
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # v3.88 OPT-14 清算区相对强度（清算区金额 / 24H 成交额）——False 即回到原行为
