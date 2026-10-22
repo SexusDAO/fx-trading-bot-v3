@@ -234,6 +234,13 @@ async def _loop_scan(interval: int = 300, signal_watcher=None, ws_listener=None)
         from scanner import _is_weekend_period as _iwp
         from datetime import datetime, timezone as _tz
         _eff_interval = 900 if _iwp(datetime.now(_tz.utc)) else interval
+        # 阶段5：触发器为主路径时（两个开关都 True）扫描降为兜底，其余情况保持原逻辑
+        try:
+            import config as _cfg_ps
+            if getattr(_cfg_ps, "TRIGGER_DETECTOR_ENABLED", False) and getattr(_cfg_ps, "TRIGGER_DISPATCH_ENABLED", False):
+                _eff_interval = int(getattr(_cfg_ps, "SCAN_INTERVAL_PASSIVE", 1800))
+        except Exception:
+            pass
         if _eff_interval != interval:
             logger.debug(f"[main] 周末模式：扫描间隔降频 {interval}s → {_eff_interval}s")
         # ── 6小时心跳推送 ────────────────────────────────────────────
@@ -688,7 +695,31 @@ async def main() -> None:
                 logger.warning("[main] market_data_hub 10 秒内未就绪，scanner 将回落 REST（不阻塞启动）")
         except Exception as e:
             logger.warning(f"[main] market_data_hub 启动失败（忽略，回落 REST）: {e}")
+
             hub = None
+
+    # 阶段3：影子触发器（默认关闭；只读 hub 内存，不下单）
+    try:
+        from config import TRIGGER_DETECTOR_ENABLED as _TD_ON
+    except ImportError:
+        _TD_ON = False
+    _trigger_det = None
+    if _TD_ON and hub is not None:
+        try:
+            from shared import trigger_detector as _td_mod
+            _trigger_det = _td_mod.create(hub=hub)
+        except Exception as e:
+            logger.warning(f"[main] trigger_detector 创建失败（忽略）: {e}")
+
+    # ── 分析进程池预热（SCAN_USE_PROCESS_POOL=True 时；失败不影响启动，扫描时会回落线程池）──
+    try:
+        import config as _cfg_pp
+        if getattr(_cfg_pp, "SCAN_USE_PROCESS_POOL", False):
+            from shared import analysis_worker as _aw
+            _ok = await asyncio.get_running_loop().run_in_executor(None, _aw.warmup)
+            logger.info(f"[main] 分析进程池预热{'完成' if _ok else '失败（扫描时回落线程池）'}")
+    except Exception as e:
+        logger.warning(f"[main] 分析进程池预热异常（忽略）: {e}")
 
     # ── 1.5 启动时对齐持仓状态 ─────────────────────────────────────────────
     await _sync_positions_on_startup()
@@ -723,7 +754,7 @@ async def main() -> None:
     signal_watcher.register_to_ws(ws)
     await signal_watcher.start_gc()           # 后台 GC
     await signal_watcher.start_polling(1.5)   # REST 轮询（1.5s间隔，与 WS 互补）
-    await signal_watcher.start_recheck(900)   # 每15min 复核 pending 挂单指标
+    await signal_watcher.start_recheck(60)   # 每60s 复核 pending 挂单指标
     await signal_watcher.start_btc_guard(300) # 每5min 检查 BTC 大跌护卫
     logger.info("[main] SignalWatcher 初始化完成（WS + REST + recheck + btc_guard）")
 
@@ -766,6 +797,10 @@ async def main() -> None:
         # 内存快照：每 20 分钟输出 tracemalloc Top 15 + RSS + asyncio 任务数
         asyncio.create_task(_loop_mem_snapshot(1200),                          name="mem_snapshot"),
     ]
+    if _trigger_det is not None:
+        _trigger_det._watcher = signal_watcher
+        tasks.append(asyncio.create_task(_trigger_det.run(), name="trigger_detector"))
+        logger.info("[main] trigger_detector 已启动（影子模式，asyncio task）")
 
     # ── 5. 优雅退出 ─────────────────────────────────────────────────────────
     stop_event = asyncio.Event()
@@ -848,6 +883,11 @@ async def main() -> None:
             hub.stop()
         except Exception as e:
             logger.warning(f"[main] market_data_hub 停止异常: {e}")
+        try:
+            from shared import analysis_worker as _aw_stop
+            _aw_stop.shutdown()
+        except Exception:
+            pass
     logger.info("[main] fx 系统已安全停止")
 
 

@@ -192,6 +192,26 @@ def _log_judge_failure(judge_name: str, e: BaseException, k1h=None, k4h=None, k1
 
 
 
+def _liq_volume_adj(trigger: float, baseline: float, mult: float = 2.5) -> int:
+    """[opt-4] 强平量软加减分：基准>1000 时达标 +10、不足 -5；基准不足返回 0。"""
+    if baseline > 1000:
+        return 10 if trigger >= baseline * mult else -5
+    return 0
+
+
+def _btc_crash_reject(ind: dict, direction: str, strategy_name: str, out: dict):
+    """[opt-5] BTC 1H 跌幅 <= -5% 时禁止 LONG；返回 (False, out) 或 None。"""
+    if direction == "LONG":
+        btc_1h_drop = float(ind.get("btc_1h_drop_pct", 0.0) or 0.0)
+        if btc_1h_drop <= -5.0:
+            out["reject_reason"] = (
+                f"BTC急跌保护：BTC 1H跌幅={btc_1h_drop:.1f}%，"
+                f"黑天鹅行情下禁止{strategy_name} LONG"
+            )
+            return False, out
+    return None
+
+
 def judge_pullback(k1h: list, k4h: list, k15: list, ind: dict,
                    chg24: float, funding: float) -> tuple[bool, dict]:
     """
@@ -324,7 +344,7 @@ def _judge_pullback_impl(k1h, k4h, k15, ind, chg24, funding):
     # GPT-5 与 Opus 4.5 均指出：实盘中 vol_ratio<0.1 的标的大量进场导致 early_stagnation
     # vol_ratio < 0.4 说明市场几乎无人参与，不是横盘震荡就是即将结束的回踩，直接拒绝
     _pb_vol_ratio_min = 0.40
-    _pb_vol = ind.get("vol_ratio", ind.get("vol_ratio_1h", 1.0))
+    _pb_vol = ind.get("vol_ratio_closed", ind.get("vol_ratio", 1.0))  # [opt-1] 已收盘 1H 量比，缺失回退
     if _pb_vol < _pb_vol_ratio_min:
         out["reject_reason"] = (
             f"pullback 量能门槛：vol_ratio={_pb_vol:.2f} < {_pb_vol_ratio_min}，"
@@ -1283,6 +1303,9 @@ def _judge_reversal_impl(k1h, k4h, k15, ind, chg24, funding):
         "reject_reason":         None,
         "pulse_short_penalty":   0,
     }
+    _crash = _btc_crash_reject(ind, direction, "reversal", out)
+    if _crash is not None:
+        return _crash
 
     # ── 极端K线标记 ────────────────────────────────────────────────────────────
     extreme_flag = any(
@@ -1346,11 +1369,28 @@ def _judge_reversal_impl(k1h, k4h, k15, ind, chg24, funding):
         if _ema20_4h_s > 0 and _ema50_4h_s > 0:
             _4h_bull_gap_s = (_ema20_4h_s - _ema50_4h_s) / (_ema50_4h_s + 1e-9) * 100
             if _4h_bull_gap_s > 1.5:
-                out["reject_reason"] = (
-                    f"4H多头排列（EMA20={_ema20_4h_s:.4g} > EMA50={_ema50_4h_s:.4g}，"
-                    f"差距{_4h_bull_gap_s:.1f}%>1.5%），趋势未逆转，拒绝逆势做空"
-                )
-                return False, out
+                # [opt-2] 4H 多头不再直接拒绝：至少 2 条衰竭证据才允许做空，并降仓 ×0.7
+                _ev, _miss = [], []
+                try:
+                    _div_ok = bool(_detect_rsi_divergence(k1h, "SHORT").get("divergence"))
+                except Exception:
+                    _div_ok = False
+                (_ev if _div_ok else _miss).append("RSI顶背离")
+                _mk, _ix = float(ind.get("markPrice", 0) or 0), float(ind.get("indexPrice", 0) or 0)
+                (_ev if (_ix > 0 and (_mk - _ix) / _ix > 0.003) else _miss).append("基差>0.3%")
+                (_ev if ind.get("taker_buy_ratio_now", 0.5) < ind.get("taker_buy_ratio", 0.5) - 0.03
+                 else _miss).append("主动买入占比下降(1H口径)")
+                _oi_n, _oi_h = float(ind.get("oi_now", 0) or 0), float(ind.get("oi_1h_ago", 0) or 0)
+                (_ev if (_oi_h > 0 and _oi_n < _oi_h * 0.97) else _miss).append("OI 1H下降>3%")
+                _miss.append("4H多头gap<=1.5%")   # 本分支 gap>1.5%，该条不成立
+                out["exhaustion_evidence"] = _ev
+                if len(_ev) < 2:
+                    out["reject_reason"] = (
+                        f"4H多头排列（gap={_4h_bull_gap_s:.1f}%>1.5%）且衰竭证据不足"
+                        f"（{len(_ev)}/2，已有:{_ev or '无'}，缺:{_miss}），拒绝逆势做空"
+                    )
+                    return False, out
+                out["exhaustion_short"] = True
             out["4h_ema_bull_gap"] = round(_4h_bull_gap_s, 2)
 
     # ── 0.6 脉冲大阳保护（仅 SHORT，拦截庄家拉盘后追空）──────────────────────
@@ -1655,6 +1695,9 @@ def _judge_reversal_impl(k1h, k4h, k15, ind, chg24, funding):
     if _hl_mult < 1.0 and direction == "LONG":
         out["position_size_cap"] = round(out["position_size_cap"] * _hl_mult, 4)
         logger.info(f"[judge_reversal] {symbol} 仅有一个摆动低点(degraded),仓位上限 → {out['position_size_cap']}")
+    # [opt-2] 4H 多头下凭衰竭证据放行的 SHORT：降仓 ×0.7
+    if out.get("exhaustion_short") and direction == "SHORT":
+        out["position_size_cap"] = round(out["position_size_cap"] * 0.7, 4)
 
 
 
@@ -2245,13 +2288,10 @@ def _judge_funding_arb_impl(symbol: str, funding: float, funding_hist: list,
     #       即费率收益率 > 0.5倍ATR，确保单次套利期望为正
     try:
         _atr_r_pct = ind.get("atr_ratio") or (atr / (ind.get("price", 1) + 1e-9) * 100)
-        _fr_pct = abs(funding) * 100  # 转换为%
-        _min_fr_pct = _atr_r_pct * 0.5  # 费率%需覆盖0.5倍ATR%
-        if _fr_pct > 0 and _atr_r_pct > 0 and _fr_pct < _min_fr_pct:
-            out["reject_reason"] = (
-                f"资金费率盈亏比不足: 费率={_fr_pct:.4f}% < ATR×0.5={_min_fr_pct:.4f}%，"
-                f"费率收入无法覆盖价格风险，不值得做套利"
-            )
+        _ = _atr_r_pct
+        # [opt-3] 改为固定手续费门槛：开+平 2×0.04% = 0.08%
+        if abs(funding) <= 0.0008:
+            out["reject_reason"] = f"资金费率{abs(funding)*100:.4f}%不足以覆盖手续费0.08%"
             return False, out
     except Exception:
         pass  # 计算失败降级放行
@@ -2478,6 +2518,9 @@ def _judge_range_bounce_impl(k1h, k4h, k15, ind, chg24, funding):
         "position_size_cap": 0.3,
         "reject_reason":     None,
     }
+    _crash = _btc_crash_reject(ind, "LONG", "range_bounce", out)
+    if _crash is not None:
+        return _crash
 
     closes = [float(k[4]) for k in k1h[:-1]]  # 已闭合 K 线
     if len(closes) < 15:
@@ -2813,6 +2856,9 @@ def _judge_stop_hunt_impl(k1h, k4h, k15, ind, chg24, funding):
             f"均量={vol_ma_15m:.0f} 量能门槛={vol_min}x"
         )
         return False, out
+    _crash = _btc_crash_reject(ind, pierce_direction, "stop_hunt", out)
+    if _crash is not None:
+        return _crash
 
     # ── 3. 快速收回确认 ─────────────────────────────────────────────────────
     # 刺穿之后的K线（在 window 里 pierce_bar_idx 后面）
@@ -2916,7 +2962,7 @@ def _judge_stop_hunt_impl(k1h, k4h, k15, ind, chg24, funding):
                 f"[judge_stop_hunt] 4H逆势 strategy_adj=-15 "
                 f"(ema_gap={_ema_gap_pct*100:.1f}% dir={pierce_direction})，允许继续"
             )
-    out["strategy_adj"] = _4h_strategy_adj
+    out["strategy_adj"] = out.get("strategy_adj", 0) + _4h_strategy_adj  # [opt-4] 累加
 
     # ── 8b. ws_listener 缓存强平量验证（v3.50：取代 Coinglass API）──────────
     # 原理：
@@ -2955,22 +3001,17 @@ def _judge_stop_hunt_impl(k1h, k4h, k15, ind, chg24, funding):
                 _liq_vol_baseline = _total_4h / 16.0  # 16 个 15min 窗口，每窗口均值
 
             _LIQ_MULT = 2.5
-            if _liq_vol_baseline > 1000 and _liq_vol_trigger < _liq_vol_baseline * _LIQ_MULT:
-                out["reject_reason"] = (
-                    f"liquidation_volume_insufficient: "
-                    f"{pierce_direction} 强平={_liq_vol_trigger/1000:.1f}k USDT "
-                    f"< 基准{_liq_vol_baseline/1000:.1f}k×{_LIQ_MULT}倍"
-                )
-                out["liq_volume_at_trigger"]  = round(_liq_vol_trigger, 0)
-                out["liq_volume_baseline"]     = round(_liq_vol_baseline, 0)
-                logger.warning(
+            # [opt-4] 强平量从硬条件改为软加减分（基准不足 1000 不处理）
+            _liq_delta = _liq_volume_adj(_liq_vol_trigger, _liq_vol_baseline, _LIQ_MULT)
+            out["strategy_adj"] = out.get("strategy_adj", 0) + _liq_delta
+            if _liq_delta < 0:
+                logger.info(
                     f"[judge_stop_hunt] {_sym} {pierce_direction} "
-                    f"强平量不足拒绝: trigger={_liq_vol_trigger/1000:.1f}k "
+                    f"强平量不足扣5分: trigger={_liq_vol_trigger/1000:.1f}k "
                     f"baseline={_liq_vol_baseline/1000:.1f}k "
                     f"ratio={_liq_vol_trigger/(_liq_vol_baseline+1e-9):.2f}x < {_LIQ_MULT}x"
                 )
-                return False, out
-            else:
+            elif _liq_delta > 0:
                 logger.info(
                     f"[judge_stop_hunt] {_sym} {pierce_direction} "
                     f"强平量验证通过: trigger={_liq_vol_trigger/1000:.1f}k "
@@ -3759,11 +3800,16 @@ def _judge_ema_trend_impl(k1h, k4h, k15, ind, chg24, funding):
     }
 
     # ── 0. CHG24 范围约束 ─────────────────────────────────────────────────
-    if chg24 > _CHG24_MAX:
-        out["reject_reason"] = f"chg24={chg24:.1f}% > {_CHG24_MAX}%，当日涨幅过大，不追高"
+    # [opt-6] SHORT 方向使用对称参数
+    _rsi4h_min_eff = 28 if _ema_direction == "short" else _RSI4H_MIN
+    _rsi4h_max_eff = 55 if _ema_direction == "short" else _RSI4H_MAX
+    _chg24_min_eff = -12.0 if _ema_direction == "short" else _CHG24_MIN
+    _chg24_max_eff = 8.0 if _ema_direction == "short" else _CHG24_MAX
+    if chg24 > _chg24_max_eff:
+        out["reject_reason"] = f"chg24={chg24:.1f}% > {_chg24_max_eff}%，当日涨幅过大，不追高"
         return False, out
-    if chg24 < _CHG24_MIN:
-        out["reject_reason"] = f"chg24={chg24:.1f}% < {_CHG24_MIN}%，大跌应走reversal路径"
+    if chg24 < _chg24_min_eff:
+        out["reject_reason"] = f"chg24={chg24:.1f}% < {_chg24_min_eff}%，大跌应走reversal路径"
         return False, out
 
     # ── 1. 波动率前置检查 ─────────────────────────────────────────────────
@@ -3819,9 +3865,9 @@ def _judge_ema_trend_impl(k1h, k4h, k15, ind, chg24, funding):
         )
         return False, out
 
-    if not (_RSI4H_MIN <= rsi_4h <= _RSI4H_MAX):
+    if not (_rsi4h_min_eff <= rsi_4h <= _rsi4h_max_eff):
         out["reject_reason"] = (
-            f"4H RSI={rsi_4h:.1f} 不在健康区间 [{_RSI4H_MIN}, {_RSI4H_MAX}]"
+            f"4H RSI={rsi_4h:.1f} 不在健康区间 [{_rsi4h_min_eff}, {_rsi4h_max_eff}]"
         )
         return False, out
 

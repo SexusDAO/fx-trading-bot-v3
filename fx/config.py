@@ -320,8 +320,9 @@ ORDER_EXPIRE_PULLBACK_MIN = 240   # 回踩/反转挂单超时，分钟
 
 # 扫描超时保护
 SCAN_SYMBOL_TIMEOUT_SEC   = 10    # 单标的分析超时（秒），超时跳过
-SCAN_TOTAL_TIMEOUT_SEC    = 240   # 整轮扫描总超时（秒）；120→240，给扫描更多时间减少 unfinished
-SCAN_MAX_WORKERS          = 4     # 并行分析线程数（6→4：回退，6线程仍导致事件循环阻塞8-67s）；v3.82: 25→10，控制并发内存峰值
+SCAN_TOTAL_TIMEOUT_SEC    = 120   # 整轮扫描总超时（秒）；v3.26: 240→120，并发25线程理论8~12s
+SCAN_MAX_WORKERS          = 4     # 并行分析线程数（10→4：降低 GIL 竞争导致事件循环阻塞）；v3.82: 25→10，控制并发内存峰值（25线程×11MB=275MB峰值，pymalloc不归还导致水位积累至3.5GB）
+SCAN_USE_PROCESS_POOL     = False  # True：并行分析走 spawn 进程池（shared/analysis_worker.py）；False：保持线程池（默认）
 SCAN_KLINE_TIMING       = True  # 是否统计 K 线请求耗时（每轮 info 一条汇总），生产环境建议开启
 KLINE_CACHE_ENABLED     = True  # 是否启用 K 线 REST 缓存（按收盘时间失效；False 时每轮直接 REST）
 KLINE_CACHE_INTERVALS   = ["1h", "4h", "15m"]  # 缓存哪些周期
@@ -997,3 +998,59 @@ OPT_DIVERGENCE_GATE_WEIGHT_CAP = 2.0
 # [v3.88 OPT-15] oi_divergence 近5根全阳（SHORT）/全阴（LONG）时直接拒绝信号；默认开启（与其他 OPT_* 不同）。
 #   关闭则恢复 mark*0.992 / mark*1.008 兜底。
 OPT_OID_REJECT_ALL_BULL = True
+
+# ── 阶段3：影子触发器（只观测，不下单、不发 REST）──────────────────────────────
+TRIGGER_DETECTOR_ENABLED = False  # True：每秒轮询 hub 内存，写 logs/trigger_log.jsonl 并与 logs/scan_signals.jsonl 对账
+TRIGGER_CONFIG_VERSION   = "phase3.1"   # 写入 trigger_log 的 config_version 前缀（后接 config.py sha1 前 8 位）
+
+# 触发阈值（比例均为小数；chg24 0.10 = 10%）
+TRIGGER_PULLBACK_ATR_MULT        = 1.5     # LONG [EMA20-1.5ATR, EMA20+0.3ATR]，SHORT 对称
+TRIGGER_REVERSAL_CHG24_ON        = 0.10
+TRIGGER_REVERSAL_CHG24_OFF       = 0.08
+TRIGGER_REVERSAL_FUNDING_THRESH  = 0.0005
+TRIGGER_REVERSAL_FUNDING_OFF     = 0.0004
+TRIGGER_REVERSAL_RSI_LOW_ON      = 32
+TRIGGER_REVERSAL_RSI_LOW_OFF     = 36
+TRIGGER_REVERSAL_RSI_HIGH_ON     = 68
+TRIGGER_REVERSAL_RSI_HIGH_OFF    = 64
+TRIGGER_BREAKOUT_CHG24           = 0.03
+TRIGGER_BREAKOUT_ATR_DIST        = 0.3
+TRIGGER_FUNDING_THRESH           = 0.0005
+TRIGGER_RANGE_BOUNCE_LOOKBACK    = 24
+TRIGGER_RANGE_BOUNCE_GAIN        = 0.10
+TRIGGER_RANGE_BOUNCE_ATR_MIN     = 0.015
+TRIGGER_RANGE_BOUNCE_ZONE        = 0.60    # 横盘振幅 <= 前期涨幅 × 0.6
+TRIGGER_STOP_HUNT_VOL_RATIO      = 1.2
+TRIGGER_STOP_HUNT_PIERCE_ATR     = 0.1
+TRIGGER_STOP_HUNT_PIERCE_PCT     = 0.0015
+TRIGGER_OI_DIV_CHANGE_1H         = 0.03
+TRIGGER_OI_DIV_CHANGE_4H         = 0.05
+TRIGGER_OI_DIV_PRICE_DIST        = 0.035
+TRIGGER_OI_DIV_PRICE_DIST_MAX    = 0.05
+TRIGGER_OI_DIV_ATR_MULT          = 1.5     # 暂不使用
+TRIGGER_OI_DIV_ATR_MIN           = 0.005
+TRIGGER_EMA_TREND_EMA_THRESH     = 0.995   # 多头 EMA20 >= EMA50×0.995；空头 EMA20 <= EMA50×(2-0.995)
+TRIGGER_EMA_TREND_PRICE_PCT      = 0.04    # 暂不使用
+TRIGGER_EMA_TREND_ATR_MULT       = 1.2     # 暂不使用
+
+# 冷却（秒）
+TRIGGER_COOL_PULLBACK     = 900
+TRIGGER_COOL_REVERSAL     = 900
+TRIGGER_COOL_BREAKOUT     = 1800
+TRIGGER_COOL_FUNDING_ARB  = 3600
+TRIGGER_COOL_RANGE_BOUNCE = 3600
+TRIGGER_COOL_STOP_HUNT    = 900
+TRIGGER_COOL_OI_DIV       = 1200
+TRIGGER_COOL_EMA_TREND    = 14400
+
+# 令牌桶（每分钟 RATE 个，容量 CAPACITY；排队超过 TTL 秒记 expired；单策略 TTL 窗口内最多占容量的 40%）
+TRIGGER_TOKEN_RATE             = 20
+TRIGGER_TOKEN_CAPACITY         = 60
+TRIGGER_TOKEN_TTL              = 300
+TRIGGER_TOKEN_STRATEGY_MAX_PCT = 0.40
+
+# ── 阶段5：触发器驱动真实分析（会真实下单）──────────────────────────────────────
+TRIGGER_DISPATCH_ENABLED = False  # 需同时 TRIGGER_DETECTOR_ENABLED=True；True 时触发 → 预取 → analyze_one → 第四步 → 注册下单
+SCAN_INTERVAL_PASSIVE    = 1800   # 两个开关都为 True 时的兜底扫描间隔（秒）；否则保持 300s / 周末 900s
+TRIGGER_DISPATCH_TIMEOUT = 30     # 单个分析任务超时（预取 + analyze_one + 第四步）
+TRIGGER_DISPATCH_WORKERS = 2      # 分析协程数

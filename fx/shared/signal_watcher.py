@@ -303,6 +303,62 @@ def compute_entry_range(
 # ─────────────────────────────────────────────────────────────────────────────
 # v3.72 挂单竞争评分
 # ─────────────────────────────────────────────────────────────────────────────
+_IV_SEC = {"15m": 900, "1h": 3600, "4h": 14400}
+
+
+def _get_hub_or_rest(sym: str, data_type: str, interval: str = "1h", limit: int = 50):
+    """[v2-11] 优先读 hub：markPrice age_sec>3、K 线 close_time 超过周期+10 秒 → 退回 REST 并写 WARNING。
+    data_type: "mark" 返回 premiumIndex dict；"klines" 返回 K 线列表。"""
+    from shared import binance_api as _api
+    hub = None
+    try:
+        from shared.market_data_hub import get_hub
+        hub = get_hub()
+    except Exception:
+        hub = None
+    if data_type == "mark":
+        if hub is not None:
+            try:
+                mp = hub.get_mark_price(sym)
+                if mp and float(mp.get("age_sec", 99)) <= 3:
+                    return mp
+                logger.warning(f"[signal_watcher] {sym} hub markPrice 过旧/缺失"
+                               f"(age={None if not mp else mp.get('age_sec')})，退回 REST")
+            except Exception as e:
+                logger.warning(f"[signal_watcher] {sym} hub markPrice 读取异常，退回 REST: {e}")
+        return _api.get_mark_price(sym) or {}
+    if hub is not None:
+        try:
+            k = hub.get_klines(sym, interval, limit)
+            if k:
+                lim = (float(k[-1][6]) / 1000.0) + _IV_SEC.get(interval, 3600) + 10
+                if time.time() <= lim:
+                    return k
+            logger.warning(f"[signal_watcher] {sym} hub {interval} K线过旧/缺失，退回 REST")
+        except Exception as e:
+            logger.warning(f"[signal_watcher] {sym} hub K线读取异常，退回 REST: {e}")
+    return _api.get_klines(sym, interval, limit) or []
+
+
+def _liq_freshness(sym: str, now: float) -> float:
+    """[v2-12] 清算图新鲜度系数：<=5min 1.0；5~15min 线性递减；>15min 0。读 liq_cache 条目 ts（取最新）。"""
+    try:
+        from shared import liq_cache as _lc
+        with _lc._CACHE_LOCK:
+            tss = [float((v or {}).get("ts", 0)) for k, v in _lc._CACHE.items()
+                   if str(k).startswith(f"{sym}:")]
+        if not tss:
+            return 0.0
+        age = now - max(tss)
+    except Exception:
+        return 1.0
+    if age <= 300:
+        return 1.0
+    if age >= 900:
+        return 0.0
+    return 1.0 - (age - 300) / 600.0
+
+
 def _calc_pending_score(entry: 'WatchEntry', now: float | None = None) -> float:
     """
     计算挂单综合分（0-100）。纯函数，无副作用。
@@ -352,6 +408,8 @@ def _calc_pending_score(entry: 'WatchEntry', now: float | None = None) -> float:
         else:
             s4 = 8  # liq_ok=True 但没有具体金额，给个基础分
 
+    if s4:
+        s4 = s4 * _liq_freshness(entry.symbol, now)   # [v2-12] 权重仍 20，按新鲜度递减
     return min(100.0, s1 + s2 + s3 + s4)
 
 
@@ -393,6 +451,12 @@ class SignalWatcher:
         self._BTC_SNAP_INTERVAL = 300.0     # 每5分钟更新一次 BTC 基准价（对比5min变化）
         self._BTC_MOVE_THRESH   = 0.01      # BTC 5min涨跌 >= 1% 触发处置
         self._btc_cancel_cooldown: float = 0.0   # 上次触发撤单的时间，防抖 10 分钟
+        # [v2-3] 按 symbol 的注册/下单锁；[v2-2] 指标缓存；[v2-8] open 持仓缓存
+        self._sym_locks: Dict[str, asyncio.Lock] = {}
+        self._ind_cache: Dict[str, dict] = {}
+        self._open_pos_cache: list = []
+        self._open_pos_ts: float = 0.0
+        self._sl_breach_alerted: Dict[str, float] = {}
 
     # ─────────────────────────────────────────────────────────────────────────
     # 公共接口
@@ -432,6 +496,112 @@ class SignalWatcher:
         symbol = signal.get("symbol", "")
         if not symbol:
             return
+        _mode0 = signal.get("sig_type") or signal.get("mode") or ""
+        _dir0 = str(signal.get("direction", "LONG")).upper()
+        # [v2-6] funding_arb 最晚在结算前 60 秒过期
+        if _mode0 == "funding_arb":
+            _nft = float(signal.get("next_settle_ts") or signal.get("next_funding_time") or signal.get("nextFundingTime")
+                         or (signal.get("ind") or {}).get("next_funding_time") or 0)
+            if _nft:
+                _deadline = (_nft / 1000.0 if _nft > 1e11 else _nft) - 60
+                if _deadline < time.time():
+                    logger.info(f"[signal_watcher] {symbol} funding_arb 已过结算前 60s 期限，拒绝注册")
+                    return
+                expire_ts = min(expire_ts, _deadline)
+        # [v2-5] BTC 统一状态
+        try:
+            from shared import btc_guard as _bg
+            if not _bg.is_allowed(_dir0, _mode0):
+                logger.info(f"[signal_watcher] {symbol} {_dir0} 被 btc_guard 拦截（state={_bg.get_state()}）")
+                return
+        except Exception:
+            pass
+        # [v2-3] 按 symbol 加锁，5 秒拿不到放弃
+        _slock = self._sym_locks.setdefault(symbol, asyncio.Lock())
+        try:
+            await asyncio.wait_for(_slock.acquire(), timeout=5.0)
+        except asyncio.TimeoutError:
+            logger.warning(f"[signal_watcher] {symbol} 注册锁等待超过 5s，放弃新信号")
+            return
+        try:
+            await self._add_signal_locked(signal, entry_low, entry_high, entry_price, expire_ts, on_trigger,
+                                          trigger_price, trigger_rsi_1h, breakout_ref, ema20_at_trigger,
+                                          atr_at_trigger, pending_score, score_created_at, score_original_expire,
+                                          is_reorder, reorder_count, replace)
+        finally:
+            _slock.release()
+
+    async def _exchange_conflict(self, symbol: str, own_order_id) -> Optional[str]:
+        """[v2-3] 查交易所真实持仓/挂单；排除本系统登记的挂单。返回冲突原因或 None。"""
+        from shared import binance_api as _api
+        loop = asyncio.get_running_loop()
+        try:
+            pos = await loop.run_in_executor(None, lambda: _api.get_position(symbol)) or []
+            for p in pos:
+                if abs(float(p.get("positionAmt", 0) or 0)) > 0:
+                    return "交易所已有持仓"
+            orders = await loop.run_in_executor(None, lambda: _api.get_open_orders(symbol)) or []
+            own = {int(e.limit_order_id) for e in self._watched.values() if e.limit_order_id}
+            if own_order_id:
+                own.add(int(own_order_id))
+            for o in orders:
+                if o.get("reduceOnly") or o.get("closePosition"):
+                    continue
+                if int(o.get("orderId", 0) or 0) not in own:
+                    return "交易所有本地未知挂单"
+        except Exception as e:
+            logger.warning(f"[signal_watcher] {symbol} 查交易所持仓/挂单失败，保守放弃: {e}")
+            return "交易所查询失败"
+        return None
+
+    async def _add_signal_locked(self, signal, entry_low, entry_high, entry_price, expire_ts, on_trigger,
+                                 trigger_price, trigger_rsi_1h, breakout_ref, ema20_at_trigger, atr_at_trigger,
+                                 pending_score, score_created_at, score_original_expire, is_reorder,
+                                 reorder_count, replace) -> None:
+        symbol = signal.get("symbol", "")
+        # [v2-4] 同标的已有挂单：同方向高 8 分替换；反方向默认拒绝，高 20 分撤旧挂新
+        _cur = self._watched.get(symbol)
+        _replace_old = None
+        if _cur and not replace and not _cur.triggered and not _cur.is_expired():
+            if _cur.cancel_state != "none":
+                logger.info(f"[signal_watcher] {symbol} 旧挂单撤单状态={_cur.cancel_state}，不下新单")
+                return
+            _probe = WatchEntry(signal=signal, entry_low=entry_low, entry_high=entry_high,
+                                entry_price=entry_price, expire_ts=expire_ts, on_trigger=on_trigger,
+                                score_created_at=score_created_at or time.time(),
+                                score_original_expire=score_original_expire or expire_ts)
+            _new_sc = _calc_pending_score(_probe)
+            _old_sc = _cur.pending_score or _calc_pending_score(_cur)
+            _same = _cur.signal.get("direction", "LONG").upper() == str(signal.get("direction", "LONG")).upper()
+            if _same and _new_sc > _old_sc + 8:
+                _replace_old = _cur
+            elif not _same and _new_sc > _old_sc + 20:
+                logger.warning(f"[signal_watcher] {symbol} 反向信号高出 {_new_sc - _old_sc:.0f} 分，撤旧挂新")
+                _replace_old = _cur
+            else:
+                if not _same:
+                    logger.info(f"[signal_watcher] {symbol} 方向冲突：已有 {_cur.signal.get('direction')} 挂单"
+                                f"(分{_old_sc:.0f})，新 {signal.get('direction')}(分{_new_sc:.0f}) 被拒")
+                else:
+                    logger.info(f"[signal_watcher] {symbol} 新分{_new_sc:.0f} ≤ 旧分{_old_sc:.0f}+8，丢弃新信号")
+                return
+        _conf = await self._exchange_conflict(symbol, _replace_old.limit_order_id if _replace_old else None)
+        if _conf:
+            logger.info(f"[signal_watcher] {symbol} {_conf}，跳过注册")
+            return
+        if _replace_old is not None:
+            if _replace_old.limit_order_id:
+                _oc = await self._cancel_exchange_order(symbol, int(_replace_old.limit_order_id))
+                if _oc != "confirmed":
+                    if _oc == "unknown":
+                        self._register_orphan(symbol, int(_replace_old.limit_order_id), "高分替换", _replace_old,
+                                              on_confirmed="remove")
+                    logger.warning(f"[signal_watcher] {symbol} 旧挂单撤单结果={_oc}，不下新单")
+                    return
+            async with self._lock:
+                if self._watched.get(symbol) is _replace_old:
+                    self._watched.pop(symbol, None)
+            logger.info(f"[signal_watcher] {symbol} 高分新信号替换旧挂单")
 
         _evict_cancel = []   # [v3.89 撤单检查] 被驱逐条目的待撤订单（锁内登记，锁外执行）
         async with self._lock:
@@ -651,7 +821,7 @@ class SignalWatcher:
     # [v3.89 #101] 价格事件新鲜度：事件年龄（接收时间 - 事件时间）超过上限、事件时间超前本地时钟超过容差，
     #   或事件时间早于该标的已处理过的最后事件（乱序/重连后的旧帧）都不得触发信号或更新 BTC 冲击基准。
     _EVT_MAX_AGE_MS = 10_000
-    _EVT_FUTURE_TOL_MS = 2_000
+    _EVT_FUTURE_TOL_MS = 15_000   # [fix-3] Binance 服务器时间可能比本机快约 13s
 
     @staticmethod
     def _normalize_event_ts(ts) -> Optional[int]:
@@ -694,13 +864,24 @@ class SignalWatcher:
         WS 实时价格回调。此方法在主 loop 内被直接 await 调用（由 ws_listener 的
         _dispatch_mark_price 触发），无需 ensure_future，直接 await 即可。
         """
-        if not self._watched:
-            return
         if not self._event_acceptable(symbol, ts):
             return
+        if symbol == "BTCUSDT":
+            await self._on_btc_price(price, ts)
+            return
+        await self._check_sl_breach(symbol, price)
+        if not self._watched:
+            return
+        _e0 = self._watched.get(symbol)
+        if _e0 is not None and not _e0.triggered and _e0.cancel_state == "none":
+            _bad, _why = self._realtime_falsified(_e0, price)
+            if _bad:
+                logger.info(f"[signal_watcher] {symbol} 实时证伪撤单: {_why}")
+                await self._cancel_and_remove(symbol, _e0, _why)
+                return
 
         # ── v3.54 BTC 即时波动检测：BTC 1分钟内波动 >= 3% 立刻撤所有 pending 挂单 ──
-        if symbol == "BTCUSDT":
+        if False and symbol == "BTCUSDT":   # [v2-5] 旧 BTC 即时检测已由 btc_guard 接管
             _now = time.time()
             if self._btc_price_prev <= 0:
                 # 第一次收到 BTC 价格，仅初始化基准，不触发撤单
@@ -840,6 +1021,78 @@ class SignalWatcher:
     # 触发：下限价单 + 交给 executor 监听成交
     # ─────────────────────────────────────────────────────────────────────────
 
+    async def _on_btc_price(self, price: float, ts) -> None:
+        """[v2-5] BTC 价格 → btc_guard；状态要求撤某方向时撤对应 pending 挂单。"""
+        try:
+            from shared import btc_guard as _bg
+            _bg.update_price(price, ts)
+            d = _bg.get_guard().cancel_direction()
+            st = _bg.get_state()
+        except Exception as e:
+            logger.debug(f"[signal_watcher] btc_guard 更新失败: {e}")
+            return
+        if not d:
+            return
+        async with self._lock:
+            victims = [(s_, e) for s_, e in list(self._watched.items())
+                       if not e.triggered and e.cancel_state == "none"
+                       and e.signal.get("direction", "LONG").upper() == d]
+        if victims:
+            logger.warning(f"[signal_watcher] btc_guard={st}，撤 {len(victims)} 个 {d} 挂单")
+        for s_, e in victims:
+            await self._cancel_and_remove(s_, e, f"btc_guard {st}")
+
+    @staticmethod
+    def _realtime_falsified(entry: 'WatchEntry', price: float) -> tuple:
+        """[v2-2] 价格类硬性证伪实时检查（不等 recheck）。"""
+        mode = entry.mode
+        d = entry.signal.get("direction", "LONG").upper()
+        atr = entry.atr_at_trigger or float((entry.signal.get("ind") or {}).get("atr_1h", 0) or 0)
+        if atr <= 0:
+            return False, ""
+        if mode == "pullback":
+            ema20 = entry.ema20_at_trigger
+            if ema20 > 0:
+                if d == "LONG" and price < ema20 - 1.0 * atr:
+                    return True, f"pullback LONG 实时跌破 EMA20-1.0ATR={ema20 - atr:.6g}"
+                if d == "SHORT" and price > ema20 + 1.0 * atr:
+                    return True, f"pullback SHORT 实时涨破 EMA20+1.0ATR={ema20 + atr:.6g}"
+        elif mode in ("reversal", "oi_divergence") and entry.trigger_price > 0:
+            tp = entry.trigger_price
+            if d == "LONG" and price < tp - 0.6 * atr:
+                return True, f"{mode} LONG 实时跌破 触发价-0.6ATR={tp - 0.6 * atr:.6g}"
+            if d == "SHORT" and price > tp + 0.6 * atr:
+                return True, f"{mode} SHORT 实时涨破 触发价+0.6ATR={tp + 0.6 * atr:.6g}"
+        return False, ""
+
+    async def _check_sl_breach(self, symbol: str, price: float) -> None:
+        """[v2-8] open 持仓止损踩空：只检测 + 告警，不平仓（平仓交给 position_manager）。持仓每 30s 刷新。"""
+        now = time.time()
+        if now - self._open_pos_ts >= 30:
+            self._open_pos_ts = now
+            try:
+                from shared.state import get_all_positions as _gap
+                self._open_pos_cache = [p_ for p_ in _gap() if p_.get("status") == "open"]
+            except Exception:
+                pass
+        for p_ in self._open_pos_cache:
+            if p_.get("symbol") != symbol:
+                continue
+            sl = float(p_.get("sl_price") or 0)
+            d = str(p_.get("direction", "")).upper()
+            if sl <= 0 or not ((d == "LONG" and price <= sl) or (d == "SHORT" and price >= sl)):
+                continue
+            if now - self._sl_breach_alerted.get(symbol, 0) < 300:
+                continue
+            self._sl_breach_alerted[symbol] = now
+            logger.error(f"[SL-BREACH] {symbol} 止损价已被越过，请检查仓位 (price={price} sl={sl} dir={d})")
+            try:
+                from shared.notifier import notify as _ntf
+                await asyncio.get_running_loop().run_in_executor(
+                    None, lambda: _ntf(f"[SL-BREACH] {symbol} 止损价已被越过，请检查仓位\n现价 {price} 止损 {sl} {d}"))
+            except Exception:
+                pass
+
     async def _trigger(self, symbol: str, price: float, entry: WatchEntry) -> None:
         """加锁确认 → 下限价单 → 交给 executor 的 WS 监听链路。"""
         async with self._lock:
@@ -901,10 +1154,19 @@ class SignalWatcher:
                 from shared.notifier import card_append, flush_signal, fmt_node_trigger
                 _sig_id_t = entry.signal.get("_sig_id", "")
                 if _sig_id_t:
-                    card_append(_sig_id_t, fmt_node_trigger(price, entry.entry_price))
-                    # [fix] 价格触发时 flush：缓冲区里「进入监控 + 价格触发」两行合并成一条消息发出
-                    #   后续 executor 开仓成交 / 预检拒绝都继续 card_append 到这张已发出的卡片
-                    flush_signal(_sig_id_t)
+                    # [fix-2] 卡片追加/flush 放到后台线程，2s 超时静默丢弃，不阻塞触发链路
+                    _line_t = fmt_node_trigger(price, entry.entry_price)
+
+                    def _card_job(_sid=_sig_id_t, _ln=_line_t):
+                        card_append(_sid, _ln)
+                        flush_signal(_sid)
+
+                    async def _card_bg():
+                        try:
+                            await asyncio.wait_for(asyncio.to_thread(_card_job), timeout=2.0)
+                        except Exception:
+                            pass
+                    asyncio.get_running_loop().create_task(_card_bg())
             except Exception as _tc_e:
                 logger.debug(f"[signal_watcher] 触发卡片追加失败: {_tc_e}")
 
@@ -912,13 +1174,20 @@ class SignalWatcher:
             # 防止 WebSocket 延迟导致触发价与当前价偏离过大（高波动行情常见）
             _skip = False
             try:
-                from shared import binance_api as _bapi
-                _mp = _bapi.get_mark_price(symbol)
+                _mp = _get_hub_or_rest(symbol, "mark")   # [v2-1] 每次取最新 markPrice
                 _mark_now = float(_mp.get("markPrice", 0))
                 # 用 WebSocket 实际触发时的 price（函数参数），而非预算入场价
                 _trigger_p = price   # _trigger(symbol, price, entry) 里的 price
                 _atr = float(entry.signal.get("ind", {}).get("atr_1h", 0)) or _mark_now * 0.03
-                if _mark_now > 0 and _trigger_p > 0:
+                # [v2-1] 价格一次跳过区间超过 0.3ATR → 放弃入场
+                _dir_t = entry.signal.get("direction", "LONG").upper()
+                if _mark_now > 0:
+                    _gap_t = (entry.entry_low - _mark_now) if _dir_t == "LONG" else (_mark_now - entry.entry_high)
+                    if _gap_t > 0.3 * _atr:
+                        logger.info(f"[trigger-skip] {symbol} {_dir_t} 价格跳过区间 {_gap_t / (_atr + 1e-9):.2f}ATR "
+                                    f"(mark={_mark_now:.6g} 区间=[{entry.entry_low:.6g},{entry.entry_high:.6g}])，放弃入场")
+                        _skip = True
+                if not _skip and _mark_now > 0 and _trigger_p > 0:
                     _deviation = abs(_mark_now - _trigger_p) / (_atr + 1e-9)
                     if _deviation > 0.5:
                         logger.warning(
@@ -948,7 +1217,8 @@ class SignalWatcher:
                     if _ws is not None and hasattr(_ws, "get_liquidation_volume"):
                         _atr_v = float(entry.signal.get("ind", {}).get("atr_1h", 0)) or price * 0.02
                         _liq_threshold = _atr_v * price * 20  # 动态阈值（约 40~60k USDT 量级）
-                        _liq_vol = await _ws.get_liquidation_volume(symbol, _liq_side, minutes=15)
+                        _liq_vol = await asyncio.wait_for(   # [fix-2] 2s 超时 → 走原降级逻辑
+                            _ws.get_liquidation_volume(symbol, _liq_side, minutes=15), timeout=2.0)
                         if _liq_vol < _liq_threshold:
                             logger.warning(
                                 f"[signal_watcher] {symbol} breakout {_direction_liq} "
@@ -966,7 +1236,10 @@ class SignalWatcher:
                     logger.debug(f"[signal_watcher] {symbol} 强平意图查询失败，降级直接入场: {_le}")
 
             if not _skip:
-                await entry.on_trigger(entry.signal)
+                # [v2-3] 下单与注册共用 symbol 锁
+                _tl = self._sym_locks.setdefault(symbol, asyncio.Lock())
+                async with _tl:
+                    await entry.on_trigger(entry.signal)
         except _PreOrderError as _pe:
             # [v3.89 #102] 下单前失败：交易所确认没有订单，复位触发标记保留条目，等下一次价格触发重试
             _keep_entry = True
@@ -1116,9 +1389,43 @@ class SignalWatcher:
                                     "attempts": 0, "first_ts": time.time(),
                                     "entry": entry, "on_confirmed": on_confirmed}
         logger.error(f"[signal_watcher] 撤单结果未知，登记对账 {symbol} id={order_id} 原因={reason}")
+        try:
+            asyncio.get_running_loop().create_task(self._guard_unknown_fill(symbol, entry))
+        except RuntimeError:
+            pass
         self._append_reconcile_log({"ts": time.time(), "event": "registered", "symbol": symbol,
                                     "order_id": int(order_id), "reason": reason,
                                     "entry_id": entry.entry_id})
+
+    async def _guard_unknown_fill(self, symbol: str, entry: 'WatchEntry') -> bool:
+        """[v2-7] 撤单结果未知：立即 REST 查持仓；有持仓就用 pre_params.sl_price + 持仓数量补挂止损。"""
+        from shared import binance_api as _api
+        loop = asyncio.get_running_loop()
+        try:
+            pos = await loop.run_in_executor(None, lambda: _api.get_position(symbol)) or []
+        except Exception as e:
+            logger.warning(f"[CANCEL-UNKNOWN] {symbol} 查持仓失败: {e}")
+            return False
+        d = entry.signal.get("direction", "LONG").upper()
+        for p_ in pos:
+            amt = float(p_.get("positionAmt", 0) or 0)
+            ps = str(p_.get("positionSide", "BOTH")).upper()
+            if amt == 0 or ps not in ("BOTH", d):
+                continue
+            sl = float((entry.signal.get("pre_params") or {}).get("sl_price") or 0)
+            if sl <= 0:
+                logger.error(f"[CANCEL-UNKNOWN] {symbol} 可能已成交但缺少 pre_params.sl_price，无法补止损，请人工处理")
+                return False
+            side = "SELL" if d == "LONG" else "BUY"
+            pside = ps if ps != "BOTH" else d
+            try:
+                await loop.run_in_executor(None, lambda: _api.place_sl(symbol, side, pside, sl, abs(amt)))
+                logger.warning(f"[CANCEL-UNKNOWN] {symbol} 可能已成交，已补止损 (sl={sl} qty={abs(amt)})")
+                return True
+            except Exception as e:
+                logger.error(f"[CANCEL-UNKNOWN] {symbol} 补止损失败: {e}")
+                return False
+        return False
 
     async def _reconcile_orphans(self) -> None:
         """[v3.89 #40] 对账撤单结果未知的订单；每个最多重试 5 次，超限 logger.error 并移除。"""
@@ -1236,7 +1543,7 @@ class SignalWatcher:
                     # 全量接口失败时降级：逐标的串行拉取（保底路径）
                     for sym in syms:
                         try:
-                            mp    = await loop.run_in_executor(None, lambda s=sym: _api.get_mark_price(s))
+                            mp    = await loop.run_in_executor(None, lambda s=sym: _get_hub_or_rest(s, 'mark'))
                             price = float(mp.get("markPrice", 0))
                             ts    = int(time.time() * 1000)   # [v3.89 #101] 每个标的拉取完成后重新取事件时间
                             if price > 0:
@@ -1283,7 +1590,7 @@ class SignalWatcher:
     # ① pending 挂单健康检查（指标失效撤单 + 清算区位移调价）
     # ─────────────────────────────────────────────────────────────────────────
 
-    async def start_recheck(self, interval_sec: float = 900.0) -> None:
+    async def start_recheck(self, interval_sec: float = 60.0) -> None:
         """每 interval_sec 秒对所有 pending 挂单做一次指标复核。默认 15min。"""
         if hasattr(self, '_recheck_task') and self._recheck_task and not self._recheck_task.done():
             return
@@ -1339,7 +1646,7 @@ class SignalWatcher:
         try:
             from shared import binance_api as _api
             from shared.indicators import ema as _ema
-            _kbtc = await loop.run_in_executor(None, lambda: _api.get_klines('BTCUSDT', '4h', 55))
+            _kbtc = await loop.run_in_executor(None, lambda: _get_hub_or_rest('BTCUSDT', 'klines', '4h', 55))
             _c4h  = [float(k[4]) for k in _kbtc]
             _e20b = _ema(_c4h, 20)
             _e50b = _ema(_c4h, 50)
@@ -1356,7 +1663,10 @@ class SignalWatcher:
 
     @staticmethod
     def _survival_check(entry: 'WatchEntry', price: float, rsi_1h: float, atr: float,
-                        realtime_ema20: float = 0.0) -> tuple[bool, str]:
+                        realtime_ema20: float = 0.0, close_1h: float = 0.0,
+                        post_high: float = 0.0, post_low: float = 0.0,
+                        oi_now: float = 0.0, ema20_4h: float = 0.0, ema50_4h: float = 0.0,
+                        atr_4h: float = 0.0, close_4h: float = 0.0) -> tuple[bool, str]:
         """v3.67 挂单存活检查——只检查「核心理由是否被证伪」，不重新跑完整 judge。
 
         开仓条件和存活条件分离：
@@ -1381,17 +1691,19 @@ class SignalWatcher:
                 return False, ""
             if direction == 'LONG':
                 # 价格跌破支撑（EMA20 下方 1.5 ATR）→ 撤单
-                support = ema20 - atr_trigger * 1.5
-                if price < support:
-                    return True, f"pullback LONG 价格跌破支撑位 EMA20-1.5ATR={support:.6g} (EMA20={ema20:.6g})"
-                # RSI 进入超卖（< 28）说明已不是回踩而是下跌延续，逻辑失效
-                if rsi_1h < 28:
-                    return True, f"pullback LONG RSI1H={rsi_1h:.1f}<28，已超卖，非标准回踩"
+                # [v2-9] 1.5→1.0 ATR；用 1H 收盘价判断（防插针）；RSI<28 需与跌破同时满足
+                _cp = close_1h if close_1h > 0 else price
+                support = ema20 - atr_trigger * 1.0
+                if _cp < support:
+                    if rsi_1h < 28:
+                        return True, f"pullback LONG RSI1H={rsi_1h:.1f}<28 且收盘跌破 EMA20-1.0ATR={support:.6g}"
+                    return True, f"pullback LONG 1H收盘跌破支撑位 EMA20-1.0ATR={support:.6g} (EMA20={ema20:.6g})"
             else:
                 # 价格涨破压力（EMA20 上方 1.5 ATR）→ 撤单
-                resistance = ema20 + atr_trigger * 1.5
-                if price > resistance:
-                    return True, f"pullback SHORT 价格涨破压力位 EMA20+1.5ATR={resistance:.6g} (EMA20={ema20:.6g})"
+                _cp = close_1h if close_1h > 0 else price
+                resistance = ema20 + atr_trigger * 1.0
+                if _cp > resistance:
+                    return True, f"pullback SHORT 1H收盘涨破压力位 EMA20+1.0ATR={resistance:.6g} (EMA20={ema20:.6g})"
                 # RSI 进入超买（> 72）说明已不是回踩而是新一轮拉升，做空时机失效
                 if rsi_1h > 72:
                     return True, f"pullback SHORT RSI1H={rsi_1h:.1f}>72，已超买，回踩逻辑失效"
@@ -1418,17 +1730,22 @@ class SignalWatcher:
             _rsi_sc, _rsi_lc = _SURVIVAL_RSI_SC, _SURVIVAL_RSI_LC
             if direction == 'SHORT':
                 # 价格反向下跌超过 1 ATR → reversal SHORT 信号证伪
-                reversal_threshold = trigger_price - atr_trigger * 1.0
-                if price < reversal_threshold:
-                    return True, f"reversal SHORT 价格反向下跌至 {price:.6g} < 触发价-1ATR={reversal_threshold:.6g}"
+                # [v2-9] 按新规则：涨破触发价+0.6ATR 或创触发后新高
+                reversal_threshold = trigger_price + atr_trigger * 0.6
+                if price > reversal_threshold:
+                    return True, f"reversal SHORT 价格涨破 触发价+0.6ATR={reversal_threshold:.6g}"
+                if post_high > 0 and price > post_high:
+                    return True, f"reversal SHORT 创触发后新高 {price:.6g} > {post_high:.6g}"
                 # RSI 回落至门槛以下 → 超买消退
                 if rsi_1h < _rsi_sc:
                     return True, f"reversal SHORT RSI1H={rsi_1h:.1f} 回落至 {_rsi_sc} 以下，超买消退"
             else:
                 # 价格反向上涨超过 1 ATR → reversal LONG 信号证伪
-                reversal_threshold = trigger_price + atr_trigger * 1.0
-                if price > reversal_threshold:
-                    return True, f"reversal LONG 价格反向上涨至 {price:.6g} > 触发价+1ATR={reversal_threshold:.6g}"
+                reversal_threshold = trigger_price - atr_trigger * 0.6
+                if price < reversal_threshold:
+                    return True, f"reversal LONG 价格跌破 触发价-0.6ATR={reversal_threshold:.6g}"
+                if post_low > 0 and price < post_low:
+                    return True, f"reversal LONG 创触发后新低 {price:.6g} < {post_low:.6g}"
                 # RSI 回升至门槛以上 → 超卖消退（45 而非 40，避免正常反弹初期误撤）
                 if rsi_1h > _rsi_lc:
                     return True, f"reversal LONG RSI1H={rsi_1h:.1f} 回升至 {_rsi_lc} 以上，超卖消退"
@@ -1460,10 +1777,14 @@ class SignalWatcher:
             # 撤单条件：价格已经走反了超过 1 ATR（背离窗口关闭）
             # oi_divergence 入场是 pending_order 模式（挂在回落位），
             # 若价格反向超过 1 ATR，说明背离结构已失效
-            if direction == 'LONG' and price < trigger_price - atr_trigger * 1.0:
-                return True, f"oi_divergence LONG 价格走反超 1ATR: {price:.6g} < 触发价-1ATR={trigger_price - atr_trigger:.6g}"
-            elif direction == 'SHORT' and price > trigger_price + atr_trigger * 1.0:
-                return True, f"oi_divergence SHORT 价格走反超 1ATR: {price:.6g} > 触发价+1ATR={trigger_price + atr_trigger:.6g}"
+            # [v2-9] 1.0→0.6 ATR；另加 OI 恢复到触发前水平（signal.ind.oi_1h_ago，±1%）→ 撤单
+            if direction == 'LONG' and price < trigger_price - atr_trigger * 0.6:
+                return True, f"oi_divergence LONG 价格走反超 0.6ATR: {price:.6g} < 触发价-0.6ATR={trigger_price - atr_trigger * 0.6:.6g}"
+            elif direction == 'SHORT' and price > trigger_price + atr_trigger * 0.6:
+                return True, f"oi_divergence SHORT 价格走反超 0.6ATR: {price:.6g} > 触发价+0.6ATR={trigger_price + atr_trigger * 0.6:.6g}"
+            _oi_pre = float((entry.signal.get("ind") or {}).get("oi_1h_ago") or 0)
+            if oi_now > 0 and _oi_pre > 0 and abs(oi_now - _oi_pre) / _oi_pre <= 0.01:
+                return True, f"oi_divergence OI 已恢复到触发前水平 (oi={oi_now:.0f} 触发前={_oi_pre:.0f})"
 
         elif mode == 'ema_trend':
             # 核心理由：EMA 趋势跟随——价格在 EMA20/EMA50 多头排列中回踩，等待反弹
@@ -1471,12 +1792,14 @@ class SignalWatcher:
             # ema_trend 是 immediate 模式（基本立刻成交），此处仅作保底
             # [v3.87 STEP5-6] 与 pullback 对齐：优先使用实时 EMA20（调用方传入），触发时快照只做兜底。
             #   原先只用触发快照，价格移动后快照会偏离真实的 EMA20 支撑/压力位。
-            ema20 = realtime_ema20 if realtime_ema20 > 0 else entry.ema20_at_trigger
-            if ema20 > 0:
-                if direction == 'LONG' and price < ema20 - atr_trigger * 0.5:
-                    return True, f"ema_trend LONG 价格跌破 EMA20-0.5ATR={ema20 - atr_trigger*0.5:.6g}"
-                elif direction == 'SHORT' and price > ema20 + atr_trigger * 0.5:
-                    return True, f"ema_trend SHORT 价格涨破 EMA20+0.5ATR={ema20 + atr_trigger*0.5:.6g}"
+            # [v2-10] 改用 4H 数据：4H 收盘价 vs 4H EMA20 ± 0.5×ATR_4h；EMA20/EMA50 差距 <0.3% 也撤
+            if ema20_4h > 0 and atr_4h > 0 and close_4h > 0:
+                if direction == 'LONG' and close_4h < ema20_4h - 0.5 * atr_4h:
+                    return True, f"ema_trend LONG 4H收盘跌破 EMA20_4h-0.5ATR_4h={ema20_4h - 0.5 * atr_4h:.6g}"
+                if direction == 'SHORT' and close_4h > ema20_4h + 0.5 * atr_4h:
+                    return True, f"ema_trend SHORT 4H收盘涨破 EMA20_4h+0.5ATR_4h={ema20_4h + 0.5 * atr_4h:.6g}"
+                if ema50_4h > 0 and abs(ema20_4h - ema50_4h) / ema50_4h < 0.003:
+                    return True, f"ema_trend 4H EMA20/EMA50 差距收窄至 {abs(ema20_4h - ema50_4h) / ema50_4h * 100:.2f}%<0.3%"
 
         # 以上条件都不满足 → 挂单存活
         return False, ""
@@ -1499,26 +1822,52 @@ class SignalWatcher:
         direction = entry.signal.get('direction', 'LONG').upper()
         mode      = entry.mode  # pullback / reversal / breakout
 
-        k1h = await loop.run_in_executor(None, lambda: _api.get_klines(sym, '1h', 50))
+        k1h = await loop.run_in_executor(None, lambda: _get_hub_or_rest(sym, "klines", "1h", 50))
         if not k1h:
             return
-        c1h     = [float(k[4]) for k in k1h]
-        atr_v   = _atr(k1h[:-1])
-        ema20   = _ema(c1h[:-1], 20)
-        # ema50 已移除：_survival_check 不再使用 EMA趋势翻转（改为价格破位判断）
-        rsi_v   = _rsi(c1h[:-1])  # 全量已闭合K线，RSI 精度更高
-        mark_mp = await loop.run_in_executor(
-            None, lambda: float(_api.get_mark_price(sym).get('markPrice', 0))
-        )
+        c1h = [float(k[4]) for k in k1h]   # 下游 RSI/新闻检查仍使用
+        # [v2-2] 只用已收盘 K 线；有新收盘才重算指标，否则复用缓存
+        _ck = self._ind_cache.get(sym) or {}
+        _last_ot = k1h[-2][0] if len(k1h) >= 2 else k1h[-1][0]
+        if _ck.get("ot_1h") != _last_ot:
+            _c = [float(k[4]) for k in k1h[:-1]]
+            _ck = {"ot_1h": _last_ot, "atr": _atr(k1h[:-1]), "ema20": _ema(_c, 20), "rsi": _rsi(_c),
+                   "close_1h": _c[-1] if _c else 0.0}
+            self._ind_cache[sym] = _ck
+        atr_v, ema20, rsi_v, close_1h = _ck["atr"], _ck["ema20"], _ck["rsi"], _ck["close_1h"]
+        _mpd = await loop.run_in_executor(None, lambda: _get_hub_or_rest(sym, "mark"))
+        mark_mp = float((_mpd or {}).get('markPrice', 0) or 0)
         if mark_mp <= 0:
             return
+        # 触发后新高/新低（reversal 用）：注册后的已收盘 1H 高低点
+        _added_ms = entry.added_ts * 1000
+        _post = [k for k in k1h[:-1] if float(k[0]) >= _added_ms]
+        post_high = max((float(k[2]) for k in _post), default=0.0)
+        post_low = min((float(k[3]) for k in _post), default=0.0)
+        # [v2-10] ema_trend 单独拉 4H
+        e20_4h = e50_4h = a4h = c4h_close = 0.0
+        if mode == "ema_trend":
+            k4h = await loop.run_in_executor(None, lambda: _get_hub_or_rest(sym, "klines", "4h", 60))
+            if k4h and len(k4h) >= 52:
+                _c4 = [float(k[4]) for k in k4h[:-1]]
+                e20_4h, e50_4h, a4h, c4h_close = _ema(_c4, 20), _ema(_c4, 50), _atr(k4h[:-1]), _c4[-1]
+        _oi_now_v = 0.0
+        if mode == "oi_divergence":
+            try:
+                _oi_now_v = float((await loop.run_in_executor(None, lambda: _api.get_open_interest(sym)) or {})
+                                  .get("openInterest", 0) or 0)
+            except Exception:
+                _oi_now_v = 0.0
 
         cancel_reason: str | None = None
 
         # ── A. v3.67 挂单存活检查（_survival_check）────────────────────────────
         # 开仓条件和存活条件分离：只检查「核心理由是否被证伪」，
         # 不重新跑完整 judge，避免 vol_ratio/15M形态等瞬时指标波动导致误撤。
-        should_cancel, survival_reason = self._survival_check(entry, mark_mp, rsi_v, atr_v, realtime_ema20=ema20)
+        should_cancel, survival_reason = self._survival_check(
+            entry, mark_mp, rsi_v, atr_v, realtime_ema20=ema20, close_1h=close_1h,
+            post_high=post_high, post_low=post_low, oi_now=_oi_now_v,
+            ema20_4h=e20_4h, ema50_4h=e50_4h, atr_4h=a4h, close_4h=c4h_close)
         if should_cancel:
             cancel_reason = survival_reason
         else:
@@ -1549,7 +1898,7 @@ class SignalWatcher:
                 _t24 = _t24[0] if isinstance(_t24, list) else _t24
                 _chg24 = abs(float(_t24.get('priceChangePercent', 0)))
                 _mp2   = await loop.run_in_executor(
-                    None, lambda: _api.get_mark_price(sym)
+                    None, lambda: _get_hub_or_rest(sym, 'mark')
                 )
                 _funding = abs(float(_mp2.get('lastFundingRate', 0)))
                 if _chg24 > 20:
@@ -1883,7 +2232,24 @@ class SignalWatcher:
             await asyncio.sleep(interval_sec)
 
     async def _btc_guard_check(self) -> None:
-        """BTC 1H 跌超 3% → 撤所有 LONG pending 挂单。"""
+        """[v2-5] 改为读 btc_guard 统一状态（不再独立拉 K 线判断）。"""
+        try:
+            from shared import btc_guard as _bg
+            _d = _bg.get_guard().cancel_direction()
+            _st = _bg.get_state()
+        except Exception:
+            return
+        if not _d:
+            return
+        async with self._lock:
+            _vic = [(s_, e) for s_, e in list(self._watched.items())
+                    if not e.triggered and e.cancel_state == "none"
+                    and e.signal.get('direction', 'LONG').upper() == _d]
+        for s_, e in _vic:
+            await self._cancel_and_remove(s_, e, f'btc_guard {_st}')
+
+    async def _btc_guard_check_legacy(self) -> None:
+        """旧实现（BTC 1H 跌超 3% → 撤 LONG），保留不再调用。"""
         loop = asyncio.get_running_loop()
         try:
             from shared import binance_api as _api
