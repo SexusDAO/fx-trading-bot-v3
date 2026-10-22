@@ -481,7 +481,7 @@ class TriggerDetector:
         atr = ind.get("atr_1h", 0.0) if kmode else 0.0
         ctx = {
             "price": price, "chg": chg, "funding": funding,
-            "exchange_ts": int(mp["time"]) if mp.get("time") else ind.get("last_close_time"),
+            "exchange_ts": int(mp["time"]) if mp.get("time") else None,
             "freshness_ms": int(float(tk.get("age_sec") or 0) * 1000),
             "snap": {"chg24": chg * 100, "rsi_1h": ind.get("rsi_1h") if kmode else None,
                      "ema20_1h": ind.get("ema20_1h") if kmode else None,
