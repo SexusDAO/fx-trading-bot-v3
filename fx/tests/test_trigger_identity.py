@@ -1,3 +1,8 @@
+# [已知问题 fdde5ff4] 标的锁范围过大：_trigger 持锁期间，同标的 add_signal(replace=True)
+# 会等锁 5s 后超时放弃，旧条目移除后监控队列里没有该标的，测试报 KeyError。
+# 线上影响：下单中同标的的替换信号会被丢弃，该标的暂时无挂单监控。
+# 修复方向：下单时不持注册锁，只在"检查并写入队列"那一小段加锁；或允许重入；补 mock。
+# 暂不修复，等后续单独处理。
 """运行：cd fx && python3 -m unittest tests.test_trigger_identity -v
 [v3.89 #102-partial] _trigger 的 finally / 冷却分支 pop 前核对条目身份。"""
 import asyncio, sys, time, unittest
