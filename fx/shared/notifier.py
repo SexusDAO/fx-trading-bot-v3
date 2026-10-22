@@ -350,10 +350,9 @@ def flush_signal(sig_id: str) -> bool:
     lines = _signal_buffer.pop(sig_id)
     if not lines:
         return False
-    _card_create_now(sig_id, lines[0])
-    for ln in lines[1:]:
-        _card_append_now(sig_id, ln)
-    logger.debug(f"[card] flush sig_id={sig_id} 合并推送 {len(lines)} 行")
+    # [notify-dedup] 标题 + 所有缓冲行拼成一条消息一次发出，不再先发标题再逐行编辑
+    _card_create_now(sig_id, "\n".join(lines))
+    logger.debug(f"[card] flush sig_id={sig_id} 合并推送 {len(lines)} 行（单条消息）")
     return True
 
 
@@ -436,10 +435,10 @@ def card_append(sig_id: str, line: str) -> bool:
     向信号卡片追加一行进展。
 
     · 有 message_id → 编辑原消息追加（动态卡片）
-    · 无 message_id → 直接发一条独立消息
-    · 卡片不存在（进程重启丢失）→ 降级独立消息
+    · [notify-dedup] 无 message_id / 卡片不存在 / 编辑失败 → 记 WARNING 丢弃，不补发新消息
+      （保持「一个信号只有一条通知」）
 
-    返回 True 表示消息已发出（不论编辑还是新消息）。
+    返回 True 表示已缓冲或编辑成功；False 表示内容被丢弃。
     """
     # [v3.90 通知聚合] 在缓冲区里就直接追加，等 flush 时一次发出
     if _signal_buffer.append(sig_id, line):
@@ -455,8 +454,7 @@ def _card_append_now(sig_id: str, line: str) -> bool:
         entry = dict(_card_cache.get(sig_id, {})) if sig_id in _card_cache else None
 
     if entry is None:
-        logger.debug(f"[card] sig_id={sig_id} 无卡片缓存，降级独立推送")
-        notify(line)
+        logger.warning(f"[card] sig_id={sig_id} 无卡片缓存，丢弃追加内容（不补发新消息）")
         return False
 
     message_id = entry.get("message_id")
@@ -473,17 +471,13 @@ def _card_append_now(sig_id: str, line: str) -> bool:
             logger.debug(f"[card] 编辑追加 sig_id={sig_id}")
             return True
         else:
-            # 编辑失败，清除 mid 防止后续重试，降级独立消息
-            logger.warning(f"[card] 编辑失败 sig_id={sig_id} mid={message_id}，降级并清除 mid")
-            with _card_lock_for(sig_id):
-                if sig_id in _card_cache:
-                    _card_cache[sig_id]["message_id"] = None
-            notify(line)
+            # [notify-dedup] 编辑失败：静默丢弃，保留 mid，不补发新消息
+            logger.warning(f"[card] 编辑失败 sig_id={sig_id} mid={message_id}，丢弃本次追加（不补发）")
             return False
     else:
-        # Popen 兜底模式：直接发独立消息
-        notify(line)
-        return True
+        # [notify-dedup] 无 message_id（Popen 兜底发出的卡片无法编辑）：丢弃，不补发
+        logger.warning(f"[card] sig_id={sig_id} 无 message_id，丢弃追加内容（不补发新消息）")
+        return False
 
 
 async def card_create_async(sig_id: str, header: str) -> Optional[str]:
