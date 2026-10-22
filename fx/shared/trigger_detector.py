@@ -115,11 +115,24 @@ def _default_oi(symbol):
         return 0.0, 0.0, 0.0
 
 
+# 候选池内存缓存：触发器每秒调用一次 _default_pool，原先每次都同步读文件 + 解析 JSON，阻塞事件循环
+_pool_cache: list | None = None
+_pool_cache_ts: float = 0.0
+_POOL_CACHE_TTL = 30.0   # 秒
+
+
 def _default_pool():
+    global _pool_cache, _pool_cache_ts
+    now = time.time()
+    if _pool_cache is not None and now - _pool_cache_ts < _POOL_CACHE_TTL:
+        return list(_pool_cache)   # 返回副本，防止调用方修改缓存
     try:
-        return list(json.loads(POOL_FILE.read_text(encoding="utf-8")).get("pool", []))
+        data = list(json.loads(POOL_FILE.read_text(encoding="utf-8")).get("pool", []))
+        _pool_cache = data
+        _pool_cache_ts = now
     except Exception:
-        return []
+        pass   # 读取失败时沿用旧缓存，不更新时间戳（下次调用会重试）；从未成功过则返回空列表
+    return list(_pool_cache) if _pool_cache is not None else []
 
 
 def _default_exinfo():
