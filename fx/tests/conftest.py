@@ -12,4 +12,8 @@ def _mock_unknown_fill_guard(request, monkeypatch):
         from shared import binance_api as _api
         monkeypatch.setattr(_api, "get_position", lambda *a, **k: [], raising=False)
         monkeypatch.setattr(_api, "place_sl", lambda *a, **k: {}, raising=False)
+        # [hp-3] add_signal 注册前盘口粗筛：旧测试未 mock，这里给足深度避免联网
+        monkeypatch.setattr(_api, "get_order_book",
+                            lambda *a, **k: {"asks": [["1", "1e12"]], "bids": [["1", "1e12"]]}, raising=False)
+        monkeypatch.setattr(_api, "get_mark_price", lambda *a, **k: {"markPrice": "1"}, raising=False)
     yield

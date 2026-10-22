@@ -261,7 +261,7 @@ def _precheck(signal: dict) -> tuple[bool, str]:
 
     # 1-10: 流动性 Gate（v3.57）——检查 mark_price ±0.5% 挂单深度，过滤极薄标的
     _liq_ok, _liq_reason = _check_liquidity_gate(
-        symbol, direction, notional=100.0,
+        symbol, direction, notional=_signal_notional(signal),   # [hp-2] 用真实名义价值
         oi_now=signal.get("ind", {}).get("oi_now", 0.0),
     )
     if not _liq_ok:
@@ -342,10 +342,14 @@ def _check_liquidity_gate(
     - 查询失败时降级放行（不因网络问题阻断开仓）
     """
     try:
-        from config import LIQUIDITY_GATE_MIN_U, LIQUIDITY_GATE_DEPTH_MULT
+        from config import LIQUIDITY_GATE_MIN_U
     except ImportError:
         LIQUIDITY_GATE_MIN_U   = 3_000    # 最小绝对深度 3000U（原 10000U，相对化后降低硬底）
-        LIQUIDITY_GATE_DEPTH_MULT = 5     # 深度需 >= 名义仓位 × 5
+    try:
+        from config import LIQ_DEPTH_NOTIONAL_MULT, LIQ_DEPTH_OI_FLOOR_PCT
+    except ImportError:
+        LIQ_DEPTH_NOTIONAL_MULT, LIQ_DEPTH_OI_FLOOR_PCT = 3, 0.0005
+    LIQUIDITY_GATE_DEPTH_MULT = LIQ_DEPTH_NOTIONAL_MULT   # 日志沿用旧变量名
 
     try:
         mark_p = float(api.get_mark_price(symbol).get("markPrice", 0))
@@ -376,7 +380,7 @@ def _check_liquidity_gate(
         # 阈值相对化：OI×0.1% 为动态底线
         # fix: oi_now 是币安返回的合约张数（非 USDT），必须乘以 mark_price 换算后再取 0.1%
         oi_usdt   = oi_now * mark_p if (oi_now > 0 and mark_p > 0) else 0.0
-        oi_based  = oi_usdt * 0.001 if oi_usdt > 0 else 0.0
+        oi_based  = oi_usdt * LIQ_DEPTH_OI_FLOOR_PCT if oi_usdt > 0 else 0.0   # [hp-2] 0.1%→0.05% 下限
         threshold = max(LIQUIDITY_GATE_MIN_U, oi_based, notional * LIQUIDITY_GATE_DEPTH_MULT)
         if depth_u < threshold:
             return False, (
@@ -2039,3 +2043,27 @@ def _crash_cd_allows(reason: str, direction: str) -> bool:
     """[fix-1] crash_guard 冷却只拦对应方向：crash_guard_short 只拦 SHORT，crash_guard 只拦 LONG。"""
     d = (direction or "").upper()
     return (reason == "crash_guard_short" and d == "LONG") or (reason == "crash_guard" and d == "SHORT")
+
+
+def _signal_notional(signal: dict) -> float:
+    """[hp-2/3] 名义价值：pre_params.notional → position_size × ind.mark_price → 100U。"""
+    try:
+        pp = signal.get("pre_params") or {}
+        n = float(pp.get("notional") or 0)
+        if n > 0:
+            return n
+        ind = signal.get("ind") or {}
+        mp = float(ind.get("mark_price") or ind.get("markPrice") or 0)
+        n = float(pp.get("position_size", 100) or 0) * mp
+        if n > 0:
+            return n
+    except (TypeError, ValueError):
+        pass
+    return 100.0
+
+
+def _book_depth_u(ob: dict, direction: str, center: float) -> float:
+    """[hp-3] mark ±0.5% 内深度（USDT）：LONG 看 asks，SHORT 看 bids。"""
+    if (direction or "").upper() == "LONG":
+        return sum(float(a[0]) * float(a[1]) for a in ob.get("asks", []) if float(a[0]) <= center * 1.005)
+    return sum(float(b[0]) * float(b[1]) for b in ob.get("bids", []) if float(b[0]) >= center * 0.995)

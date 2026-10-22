@@ -516,6 +516,39 @@ class SignalWatcher:
                 return
         except Exception:
             pass
+        # [hp-4] 冷却前置：crash_guard_short 只拦 SHORT，crash_guard 只拦 LONG，其余冷却全拦
+        try:
+            from shared.state import is_in_cooldown as _icd
+            _in_cd, _cd_reason = _icd(symbol)
+        except Exception:
+            _in_cd, _cd_reason = False, ""
+        if _in_cd:
+            _cdr = str(_cd_reason or "")
+            if not ((_cdr == "crash_guard_short" and _dir0 == "LONG") or
+                    (_cdr == "crash_guard" and _dir0 == "SHORT")):
+                logger.info(f"[add_signal-skip] {symbol} 冷却期中({_cdr})，跳过注册")
+                return
+        # [hp-3] 盘口粗筛：mark ±0.5% 深度 < 名义价值 × 2 → 不注册（查询失败放行，executor 仍精确检查）
+        try:
+            from executor import _signal_notional, _book_depth_u
+            from shared import binance_api as _bapi_d
+            try:
+                from config import LIQ_PREFILTER_NOTIONAL_MULT as _pf_mult
+            except ImportError:
+                _pf_mult = 2
+            _loop_d = asyncio.get_running_loop()
+            _mp_d = float((await _loop_d.run_in_executor(None, lambda: _get_hub_or_rest(symbol, "mark")) or {})
+                          .get("markPrice", 0) or 0)
+            if _mp_d > 0:
+                _ob = await _loop_d.run_in_executor(None, lambda: _bapi_d.get_order_book(symbol, limit=20)) or {}
+                _dep = _book_depth_u(_ob, _dir0, _mp_d)
+                _need = _signal_notional(signal) * _pf_mult
+                if _dep < _need:
+                    logger.info(f"[add_signal-skip] {symbol} {_dir0} 盘口深度不足 ±0.5%={_dep:.0f}U < "
+                                f"名义价值×{_pf_mult}={_need:.0f}U，跳过注册")
+                    return
+        except Exception as _de:
+            logger.debug(f"[signal_watcher] {symbol} 盘口粗筛失败，放行: {_de}")
         # [v2-3] 按 symbol 加锁，5 秒拿不到放弃
         _slock = self._sym_locks.setdefault(symbol, asyncio.Lock())
         try:
@@ -1186,6 +1219,13 @@ class SignalWatcher:
                     if _gap_t > 0.3 * _atr:
                         logger.info(f"[trigger-skip] {symbol} {_dir_t} 价格跳过区间 {_gap_t / (_atr + 1e-9):.2f}ATR "
                                     f"(mark={_mark_now:.6g} 区间=[{entry.entry_low:.6g},{entry.entry_high:.6g}])，放弃入场")
+                        _skip = True
+                # [hp-1] 价格已穿过入场锚 0.5% → 信号作废
+                if not _skip and _mark_now > 0 and entry.entry_price > 0:
+                    if (_dir_t == "LONG" and _mark_now < entry.entry_price * 0.995) or \
+                       (_dir_t == "SHORT" and _mark_now > entry.entry_price * 1.005):
+                        logger.info(f"[trigger-skip-anchor] {symbol} {_dir_t} mark={_mark_now:.6g} 已穿过入场锚 "
+                                    f"{entry.entry_price:.6g}(±0.5%)，信号作废")
                         _skip = True
                 if not _skip and _mark_now > 0 and _trigger_p > 0:
                     _deviation = abs(_mark_now - _trigger_p) / (_atr + 1e-9)

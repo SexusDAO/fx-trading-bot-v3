@@ -291,7 +291,10 @@ ENABLE_USDC_PAIRS = False  # 是否扫描 USDC 保证金交易对（False 时只
 
 # ── 流动性 Gate（v3.57）──────────────────────────────────────────────────────
 LIQUIDITY_GATE_MIN_U      = 3_000    # 最小深度硬底 3000U（相对化后降低，OI×0.1% 为动态主阈值）
-LIQUIDITY_GATE_DEPTH_MULT = 5        # 深度需 >= 名义仓位 × 5
+LIQUIDITY_GATE_DEPTH_MULT = 5        # 深度需 >= 名义仓位 × 5（[hp-2] 起执行层改用 LIQ_DEPTH_NOTIONAL_MULT）
+LIQ_DEPTH_NOTIONAL_MULT   = 3        # [hp-2] 深度需 >= 实际仓位名义价值 × 3
+LIQ_DEPTH_OI_FLOOR_PCT    = 0.0005   # [hp-2] OI(USDT) × 0.05% 作为下限
+LIQ_PREFILTER_NOTIONAL_MULT = 2      # [hp-3] 注册前盘口粗筛：深度需 >= 名义价值 × 2
 
 # ── 净 Delta 监控（v3.57）────────────────────────────────────────────────────
 NET_DELTA_MAX_PCT = 0.30   # 净多头/空头 Delta 不超过账户权益30%
