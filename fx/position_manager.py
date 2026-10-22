@@ -57,7 +57,7 @@ from shared import binance_api as api
 from shared.async_utils import _run_sync   # [v3.89 #61] 同步调用移出事件循环的统一封装
 from shared.risk_manager import record_pnl as _record_pnl
 from shared.state import (
-    get_all_positions, update_position, remove_position,
+    get_all_positions, update_position, remove_position, remove_position_exclusive,
     set_cooldown, is_in_cooldown,
 )
 from shared.notifier import (
@@ -256,6 +256,7 @@ async def _execute_trail_sl(pos: dict, new_sl: float) -> bool:
 
 async def _execute_trail_sl_inner(pos: dict, new_sl: float,
                                    pos_id: str, old_sl_id, qty_remaining: float) -> bool:
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     symbol    = pos["symbol"]
     direction = pos["direction"].upper()
 
@@ -285,7 +286,7 @@ async def _execute_trail_sl_inner(pos: dict, new_sl: float,
         logger.info(f"[pm] {symbol} 新止损单 algoId={new_sl_id} stopPrice={sl_r:.6g}")
     except Exception as e:
         logger.error(f"[pm] {symbol} 新止损单提交失败: {e}")
-        update_position(pos_id, {"sl_target_price": new_sl, "sl_sync_status": "failed"})
+        await loop.run_in_executor(None, update_position, pos_id, {"sl_target_price": new_sl, "sl_sync_status": "failed"})
         return False
 
     # 2. 新单确认成功后,撤旧SL(确保新保护已就位再撤旧的,零裸仓窗口)
@@ -322,7 +323,7 @@ async def _execute_trail_sl_inner(pos: dict, new_sl: float,
     # 如果 _calc_trail_sl 内将 rr_protection_triggered 设为 True,同步写入
     if pos.get("rr_protection_triggered"):
         _update_fields["rr_protection_triggered"] = True
-    if update_position(pos_id, _update_fields) is False:
+    if (await loop.run_in_executor(None, update_position, pos_id, _update_fields)) is False:
         logger.error(f"[pm] {symbol} 新止损已受理但持仓状态写入失败")
         return False
     logger.info(f"[pm] {symbol} 移动止损完成 {pos.get('sl_price'):.6g} → {new_sl:.6g}")
@@ -397,9 +398,10 @@ class PositionManager:
 
     # ── A1. 标记价格实时监听(防抖 1 秒)────────────────────────────────────
     async def _mark_price_loop(self):
+        loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
         while self._running:
             try:
-                positions = get_all_positions()
+                positions = await loop.run_in_executor(None, get_all_positions)
                 open_pos  = [p for p in positions if p.get("status") == "open"]
                 if not open_pos:
                     await asyncio.sleep(2)
@@ -578,9 +580,11 @@ class PositionManager:
             logger.info("[pm] 无 ws_listener,跳过订单事件监听(降级模式)")
             return
 
+        # 持仓读写是同步磁盘 IO（拿线程锁 + 读写 JSON），放线程池执行，避免卡死事件循环
+        loop = asyncio.get_running_loop()
         while self._running:
             try:
-                positions = get_all_positions()
+                positions = await loop.run_in_executor(None, get_all_positions)
                 open_pos    = [p for p in positions if p.get("status") == "open"]
                 pending_pos = [p for p in positions if p.get("status") == "pending"
                                and p.get("open_order_id")]
@@ -642,12 +646,12 @@ class PositionManager:
                         f"[pm] ⚡ {_symbol} pending入场单 {_oid} WS实时感知成交 "
                         f"price={_fill_price:.6g} qty={_fill_qty},立即补挂SL/TP"
                     )
-                    update_position(_pid, {"status": "patching"})
+                    await loop.run_in_executor(None, update_position, _pid, {"status": "patching"})
                     mark_system_order_update(_symbol)
                     try:
                         await _补挂保护单(pos, _fill_price, _fill_qty, _pid, _symbol)
                     except Exception as _ge:
-                        update_position(_pid, {"status": "pending"})
+                        await loop.run_in_executor(None, update_position, _pid, {"status": "pending"})
                         logger.error(f"[pm] {_symbol} WS感知后补挂失败: {_ge}")
                         await _notify_async(
                             f"⚠️ {_symbol} 入场单成交但补挂止损失败,请人工介入!\n错误:{_ge}"
@@ -662,6 +666,7 @@ class PositionManager:
                 await asyncio.sleep(2)
 
     async def _handle_order_filled(self, pos: dict, filled_oid: int, event: dict):
+        loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
         pid       = pos.get("pos_id", pos.get("symbol","unknown"))
         symbol    = pos["symbol"]
         direction = pos["direction"].upper()
@@ -709,11 +714,11 @@ class PositionManager:
             single_tp = pos.get("tp_mode") == "single" or (pos.get("tp_mode") is None and pos.get("tp2_price") is None and not tp2_id)
             if single_tp:
                 await _cancel(sl_id, is_algo=True)
-                update_position(pid, {"tp1_filled": True, "quantity_remaining": 0.0})
+                await loop.run_in_executor(None, update_position, pid, {"tp1_filled": True, "quantity_remaining": 0.0})
                 await self._close_position_post(pid, symbol, "tp1", event)
                 return
             logger.info(f"[pm] {symbol} TP1触发,更新剩余数量,补挂剩余40%仓位的SL单")
-            update_position(pid, {
+            await loop.run_in_executor(None, update_position, pid, {
                 "tp1_filled":        True,
                 "quantity_remaining": tp2_qty,
                 "trailing_stop_activated": True,
@@ -745,7 +750,7 @@ class PositionManager:
                                 )
                             except Exception:
                                 pass
-                        update_position(pid, {"sl_order_id": int(_new_sl_id)})
+                        await loop.run_in_executor(None, update_position, pid, {"sl_order_id": int(_new_sl_id)})
                         logger.info(
                             f"[pm] {symbol} TP1后补挂SL单成功: "
                             f"qty={_sl_qty} price={_sl_p} id={_new_sl_id}"
@@ -754,13 +759,13 @@ class PositionManager:
                         logger.warning(f"[pm] {symbol} TP1后补挂SL单失败: {_resp}")
                         await _notify_async(f"🚨 {symbol} TP1触发后补挂SL失败,剩余40%仓位无止损保护!")
                         # 同步卡片
-                        _pos_tp1f = get_all_positions()
+                        _pos_tp1f = await loop.run_in_executor(None, get_all_positions)
                         _tp1_sid = next((p.get("_sig_id","") for p in _pos_tp1f if p.get("symbol")==symbol), "")
                         if _tp1_sid: await card_append_async(_tp1_sid, fmt_node_sl_lost())
                 except Exception as _tp1_sl_e:
                     logger.error(f"[pm] {symbol} TP1后补挂SL异常: {_tp1_sl_e}")
                     await _notify_async(f"🚨 {symbol} TP1触发后补挂SL异常,请检查仓位!\n错误:{_tp1_sl_e}")
-                    _pos_tp1f2 = get_all_positions()
+                    _pos_tp1f2 = await loop.run_in_executor(None, get_all_positions)
                     _tp1_sid2 = next((p.get("_sig_id","") for p in _pos_tp1f2 if p.get("symbol")==symbol), "")
                     if _tp1_sid2: await card_append_async(_tp1_sid2, fmt_node_sl_lost())
             return
@@ -769,7 +774,7 @@ class PositionManager:
         if filled_oid == tp2_id:
             logger.info(f"[pm] {symbol} TP2触发,撤止损单")
             await _cancel(sl_id, is_algo=True)  # SL 是 Algo 单
-            update_position(pid, {"tp2_filled": True})   # 标记 TP2 已成交,供 trade_log 和平仓后分析区分关闭原因
+            await loop.run_in_executor(None, update_position, pid, {"tp2_filled": True})   # 标记 TP2 已成交,供 trade_log 和平仓后分析区分关闭原因
             await self._close_position_post(pid, symbol, "tp2", event)
             return
 
@@ -779,6 +784,7 @@ class PositionManager:
         #   本循环(PositionManager.start 启动):孤单检测、TP REST 确认、时间止损 / 突破失败 / 反向信号、健康检查(含计数器)、挂单有效期。
         #   patrol_once(main.py 的 _loop_patrol 调用):除上述同类检查外,还负责 funding_arb 专用巡检、TP2 动态收紧、加仓。
         #   两处的 B1 检查同时存在,重复平仓由 _force_close_static 开头的状态重读兜底(见 STEP7-2)。
+        loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
         global _health_check_counter
         # 错开 scanner 的30秒
         await asyncio.sleep(30)
@@ -788,7 +794,7 @@ class PositionManager:
                 _health_check_counter += 1
                 do_health = (_health_check_counter % PM_HEALTH_CHECK_INTERVAL == 0)
 
-                positions = get_all_positions()
+                positions = await loop.run_in_executor(None, get_all_positions)
                 open_pos  = [p for p in positions if p.get("status") == "open"]
                 # patching = 正在补挂中,跳过巡检防止重入
                 pending   = [p for p in positions if p.get("status") == "pending"]
@@ -799,7 +805,7 @@ class PositionManager:
                 for pos in open_pos:
                     await self._check_manual_close(pos)
                 # 重新加载(_check_manual_close 可能删除了仓位)
-                positions = get_all_positions()
+                positions = await loop.run_in_executor(None, get_all_positions)
                 open_pos  = [p for p in positions if p.get("status") == "open"]
 
                 # B0. REST 轮询确认 TP1/TP2 成交(WS不可用时的保底,每轮都跑)
@@ -814,7 +820,7 @@ class PositionManager:
                     await self._check_exit_signal(pos)
 
                 # v3.56: B1 可能平仓,刷新 open_pos 避免 B2/B3 对已平仓仓位跑 API
-                positions = get_all_positions()
+                positions = await loop.run_in_executor(None, get_all_positions)
                 open_pos  = [p for p in positions if p.get("status") == "open"]
 
                 # B2. 健康检查(每30分钟)
@@ -852,6 +858,7 @@ class PositionManager:
           1. 撤销所有对应的 Algo SL 和限价 TP 挂单
           2. 将 pos_state 标记为 closed 并删除
         """
+        loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
         symbol    = pos["symbol"]
         pid       = pos.get("pos_id", symbol)
         direction = pos["direction"].upper()
@@ -996,8 +1003,8 @@ class PositionManager:
             pass
 
         # 更新 pos_state
-        update_position(pid, {"status": "closed", "close_reason": _inferred_close_reason})
-        _remove_position_checked(pid)
+        await loop.run_in_executor(None, update_position, pid, {"status": "closed", "close_reason": _inferred_close_reason})
+        await loop.run_in_executor(None, _remove_position_checked, pid)
         logger.info(f"[pm] {symbol} 仓位清理完成 close_reason={_inferred_close_reason}, pos_state 已删除")
 
         # v3.78 fix: 手动平仓补写 trade_log
@@ -1082,6 +1089,7 @@ class PositionManager:
     # ── B1. 时间止损 ─────────────────────────────────────────────────────────
     async def _check_time_stop(self, pos: dict, now_ms: int):
         # v3.56: funding_arb 有自己的最大持仓逻辑(_patrol_funding_arb),跳过通用时间止损
+        loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
         if pos.get("sig_type") == "funding_arb":
             return
         pid       = pos.get("pos_id", pos.get("symbol","unknown"))
@@ -1161,14 +1169,14 @@ class PositionManager:
                         )
                         new_id = int(new_resp.get("algoId") or new_resp.get("orderId") or 0)
                         if new_id:
-                            update_position(pid, {"sl_order_id": new_id})
+                            await loop.run_in_executor(None, update_position, pid, {"sl_order_id": new_id})
                             logger.info(f"[pm] {symbol} 重挂 SL 成功: algoId={new_id} stopPrice={sl_price:.6g}")
                             # 仅在真正失效后重挂成功时通知,不打扰正常状态
                         else:
                             logger.error(f"[pm] {symbol} 重挂 SL 失败: resp={new_resp}")
                             # 追加到卡片 + 独立告警
                             try:
-                                _sl_pos = next((p for p in get_all_positions() if p.get("symbol")==symbol), {})
+                                _sl_pos = next((p for p in (await loop.run_in_executor(None, get_all_positions)) if p.get("symbol")==symbol), {})
                                 _sl_sid = _sl_pos.get("_sig_id", "")
                                 _sl_warn = fmt_node_sl_lost()
                                 if _sl_sid:
@@ -1225,11 +1233,11 @@ class PositionManager:
         if hold_min >= _stag_limit and hold_min < _stag_upper:
             if not pos.get("early_stagnation_checked"):
                 if pnl_pct >= 0.01:  # 浮盈已超1%,持仓有效,不触发
-                    update_position(pid, {"early_stagnation_checked": True})
+                    await loop.run_in_executor(None, update_position, pid, {"early_stagnation_checked": True})
                 elif pnl_pct < -_stag_loss_thr:  # 浮亏超过动态阈值(OPT-1):已在持续下跌,直接平仓,不给豁免
                     logger.info(f"[pm] {symbol} 早期滞涨:浮亏={pnl_pct*100:.2f}%>{_stag_loss_thr*100:.1f}%(止损距离{_sl_dist_pct*100:.1f}%),直接平仓")
                     await self._force_close(pos, "early_stagnation")
-                    update_position(pid, {"early_stagnation_checked": True})
+                    await loop.run_in_executor(None, update_position, pid, {"early_stagnation_checked": True})
                     return
                 else:  # -2% <= pnl_pct < 1%:横盘/小亏,看 EMA 结构
                     # ── 豁免检查 ──────────────────────────────────────────
@@ -1237,7 +1245,7 @@ class PositionManager:
                     _structure_ok = False
                     try:
                         from config import RISK_MAX_POSITIONS
-                        _open_cnt = len([p for p in get_all_positions() if p.get("status") == "open"])
+                        _open_cnt = len([p for p in (await loop.run_in_executor(None, get_all_positions)) if p.get("status") == "open"])
                         _slot_free = _open_cnt < RISK_MAX_POSITIONS
                     except Exception as _e:
                         logger.warning(f"[pm] {symbol} 早期横盘豁免:槽位检查失败 {_e}")
@@ -1262,7 +1270,7 @@ class PositionManager:
                             f"[pm] {symbol} 早期横盘止损豁免:槽位未满({_open_cnt}/{RISK_MAX_POSITIONS})"
                             f" 且4H趋势结构仍在(EMA_gap={_ema_gap*100:.2f}%),继续持有"
                         )
-                        update_position(pid, {"early_stagnation_checked": True})
+                        await loop.run_in_executor(None, update_position, pid, {"early_stagnation_checked": True})
                     else:
                         _reason = []
                         if not _slot_free:
@@ -1271,7 +1279,7 @@ class PositionManager:
                             _reason.append(f"4H结构失效(EMA_gap={_ema_gap*100:.2f}%)")
                         logger.info(f"[pm] {symbol} 早期横盘止损({_stag_limit//60}H内反弹不足1%,当前{pnl_pct*100:.2f}%)原因: {', '.join(_reason)}")
                         await self._force_close(pos, "early_stagnation")
-                        update_position(pid, {"early_stagnation_checked": True})
+                        await loop.run_in_executor(None, update_position, pid, {"early_stagnation_checked": True})
                         return
 
         # 软上限:reversal 12H、ema_trend 16H(4H趋势追踪需要更长窗口)、其余 8H
@@ -1340,7 +1348,7 @@ class PositionManager:
                             )
                             remaining_qty = round(total_qty - partial_qty, 8)
                             partial_pnl   = round(pnl_pct * float(pos.get("pos_usdt", 0)) * 0.4, 2)
-                            update_position(pid, {
+                            await loop.run_in_executor(None, update_position, pid, {
                                 "quantity":                    remaining_qty,
                                 "pos_usdt":                    round(float(pos.get("pos_usdt", 0)) * 0.6, 2),
                                 "sl_price":                    entry,
@@ -1400,7 +1408,7 @@ class PositionManager:
                         pos.get("tp2_quantity") or
                         pos.get("quantity_remaining", pos.get("quantity", 0)) * 0.4
                     )
-                    update_position(pid, {
+                    await loop.run_in_executor(None, update_position, pid, {
                         "tp1_filled":              True,
                         "quantity_remaining":       tp2_qty,
                         "trailing_stop_activated": True,
@@ -1438,12 +1446,12 @@ class PositionManager:
                                         )
                                     except Exception:
                                         pass
-                                update_position(pid, {"sl_order_id": int(_new_sl_id_r)})
+                                await loop.run_in_executor(None, update_position, pid, {"sl_order_id": int(_new_sl_id_r)})
                                 logger.info(f"[pm] {symbol} REST路径TP1后补挂SL成功 id={_new_sl_id_r}")
                         except Exception as _rsl_e:
                             logger.warning(f"[pm] {symbol} REST路径TP1后补挂SL失败: {_rsl_e}")
                     # TP1 成交：追加到卡片
-                    _pos_tp1r  = next((p for p in get_all_positions() if p.get("symbol")==symbol), {})
+                    _pos_tp1r  = next((p for p in (await loop.run_in_executor(None, get_all_positions)) if p.get("symbol")==symbol), {})
                     _sl_new_p  = float(_pos_tp1r.get("sl_price", 0))
                     _tp1_sid_r = _pos_tp1r.get("_sig_id", "")
                     _tp1_line  = fmt_node_tp1(fill_price, _sl_new_p)
@@ -1597,6 +1605,7 @@ class PositionManager:
 
     # ── B3. 健康检查(每30分钟) ──────────────────────────────────────────────
     async def _check_health(self, pos: dict):
+        loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
         symbol    = pos["symbol"]
         pid       = pos.get("pos_id", pos.get("symbol","unknown"))
         direction = pos["direction"].upper()
@@ -1676,7 +1685,7 @@ class PositionManager:
             )
             if time.time() - last_warn >= 1800:
                 _health_warned[pid] = time.time()
-                update_position(pid, {"health_last_warn_ts": time.time()})
+                await loop.run_in_executor(None, update_position, pid, {"health_last_warn_ts": time.time()})
                 dim = _health_score_detail(direction, ema20_1h, ema50_1h,
                                             ema20_4h, ema50_4h, rsi_1h, funding,
                                             mode=mode)
@@ -1751,6 +1760,7 @@ def _health_score_detail(direction: str,
 
     # ── B4. 挂单有效期检查 ────────────────────────────────────────────────────
 async def _check_pending_expire_static(pos: dict, now_ms: int):
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     pid      = pos.get("pos_id", pos.get("symbol","unknown"))
     symbol   = pos["symbol"]
     mode     = pos.get("mode", "pullback")
@@ -1778,7 +1788,7 @@ async def _check_pending_expire_static(pos: dict, now_ms: int):
                 if od is not None:
                     status = od.get("status","")
                     if status in ("CANCELED","EXPIRED","REJECTED"):
-                        _remove_position_checked(pid)
+                        await loop.run_in_executor(None, _remove_position_checked, pid)
                         logger.info(f"[pm] {symbol} pending订单 {order_id} 已{status},清除本地记录")
                         return
                     elif status == "FILLED":
@@ -1790,20 +1800,20 @@ async def _check_pending_expire_static(pos: dict, now_ms: int):
                             f"(price={fill_price} qty={fill_qty})但状态未更新,开始补挂止损止盈"
                         )
                         # 先把状态标记为 patching,防止下一轮 patrol 重复进入
-                        update_position(pid, {"status": "patching"})
+                        await loop.run_in_executor(None, update_position, pid, {"status": "patching"})
                         mark_system_order_update(symbol)  # 补挂期间禁止手动平仓误判
                         try:
                             await _补挂保护单(pos, fill_price, fill_qty, pid, symbol)
                         except Exception as ge:
                             # 补挂失败→状态回滚到 pending,下轮再试
-                            update_position(pid, {"status": "pending"})
+                            await loop.run_in_executor(None, update_position, pid, {"status": "pending"})
                             logger.error(f"[pm] {symbol} 补挂保护单失败: {ge}")
                             await _notify_async(f"⚠️ {symbol} 已成交但补挂止损失败,请人工介入!\n错误:{ge}")
                         return
                 else:
                     # api.get_order 返回 None → 订单不存在或查询失败,超过24h再清除
                     if hold_min > 24 * 60:
-                        _remove_position_checked(pid)
+                        await loop.run_in_executor(None, _remove_position_checked, pid)
                         logger.info(f"[pm] {symbol} pending订单 {order_id} 查询失败且超24h,清除本地记录")
                         return
         except Exception as e:
@@ -1815,7 +1825,7 @@ async def _check_pending_expire_static(pos: dict, now_ms: int):
         return
 
     if not order_id:
-        _remove_position_checked(pid)
+        await loop.run_in_executor(None, _remove_position_checked, pid)
         return
 
     for attempt in range(2):
@@ -1834,7 +1844,7 @@ async def _check_pending_expire_static(pos: dict, now_ms: int):
                 await _notify_async(f"⚠️ {symbol} 挂单 {order_id} 超时撤单失败,请人工处理。\n错误:{e}")
                 return
 
-    _remove_position_checked(pid)
+    await loop.run_in_executor(None, _remove_position_checked, pid)
     logger.info(f"[pm] {symbol} 挂单超时({hold_min:.0f}min)已撤销")
 
 
@@ -1857,6 +1867,7 @@ def _pos_still_open(pos: dict) -> bool:
 async def _force_close_static(pos: dict, close_reason: str):
     # v3.56: 幂等保护--同一 pos_id 同时只允许一条路径执行平仓
     # 场景:WS SL触发 和 patrol时间止损 极端情况下并发调用同一仓位
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     _pid_fc = pos.get("pos_id", pos.get("symbol", "unknown"))
     if _pid_fc in _closing_set:
         logger.info(f"[pm] {pos.get('symbol')} _force_close 已在执行中,跳过重复调用({close_reason})")
@@ -1867,7 +1878,7 @@ async def _force_close_static(pos: dict, close_reason: str):
         #   _closing_set 只防「同时执行」,防不住「先后各执行一次」:PositionManager._patrol_loop 与 main 里的 patrol_once
         #   都每 5 分钟跑时间止损 / 突破失败 / 反向信号检查,第一个平仓完成后,第二个拿着旧快照仍可能再发一次平仓。
         #   读不到(已被删除)或 status 不是 open → 直接返回,不做任何平仓操作。
-        if not _pos_still_open(pos):
+        if not (await loop.run_in_executor(None, _pos_still_open, pos)):
             logger.debug(f"[pm] {pos.get('symbol')} 持仓已不存在或已非 open,跳过重复平仓({close_reason})")
             return
         await _force_close_static_inner(pos, close_reason)
@@ -2052,8 +2063,9 @@ async def _close_position_post_static(
     pos_id: str, symbol: str, close_reason: str, event: dict,
     fill_price: float = 0, fill_qty: float = 0,
 ) -> None:
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     pos = None
-    for p in get_all_positions():
+    for p in await loop.run_in_executor(None, get_all_positions):
         if p.get("pos_id") == pos_id:
             pos = p; break
     if pos is None:
@@ -2086,21 +2098,40 @@ async def _close_position_post_static(
     pnl_pct      = pnl_usdt / (nominal + 1e-9) * 100
     hold_minutes = (close_ms - open_ms) / 60000
 
-    # 步骤2:更新熔断器(v3.16 修复:record_pnl 正确区分盈亏,盈利不再计入 daily_loss)
+    # 步骤3:设置冷却期(清除持仓前先设置,防止窗口期重新开仓)
+    #   [并发平仓互斥] 冷却幂等，提前到清仓之前；两路同时处理同一笔平仓时各设一次无害
+    try:
+        if close_reason == "sl":
+            await loop.run_in_executor(None, set_cooldown, symbol, PM_COOLDOWN_SL_HOURS, "sl_trigger")
+        elif close_reason == "crash_guard":
+            await loop.run_in_executor(None, set_cooldown, symbol, PM_COOLDOWN_CRASH_HOURS, "crash_guard")
+        # 止盈/时间止损/健康检查/突破失败不设冷却
+    except Exception as e:
+        logger.error(f"[pm] set_cooldown 失败: {e}")
+
+    # 步骤4:独占式清除持仓状态（原在盈亏/黑名单之后，现提前作为互斥闸门）
+    #   只有真正删到记录的那一路才继续记盈亏、黑名单、交易日志、通知；
+    #   WS 成交路径与巡检 REST 路径可能同时处理同一笔平仓，原先靠"读到删除之间没有 await"隐含互斥，
+    #   run_in_executor 化之后这个隐含互斥消失，改由 remove_position_exclusive 的返回值显式保证。
+    try:
+        _removed = await loop.run_in_executor(None, remove_position_exclusive, pos_id)
+    except Exception as e:
+        logger.error(f"[pm] remove_position 失败: {e}")
+        _removed = False
+    if _removed is None:
+        logger.info(f"[pm] {symbol} _close_position_post_static: pid={pos_id} 已被其他路径处理，跳过({close_reason})")
+        return
+    if _removed is False:
+        logger.error(f"[pm] {symbol} pid={pos_id} 持仓文件异常(拒绝写入/写入失败)，记账继续，请人工核查 pos_state")
+    _peak.pop(pos_id, None)
+    _mfe.pop(pos_id, None)
+    _mae.pop(pos_id, None)
+
+    # 步骤2:更新熔断器（现位于清仓闸门之后，避免并发平仓时重复记账）(v3.16 修复:record_pnl 正确区分盈亏,盈利不再计入 daily_loss)
     try:
         _record_pnl(pnl_usdt, symbol=symbol)
     except Exception as e:
         logger.error(f"[pm] record_pnl 失败: {e}")
-
-    # 步骤3:设置冷却期(清除持仓前先设置,防止窗口期重新开仓)
-    try:
-        if close_reason == "sl":
-            set_cooldown(symbol, PM_COOLDOWN_SL_HOURS, "sl_trigger")
-        elif close_reason == "crash_guard":
-            set_cooldown(symbol, PM_COOLDOWN_CRASH_HOURS, "crash_guard")
-        # 止盈/时间止损/健康检查/突破失败不设冷却
-    except Exception as e:
-        logger.error(f"[pm] set_cooldown 失败: {e}")
 
     # 步骤3b:累计亏损黑名单检查
     # 止损触发后检查过去7天同标的止损次数,≥3次加入7天冷却黑名单
@@ -2124,16 +2155,6 @@ async def _close_position_post_static(
                 logger.warning(f"[blacklist] {symbol} 7天止损{_sl_count}次,加入{_blacklist_days}天黑名单")
         except Exception as _be:
             logger.error(f"[pm] 黑名单检查失败: {_be}")
-
-
-    # 步骤4:清除持仓状态
-    try:
-        _remove_position_checked(pos_id)
-        _peak.pop(pos_id, None)
-        _mfe.pop(pos_id, None)
-        _mae.pop(pos_id, None)
-    except Exception as e:
-        logger.error(f"[pm] remove_position 失败: {e}")
 
 
     # 步骤5:写入 trade_log.jsonl(持仓清除后再写,保证状态一致)
@@ -2299,6 +2320,7 @@ async def _maybe_tighten_tp2(pos: dict) -> None:
     只在 TP1 未触达 + TP2 未成交 + 浮盈 > 0 时生效。
     try/except 全包,失败不影响主策略。
     """
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     try:
         from config import (
             TP2_TIGHTEN_4H_MULT, TP2_TIGHTEN_8H_MULT,
@@ -2384,7 +2406,7 @@ async def _maybe_tighten_tp2(pos: dict) -> None:
             )
             new_tp2_id = resp.get("orderId")
             if new_tp2_id:
-                update_position(pid, {
+                await loop.run_in_executor(None, update_position, pid, {
                     "tp2_price":    new_tp2,
                     "tp2_order_id": int(new_tp2_id),
                     "tp2_tighten_ts": time.time(),
@@ -2409,7 +2431,7 @@ async def _maybe_tighten_tp2(pos: dict) -> None:
                     )
                 )
                 if _resp2.get("orderId"):
-                    update_position(pid, {"tp2_order_id": int(_resp2["orderId"])})
+                    await loop.run_in_executor(None, update_position, pid, {"tp2_order_id": int(_resp2["orderId"])})
             except Exception:
                 pass
     except Exception as e:
@@ -2469,6 +2491,7 @@ async def _maybe_pyramid(pos: dict) -> None:
       4 未加过仓(pyramid_addup 标记)
     try/except 全包。
     """
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     try:
         from config import (
             PYRAMID_ENABLED, PYRAMID_FLOAT_PROFIT_ATR,
@@ -2592,7 +2615,7 @@ async def _maybe_pyramid(pos: dict) -> None:
                     f"[pm] {symbol} 加仓订单未确认成交 orderId={_oid_p} status={_st} "
                     f"executedQty={_exec_q} avgPrice={_avg}，不更新仓位，请人工核对"
                 )
-                update_position(pid, {"pyramid_pending_order_id": _oid_p, "pyramid_pending_status": _st})
+                await loop.run_in_executor(None, update_position, pid, {"pyramid_pending_order_id": _oid_p, "pyramid_pending_status": _st})
                 await _notify_async(
                     f"⚠️ {symbol} 加仓订单 {_oid_p} 未确认成交（status={_st}，已成交={_exec_q}），"
                     f"本地仓位未更新，请核对交易所持仓。"
@@ -2606,7 +2629,7 @@ async def _maybe_pyramid(pos: dict) -> None:
             new_avg_entry  = (entry * remaining + fill_p * addup_qty) / new_remaining
             # 加仓后 SL 设到原入场价(保本线)
             new_sl = entry
-            update_position(pid, {
+            await loop.run_in_executor(None, update_position, pid, {
                 "quantity":          new_total_qty,
                 "quantity_remaining": new_remaining,
                 "entry_price":       round(new_avg_entry, 8),
@@ -2673,6 +2696,7 @@ async def _maybe_record_funding_costs() -> None:
     对所有 open 持仓计算并累积资金费率成本。
     try/except 包裹,任何失败不影响主策略。
     """
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     try:
         from datetime import datetime, timezone
         from shared.state import get_all_positions, update_position
@@ -2681,7 +2705,7 @@ async def _maybe_record_funding_costs() -> None:
             return
         if now_utc.minute >= 30:
             return
-        positions = get_all_positions()
+        positions = await loop.run_in_executor(None, get_all_positions)
         try:
             acc_data = api.get_account()
             equity   = float(acc_data.get("totalMarginBalance", 0) or 0)
@@ -2697,7 +2721,7 @@ async def _maybe_record_funding_costs() -> None:
             updates = _calc_funding_cost_for_pos(pos, equity)
             if updates:
                 updates["funding_last_settle_hour"] = now_utc.hour
-                update_position(pos["pos_id"], updates)
+                await loop.run_in_executor(None, update_position, pos["pos_id"], updates)
                 logger.debug(
                     f"[pm] {pos.get('symbol')} 资金费率成本记录: "
                     f"{updates.get('funding_cost_last',0):+.4f}U "
@@ -2709,6 +2733,7 @@ async def _maybe_record_funding_costs() -> None:
 
 async def _generate_daily_report():
     """读取 trade_log.jsonl 里昨日记录,生成并发送日报"""
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     now_utc   = datetime.now(timezone.utc)
     bj_now    = now_utc + timedelta(hours=8)
     yesterday = (bj_now - timedelta(days=1)).date()
@@ -2749,7 +2774,7 @@ async def _generate_daily_report():
             mode_stats[m]["wins"] += 1
 
     # 当前持仓
-    open_pos  = [p for p in get_all_positions() if p.get("status") == "open"]
+    open_pos  = [p for p in (await loop.run_in_executor(None, get_all_positions)) if p.get("status") == "open"]
     pos_lines = []
     for p in open_pos:
         sym   = p["symbol"]
@@ -2888,6 +2913,7 @@ async def _补挂保护单(pos: dict, fill_price: float, fill_qty: float, pid: s
     互斥保护:同一 pos_id 同时只允许一条路径运行(防止 executor + patrol 并发补挂)。
     防重复:调用前先查交易所是否已有 TP 限价单,有则直接同步状态跳过挂单。
     """
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent))
@@ -2922,8 +2948,8 @@ async def _补挂保护单(pos: dict, fill_price: float, fill_qty: float, pid: s
             real_qty = abs(float(real_pos.get("positionAmt", 0))) if real_pos else 0.0
             if real_qty <= 0:
                 logger.info(f"[pm] {symbol} 交易所实际持仓为0(已被平仓),跳过补挂")
-                update_position(pid, {"status": "closed", "close_reason": "already_closed"})
-                _remove_position_checked(pid)
+                await loop.run_in_executor(None, update_position, pid, {"status": "closed", "close_reason": "already_closed"})
+                await loop.run_in_executor(None, _remove_position_checked, pid)
                 return
             # 使用交易所实际量覆盖本地记录(防止部分成交导致数量偏差)
             if abs(real_qty - fill_qty) / max(fill_qty, 1e-9) > 0.01:
@@ -2969,7 +2995,7 @@ async def _补挂保护单(pos: dict, fill_price: float, fill_qty: float, pid: s
                                 None, lambda: _api.cancel_order(symbol, tp2_id)
                             )
                             tp2_qty = pos.get("tp2_quantity") or pos.get("tp2_qty") or 0
-                            prec = _get_precision(symbol)
+                            prec = await loop.run_in_executor(None, _get_precision, symbol)
                             tp2_price_r = round(float(tp2_state_price) / prec["tick"]) * prec["tick"]
                             tp2_qty_r   = _round_qty(float(tp2_qty), prec["step"])
                             resp = await asyncio.get_running_loop().run_in_executor(
@@ -2992,7 +3018,7 @@ async def _补挂保护单(pos: dict, fill_price: float, fill_qty: float, pid: s
                     f"[pm] {symbol} 交易所已有 {len(existing_tp)} 个 TP 挂单 "
                     f"(tp1={tp1_id} tp2={tp2_id}),跳过补挂,同步 pos_state"
                 )
-                update_position(pid, {
+                await loop.run_in_executor(None, update_position, pid, {
                     "status":       "open",
                     "fill_price":   fill_price,
                     "quantity":     fill_qty,
@@ -3006,7 +3032,7 @@ async def _补挂保护单(pos: dict, fill_price: float, fill_qty: float, pid: s
         # ── 如果 pos_state 里没有 sl/tp 价格,重新用 ATR 降级计算 ─────────────
         if not sl_price or not tp1_price:
             try:
-                klines = _api.get_klines(symbol, "1h", 22)
+                klines = await loop.run_in_executor(None, _api.get_klines, symbol, "1h", 22)
                 now_ms = __import__("time").time() * 1000
                 closed = [k for k in klines if float(k[6]) < now_ms]
                 trs = [max(float(closed[i][2])-float(closed[i][3]),
@@ -3029,7 +3055,7 @@ async def _补挂保护单(pos: dict, fill_price: float, fill_qty: float, pid: s
             except Exception as e:
                 raise RuntimeError(f"计算止损价失败: {e}")
 
-        precision = _get_precision(symbol)
+        precision = await loop.run_in_executor(None, _get_precision, symbol)
         guard = await _place_guards_async(
             symbol, direction, fill_qty,
             sl_price, tp1_price, tp2_price,
@@ -3039,7 +3065,7 @@ async def _补挂保护单(pos: dict, fill_price: float, fill_qty: float, pid: s
         # 更新 pos_state:pending → open,写入保护单 id
         # 注意:_place_guards_async 返回 key 为 sl_id / tp1_id / tp2_id
         import time as _time_fill
-        update_position(pid, {
+        await loop.run_in_executor(None, update_position, pid, {
             "status":      "open",
             "fill_price":  fill_price,
             "fill_time":   int(_time_fill.time()),  # v3.39: 补挂路径补写 fill_time,时间止损用真实成交时间
@@ -3061,7 +3087,7 @@ async def _补挂保护单(pos: dict, fill_price: float, fill_qty: float, pid: s
             from shared.state import get_all_positions as _gap
             import config as _cfg_pm
             from shared.risk_manager import get_market_mode as _gmm_pm
-            _mkt = _gmm_pm()
+            _mkt = await loop.run_in_executor(None, _gmm_pm)
             if _mkt == "bear":
                 _max_l = max(1, _cfg_pm.MAX_POSITIONS_LONG_BEAR)
                 _max_s = _cfg_pm.MAX_POSITIONS_SHORT_BEAR
@@ -3071,7 +3097,7 @@ async def _补挂保护单(pos: dict, fill_price: float, fill_qty: float, pid: s
             else:
                 _max_l = _cfg_pm.MAX_POSITIONS_LONG_RANGE
                 _max_s = _cfg_pm.MAX_POSITIONS_SHORT_RANGE
-            _all_pos = _gap()
+            _all_pos = await loop.run_in_executor(None, _gap)
             _open_long  = sum(1 for p in _all_pos if p.get("direction")=="LONG"  and p.get("status")=="open")
             _open_short = sum(1 for p in _all_pos if p.get("direction")=="SHORT" and p.get("status")=="open")
             # 检查刚成交的这个方向是否已达上限
@@ -3101,7 +3127,7 @@ async def _补挂保护单(pos: dict, fill_price: float, fill_qty: float, pid: s
                             from shared.state import remove_position as _rm_pos
                             # [v3.89 remove-pos 检查] 检查返回值，失败只记日志
                             try:
-                                if _rm_pos(_pp.get("pos_id", _pp_sym)) is False:
+                                if (await loop.run_in_executor(None, _rm_pos, _pp.get("pos_id", _pp_sym))) is False:
                                     logger.warning(f"[pm] remove_position({_pp_sym}) 返回 False，pos_state 未写入成功，请人工核查")
                             except Exception as _re:
                                 logger.error(f"[pm] remove_position({_pp_sym}) 抛异常，持仓文件可能损坏，请人工核查: {_re}")
@@ -3120,12 +3146,13 @@ async def _补挂保护单(pos: dict, fill_price: float, fill_qty: float, pid: s
 
 async def patrol_once() -> dict:
     """单次执行所有巡检(时间止损 + 突破失败 + 健康检查 + 挂单过期 + 手动平仓检测 + TP REST 确认)。"""
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     pm = get_manager()
     if pm is None:
         return {"error": "PositionManager 未初始化"}
     try:
         from shared.state import get_all_positions
-        positions = get_all_positions()
+        positions = await loop.run_in_executor(None, get_all_positions)
         open_pos  = [p for p in positions if p.get("status") == "open"]
         now_ms = int(__import__("time").time() * 1000)
 
@@ -3133,7 +3160,7 @@ async def patrol_once() -> dict:
         for pos in list(open_pos):
             await pm._check_manual_close(pos)
         # 重新加载(_check_manual_close 可能删除了记录)
-        positions = get_all_positions()
+        positions = await loop.run_in_executor(None, get_all_positions)
         open_pos  = [p for p in positions if p.get("status") == "open"]
 
         # TP REST 确认保底
@@ -3220,6 +3247,7 @@ async def _adjust_sl_tp_once(pos: dict, force: bool = False) -> dict | None:
 
     返回调整摘要 dict,或 None(跳过)。
     """
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     import json as _json, datetime, pathlib
 
     symbol    = pos["symbol"]
@@ -3478,7 +3506,7 @@ async def _adjust_sl_tp_once(pos: dict, force: bool = False) -> dict | None:
             logger.warning(f"[adjust_sltp] {symbol} 新SL挂单失败: {e}")
             return
 
-        update_position(pid, {"sl_price": new_sl, "sl_order_id": new_id})
+        await loop.run_in_executor(None, update_position, pid, {"sl_price": new_sl, "sl_order_id": new_id})
         sl_id = new_id
         logger.info(f"[adjust_sltp] {symbol} SL {old_sl:.6g}→{new_sl:.6g} ({sl_reason})")
 
@@ -3511,7 +3539,7 @@ async def _adjust_sl_tp_once(pos: dict, force: bool = False) -> dict | None:
             # ── 挂单失败:记录失败次数,连续3次告警 ──
             fail_key = f"tp1_fail_count"
             prev_fail = int(pos.get(fail_key, 0)) + 1
-            update_position(pid, {fail_key: prev_fail})
+            await loop.run_in_executor(None, update_position, pid, {fail_key: prev_fail})
             logger.warning(f"[adjust_sltp] {symbol} 新TP1挂单失败(第{prev_fail}次): {e}")
             if prev_fail >= 3 and prev_fail % 3 == 0:
                 asyncio.ensure_future(_notify_async(
@@ -3521,7 +3549,7 @@ async def _adjust_sl_tp_once(pos: dict, force: bool = False) -> dict | None:
                 ))
             return
         # ── 挂单成功:更新状态,重置失败计数 ──
-        update_position(pid, {"tp1_price": new_tp1, "tp1_order_id": new_id, "tp1_fail_count": 0})
+        await loop.run_in_executor(None, update_position, pid, {"tp1_price": new_tp1, "tp1_order_id": new_id, "tp1_fail_count": 0})
         tp1_id = new_id
         logger.info(f"[adjust_sltp] {symbol} TP1 {old_tp1:.6g}→{new_tp1:.6g} ({tp1_reason})")
 
@@ -3554,7 +3582,7 @@ async def _adjust_sl_tp_once(pos: dict, force: bool = False) -> dict | None:
         except Exception as e:
             logger.warning(f"[adjust_sltp] {symbol} 新TP2挂单失败: {e}")
             return
-        update_position(pid, {"tp2_price": new_tp2, "tp2_order_id": new_id})
+        await loop.run_in_executor(None, update_position, pid, {"tp2_price": new_tp2, "tp2_order_id": new_id})
         tp2_id = new_id
         logger.info(f"[adjust_sltp] {symbol} TP2 {old_tp2:.6g}→{new_tp2:.6g}")
 
@@ -3588,7 +3616,7 @@ async def _adjust_sl_tp_once(pos: dict, force: bool = False) -> dict | None:
                 # (_replace_tp1 已 update_position,但传入的 pos dict 未同步)
                 try:
                     from shared.state import get_all_positions as _gap
-                    _matches = [p for p in _gap() if p.get("pos_id") == pid]
+                    _matches = [p for p in (await loop.run_in_executor(None, _gap)) if p.get("pos_id") == pid]
                     if not _matches:
                         logger.info(f"[adjust_sltp] {symbol} RR平仓前发现仓位已关闭,跳过")
                         return {"closed": True, "reason": "already_closed"}
@@ -3665,12 +3693,13 @@ def _write_adjust_log(pid, symbol, direction, action,
 # ── 每30分钟循环,遍历所有 open 仓位 ─────────────────────────────────────────
 async def _adjust_sl_tp_loop_static():
     """静默 loop:每 TP_SL_ADJUST_INTERVAL_MIN 分钟对所有 open 仓位跑一次动态调整"""
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     interval = TP_SL_ADJUST_INTERVAL_MIN * 60
     # 错开其他 loop 启动时间
     await asyncio.sleep(90)
     while True:
         try:
-            positions = get_all_positions()
+            positions = await loop.run_in_executor(None, get_all_positions)
             open_pos  = [p for p in positions if p.get("status") == "open"]
             for pos in open_pos:
                 sym = pos.get("symbol", "?")
@@ -3688,7 +3717,7 @@ async def _adjust_sl_tp_loop_static():
                         if _liq_l or _liq_s:
                             # 清算数据已就绪,更新标记,继续调整
                             from shared.state import update_position as _upd
-                            _upd(pos.get("pos_id", sym), {"liq_data_available": True})
+                            await loop.run_in_executor(None, _upd, pos.get("pos_id", sym), {"liq_data_available": True})
                             pos["liq_data_available"] = True
                             logger.info(f"[adjust_sltp] {sym} 清算数据已就绪,补标 liq_data_available=True")
                         else:
@@ -3724,6 +3753,7 @@ async def _check_arb_post_settle(pos: dict) -> None:
     v3.37: 结算完成后5分钟内执行,重新评估费率,决定续持或平仓。
     支持 1h/4h/8h 不同结算周期的标的自动续持。
     """
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     import time as _t
     from shared import binance_api as _bapi
     from shared.state import update_position as _upd_pos, remove_position as _rm_pos
@@ -3759,7 +3789,7 @@ async def _check_arb_post_settle(pos: dict) -> None:
         # 计算下次结算时间
         interval_h = int(pos.get("funding_interval_h", 8))
         next_settle = _next_settle_ts(now_ts, interval_h=interval_h)
-        _upd_pos(pid, {
+        await loop.run_in_executor(None, _upd_pos, pid, {
             "cancel_before_ts":   next_settle - 300,
             "cooldown_end_ts":    next_settle + 300,
             "arb_settle_count":   settle_cnt + 1,
@@ -3788,7 +3818,7 @@ async def _check_arb_post_settle(pos: dict) -> None:
         )
         # 触发平仓:更新 cancel_before_ts 为当前时间,让下次 patrol 触发平仓
         # 直接调用 _close 需要在 _patrol_funding_arb 的 closure 里,这里用状态标记
-        _upd_pos(pid, {"arb_force_close_reason": reason})
+        await loop.run_in_executor(None, _upd_pos, pid, {"arb_force_close_reason": reason})
 
 
 async def _patrol_funding_arb(pos: dict) -> None:
@@ -3796,6 +3826,7 @@ async def _patrol_funding_arb(pos: dict) -> None:
     对单个 funding_arb 仓位执行四步巡检:
     1 止损  2 费率突变  3 结算后续持/退出  4 最大持有时间
     """
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     import time as _t
     from shared import binance_api as api
     from shared.state import (update_position, remove_position,
@@ -3858,7 +3889,7 @@ async def _patrol_funding_arb(pos: dict) -> None:
         fr_collected = notional * abs(fr_entry) * (hold_cnt + 1)
 
         _append_fa_trade_log(pos, exit_price, fr_exit, reason, hold_cnt, fr_collected, pnl)
-        _remove_position_checked(pid)
+        await loop.run_in_executor(None, _remove_position_checked, pid)
 
         if is_sl:
             consec = inc_funding_arb_consec_sl()
@@ -3886,7 +3917,7 @@ async def _patrol_funding_arb(pos: dict) -> None:
                 logger.info(f"[arb_patrol] {symbol} 结算前5min未成交,已撤单 {order_id}")
             except Exception as _ce:
                 logger.warning(f"[arb_patrol] {symbol} 撤单失败: {_ce}")
-        _remove_position_checked(pid)
+        await loop.run_in_executor(None, _remove_position_checked, pid)
         await _notify(f"⏱ {symbol} funding_arb 挂单在结算前5min未成交,已撤单,冷却30min后重新评估")
         return
 
@@ -3896,7 +3927,7 @@ async def _patrol_funding_arb(pos: dict) -> None:
             and not is_pending and not _post_check_done):
         # 标记已执行,防止重复
         from shared.state import update_position as _upd_pos
-        _upd_pos(pid, {"arb_post_check_done": True})
+        await loop.run_in_executor(None, _upd_pos, pid, {"arb_post_check_done": True})
         pos["arb_post_check_done"] = True
         await _check_arb_post_settle(pos)
 
@@ -3906,7 +3937,7 @@ async def _patrol_funding_arb(pos: dict) -> None:
     _force_close_reason = pos.get("arb_force_close_reason")
     if _force_close_reason:
         from shared.state import update_position as _upd_force
-        _upd_force(pid, {"arb_force_close_reason": None})
+        await loop.run_in_executor(None, _upd_force, pid, {"arb_force_close_reason": None})
         await _close(_force_close_reason); return
 
     # ── 1 止损检查 ──────────────────────────────────────────────────────────
@@ -3975,7 +4006,7 @@ async def _patrol_funding_arb(pos: dict) -> None:
                 if renew_ok:
                     # 计算下次结算时间
                     next_ts = _next_settle_ts(now_ts, interval_h=int(pos.get("funding_interval_h", 8)))
-                    update_position(pid, {
+                    await loop.run_in_executor(None, update_position, pid, {
                         "funding_arb_target_ts": next_ts,
                         "funding_arb_hold_count": hold_cnt + 1,
                     })
@@ -4010,7 +4041,7 @@ async def _patrol_funding_arb(pos: dict) -> None:
                             and oi_drop <= FUNDING_ARB_OI_DROP_LIMIT)
                 if renew_ok:
                     next_ts = _next_settle_ts(now_ts, interval_h=int(pos.get("funding_interval_h", 8)))
-                    update_position(pid, {
+                    await loop.run_in_executor(None, update_position, pid, {
                         "funding_arb_target_ts": next_ts,
                         "funding_arb_hold_count": hold_cnt + 1,
                     })
@@ -4082,6 +4113,7 @@ async def _check_pending_health_static(pos: dict) -> None:
     2. 入场价是否需要调整(变化 >= 0.2ATR)→ 撤单重挂
     3. 调整次数达上限(3次)→ 直接撤单
     """
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     import time as _t
     from shared import binance_api as _api
     from shared.state import update_position, remove_position
@@ -4312,7 +4344,7 @@ async def _check_pending_health_static(pos: dict) -> None:
         return
 
     # 更新 pos_state(v3.72: 标记为重挂单,保护不被竞争替换)
-    update_position(pid, {
+    await loop.run_in_executor(None, update_position, pid, {
         "entry_price":               new_entry,
         "sl_price":                  new_params["sl_price"],
         "tp1_price":                 new_params["tp1_price"],
@@ -4333,6 +4365,7 @@ async def _check_pending_health_static(pos: dict) -> None:
 async def _pending_cancel(pos: dict, reason: str, pid: str, symbol: str,
                            _api, remove_position, _notify) -> None:
     """撤销挂单并清除 pos_state 记录"""
+    loop = asyncio.get_running_loop()   # 同步磁盘 IO 统一走线程池，避免卡事件循环
     oid = pos.get("open_order_id")
     if oid:
         try:
@@ -4341,7 +4374,7 @@ async def _pending_cancel(pos: dict, reason: str, pid: str, symbol: str,
             logger.warning(f"[pending_health] {symbol} 撤单失败(忽略): {_ce}")
     # [v3.89 remove-pos 检查] 检查返回值；失败只记日志，不影响撤单后的流程
     try:
-        if remove_position(pid) is False:
+        if (await loop.run_in_executor(None, remove_position, pid)) is False:
             logger.warning(f"[pm] remove_position({symbol}) 返回 False，pos_state 未写入成功，请人工核查")
     except Exception as _re:
         logger.error(f"[pm] remove_position({symbol}) 抛异常，持仓文件可能损坏，请人工核查: {_re}")

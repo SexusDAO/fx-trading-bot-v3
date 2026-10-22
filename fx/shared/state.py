@@ -219,6 +219,27 @@ def remove_position(pos_id: str) -> bool:
     return True
 
 
+def remove_position_exclusive(pos_id: str) -> bool | None:
+    """
+    尝试删除 pos_id 对应的记录，并区分"这次是否真的由我删掉"（供多路并发平仓时做互斥）。
+    返回值语义：
+      True  — 找到并删除了
+      None  — 找不到（已被其他路径删除）
+      False — 持仓文件曾损坏，拒绝写入
+    remove_position 原样不动，所有现有调用方不受影响。
+    """
+    if _POS_STATE_CORRUPTED:
+        logger.error("[state] 持仓文件曾损坏，拒绝写入: remove_position_exclusive")
+        return False
+    with _locks["pos"]:
+        data = _load_pos()
+        new  = [p for p in data if p.get("pos_id") != pos_id]
+        if len(new) == len(data):
+            return None   # 找不到：已被其他路径删除
+        _save_pos(new)
+    return True
+
+
 def remove_position_by_symbol(symbol: str, status: str | None = None) -> int:
     """
     按 symbol（可选 status 过滤）删除记录，返回删除数量。
