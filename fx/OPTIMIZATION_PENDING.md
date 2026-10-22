@@ -30,12 +30,11 @@
 
 ## [P-03] 冷缓存时注册阶段清算区为空，止损降级为 ATR
 - **来源**：`cb792429`（`fetch_if_missing=False`）
-- **问题**：后台刷新周期与缓存有效期都是 15 分钟，刷新稍有延迟或标的刚进池时缓存过期，注册阶段拿到空清算区，止损止盈改用 ATR 公式；794 秒卡顿是否确实卡在这 4 处调用也未用日志验证
-- **方案**：注册阶段加耗时日志确认卡点；将缓存有效期放宽到刷新周期的 1.5~2 倍，或注册时只读"未超过 2×TTL"的数据
-- **涉及文件**：`scanner.py`、`shared/liq_cache.py`
-- **依赖**：无
-- **状态**：待实现（先加日志观察）
-
+- **问题**：后台刷新周期与缓存有效期都是 15 分钟，刷新稍有延迟或标的刚进池时缓存过期，注册阶段拿到空清算区，止损止盈改用 ATR 公式；794 秒卡顿是否卡在这 4 处调用未验证
+- **方案**：已在 scanner 注册阶段 4 处清算区调用加耗时日志 `[liq-timing] {symbol} fetch_liq_zones 耗时 {ms}ms 结果=有数据/空`；上线后按日志统计"空"占比与耗时，再决定是否放宽缓存有效期到刷新周期的 1.5~2 倍
+- **涉及文件**：`scanner.py`（已加日志）；后续可能改 `shared/liq_cache.py`
+- **依赖**：上线日志
+- **状态**：日志已加，待观察数据
 ## [P-04] binance_api 签名接口没有代理主备切换
 - **来源**：`3852aa1b`（clawby_adapter 主备切换）、`d43efc6e`（只做了 listenKey）
 - **问题**：`BINANCE_PROXY` 改成日本节点后，下单、行情等交易所请求也走它，节点断了不会切到备用；只有 listenKey 两个函数有切换
@@ -68,22 +67,24 @@
 - **依赖**：无
 - **状态**：待实现（低优先级）
 
-## [P-08] 名义价值字段未确认，流动性阈值可能失效
+## [P-08] 名义价值计算单位错误，流动性阈值随币价缩放
 - **来源**：`7b2ae3e1`（高优先级修复【2】【3】）
-- **问题**：`_signal_notional` 读 `pre_params.notional` → `position_size × ind.mark_price` → 100U；未确认 scanner 是否写入这些字段，若都没有，名义价值恒为 100U，新的流动性阈值基本由 3000U 硬底决定
-- **方案**：核对 scanner `pre_params` / `ind` 实际字段，必要时在 scanner 写入 notional
-- **涉及文件**：`scanner.py`（可能）、`executor.py`（仅读取逻辑）
+- **问题**（已核对，`_signal_notional` 实际在 `executor.py`，不在 signal_watcher）：
+  - `pre_params` 来自 `calc_sl_tp` 返回值，只有 entry_price / sl_price / tp1_price / tp2_price / rr / 降级标记等，**没有 `notional`，也没有 `position_size`**
+  - `ind` 没有 `mark_price`，但有 `markPrice`（scanner 分析阶段写入），代码两个键都读，所以能取到价格
+  - 结果：第二步 `position_size` 缺失时取默认值 100 → 名义价值 = **100 × 标记价格**，不是 100U 硬底；只有 markPrice 为 0 时才落到 100U
+  - 影响：BTC（约 6 万）名义价值被算成约 600 万 U，盘口粗筛要求 ±0.5% 深度 ≥ 1200 万 U，大概率被误拦；低价币（<1U）名义价值 < 100U，阈值实际由 3000U 硬底决定
+- **方案**（已实现）：scanner 拿不到真实仓位（executor 下单时才算），在 `pre_params` 写入 `notional = MIN_NOTIONAL_GUARD`（100U），粗筛门槛 = 100 × 2 = 200U；精确深度检查仍由 executor 下单前完成。未采用"scanner 读余额估算仓位"方案（需复刻 executor 公式，改动不值当）
+- **涉及文件**：`scanner.py`（已改）；`executor.py` 未改
 - **依赖**：无
-- **状态**：待实现（先核对字段）
-
-## [P-09] oi_divergence 存活检查的"触发前 OI"字段未确认
+- **状态**：已修复（粗筛降为 200U 门槛，只拦盘口极薄的币）
+## [P-09] oi_divergence 存活检查的 OI 基准是"扫描前 1 小时"而非"触发前"
 - **来源**：`fdde5ff4`（【9】OI 恢复撤单）
-- **问题**：读 `signal.ind.oi_1h_ago`，未确认 scanner 是否写入；没有时只按价格条件撤单
-- **方案**：核对字段，必要时在 scanner 写入触发前 OI
+- **问题**（已核对）：scanner 分析阶段会写入 `ind["oi_1h_ago"]`（预取的 OI 历史第 1 条；另一条分析路径同样写入），所以 oi_divergence 信号带有这个字段，存活检查不是只按价格撤单。但字段含义是"扫描时往前 1 小时的 OI"，与注释里的"触发前水平"不完全等价；OI 本就在该值 ±1% 内时，注册后很快就会被判"已恢复"撤单
+- **方案**：观察 `oi_divergence OI 已恢复到触发前水平` 撤单日志的频率与注册到撤单的时长；若过早撤单，改为注册时记录当时 OI 作为基准
 - **涉及文件**：`scanner.py`、`shared/signal_watcher.py`
-- **依赖**：无
-- **状态**：待实现（先核对字段）
-
+- **依赖**：上线日志
+- **状态**：已核对，字段存在；暂缓（先看撤单日志）
 ## [P-10] 漏斗统计不完整
 - **来源**：`afd4506c`（漏斗统计）
 - **问题**：`run_scan` 有 5 个提前返回分支（熔断等）不写漏斗记录；chg24、熊市禁止、资金费率等原因都归入"其他"，占比可能偏大
@@ -111,17 +112,15 @@
 ## [P-13] 测试套件问题
 - **来源**：多次回归中发现
 - **问题**：
-  - 没有固定回归范围的配置文件（pytest.ini 等），"385 项回归"只是手动命令，`test_notifier_flush_timing.py` 等因此漏跑过
-  - `test_config_fallback_signal_watcher.py` 与 `test_exit_signal_and_direction.py` 一起跑报"no current event loop"（旧问题）
-  - `test_shutdown.py`、`test_task_exception.py` 收集失败（旧问题）
-  - `tests/test_phase5_dispatch.py` 整文件跑会卡住，默认 skip（`FX_RUN_PHASE5=1` 启用）
-  - `test_cancel_paths.py`、`test_cancel_state_batch1.py` 单文件约 20 秒
-  - 部分旧测试未 mock 注册前的交易所查询，会真实联网（目前靠 `tests/conftest.py` 按文件补 mock）
-- **方案**：新建 `fx/pytest.ini` 或回归脚本固定范围；全局 conftest 默认断网，需要联网的测试显式放行；逐个修复事件循环与收集问题
-- **涉及文件**：`tests/` 下相关文件、新建 `pytest.ini` 或回归脚本
+  - 已新建 `fx/pytest.ini` 固定回归范围（原手动"扩大回归组"17 个文件），`cd fx && python3 -m pytest` 即可
+  - `test_shutdown.py`、`test_task_exception.py` 收集阶段报 StopIteration，已在 pytest.ini 中排除，问题本身未修
+  - `test_phase5_dispatch.py` 整文件跑会卡住，仍靠文件内 skip（`FX_RUN_PHASE5=1` 启用）
+  - `test_config_fallback_signal_watcher.py` 与 `test_exit_signal_and_direction.py` 同跑报"no current event loop"，不在固定范围内
+  - 已加 `network` 标记并默认排除，但现有联网测试尚未打标记，仍靠 `tests/conftest.py` 按文件补 mock
+- **方案**：逐个修复收集失败与事件循环问题后加回 testpaths；给联网测试补 `@pytest.mark.network`
+- **涉及文件**：`pytest.ini`（已建）、`tests/` 下相关文件
 - **依赖**：无
-- **状态**：待实现
-
+- **状态**：部分完成（固定范围已建），其余待实现
 ## [P-14] stop_hunt 仓位上限写死 0.1，没有观察期退出机制
 - **来源**：`36c88c25` 后的 judges 代码阅读
 - **问题**：`shared/judges.py` 第 3090 行 `pos_cap = 0.1`，注释称"观察期，积累胜率数据"，但没有结束条件、没有胜率统计，也不会提升；函数外是否再被修改未查；`STOP_HUNT_ENABLED=False`（胜率约 9%）

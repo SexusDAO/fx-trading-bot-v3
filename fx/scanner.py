@@ -2995,7 +2995,15 @@ def _filter_and_register_signals(
             # ── 第一阶段（子线程）：耗时 IO 操作，预算每个信号的 entry_price ───────
             import fx.executor as _executor_mod
             from shared.calc_sl_tp import calc_sl_tp as _calc_sl_tp
-            from shared.liq_cache import get_liq_zones_cached as _liq_zones
+            from shared.liq_cache import get_liq_zones_cached as _liq_zones_raw
+
+            def _liq_zones(_s, *a, **k):
+                # [P-03] 注册阶段清算区耗时日志（只记录，不改逻辑）
+                _t0 = time.monotonic()
+                _r = _liq_zones_raw(_s, *a, **k)
+                logger.info(f"[liq-timing] {_s} fetch_liq_zones 耗时 {(time.monotonic() - _t0) * 1000:.0f}ms "
+                            f"结果={'有数据' if _r else '空'}")
+                return _r
             from shared.indicators import atr as _calc_atr, ema as _calc_ema
 
             prepared = []   # [(sig, entry_low, entry_high, expire_ts, ws_ref)]
@@ -3058,6 +3066,15 @@ def _filter_and_register_signals(
                         if "error" not in params:
                             sig["pre_entry_price"] = params["entry_price"]
                             sig["pre_params"] = params
+                            # [P-08] scanner 拿不到真实仓位（executor 下单时才算），pre_params 无 notional/position_size
+                            #   时 _signal_notional 会算成 100×标记价格，高价币被盘口粗筛误拦；这里写入最小名义保底，
+                            #   粗筛门槛 = MIN_NOTIONAL_GUARD × LIQ_PREFILTER_NOTIONAL_MULT，精确深度由 executor 下单前检查
+                            if "notional" not in params:
+                                try:
+                                    from config import MIN_NOTIONAL_GUARD as _min_ntl
+                                except ImportError:
+                                    _min_ntl = 100.0
+                                params["notional"] = float(_min_ntl)
                             sig["_entry_params_ok"] = True
                         else:
                             sig["_entry_params_ok"] = False
