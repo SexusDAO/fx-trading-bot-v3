@@ -289,14 +289,13 @@ def get_liq_zones_cached(symbol: str, direction: str,
     return (entry or {}).get(direction.upper(), [])
 
 
-def prefetch_liq_cache(symbols: list) -> None:
-    """
-    后台批量预热缓存（每 15 分钟由 main.py 触发）。
-    v3.15.1：BYK有数据时三个range共享；非主流币对每个range独立用CG拉取。
-    """
-    logger.info(f"[liq_cache] 开始预热 {len(symbols)} 个标的的清算区缓存")
-    updated = 0
-    for sym in symbols:
+# [hotfix] 预热并发限制：最多同时 5 个标的并行拉取，避免 GIL/Lock 争用压 event loop
+_PREFETCH_SEM = threading.Semaphore(5)
+
+
+def _prefetch_one(sym: str, updated_box: list) -> None:
+    """[hotfix] 单标的预热，受 _PREFETCH_SEM 并发限制。"""
+    with _PREFETCH_SEM:
         try:
             # [v3.89 #36] 先判断是否需要刷新，缓存仍新鲜的标的不再白白请求一次 mark price
             needs_refresh = False
@@ -308,12 +307,12 @@ def prefetch_liq_cache(symbols: list) -> None:
                     needs_refresh = True
                     break
             if not needs_refresh:
-                continue
+                return
 
             from shared.binance_api import get_mark_price
             price = float(get_mark_price(sym).get("markPrice", 0))
             if price <= 0:
-                continue
+                return
 
             wrote = 0
             for r in _PREFETCH_RANGES:
@@ -334,12 +333,30 @@ def prefetch_liq_cache(symbols: list) -> None:
                         break
 
             if wrote > 0:
-                updated += 1
+                updated_box[0] += 1
                 logger.debug(f"[liq_cache] {sym} 预热写入 {wrote}/3 个 range key")
-            time.sleep(3)
+            time.sleep(0.5)  # [hotfix] 3s→0.5s，减少 GIL 占用对 event loop 的影响
         except Exception as e:
             logger.debug(f"[liq_cache] {sym} 预热失败: {e}")
-    logger.info(f"[liq_cache] 预热完成，更新 {updated}/{len(symbols)} 个")
+
+
+def prefetch_liq_cache(symbols: list) -> None:
+    """
+    后台批量预热缓存（每 15 分钟由 main.py 触发）。
+    v3.15.1：BYK有数据时三个range共享；非主流币对每个range独立用CG拉取。
+    [hotfix] 改为最多5并发线程池，sleep 3s→0.5s，避免长期串行阻塞 event loop。
+    """
+    logger.info(f"[liq_cache] 开始预热 {len(symbols)} 个标的的清算区缓存")
+    updated_box = [0]  # 用列表做可变计数器（线程共享）
+    threads = []
+    for sym in symbols:
+        t = threading.Thread(target=_prefetch_one, args=(sym, updated_box),
+                             name=f"liq-warm-{sym}", daemon=True)
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join()
+    logger.info(f"[liq_cache] 预热完成，更新 {updated_box[0]}/{len(symbols)} 个")
 
 
 _bg_stop = threading.Event()
