@@ -29,6 +29,8 @@ if not BINANCE_API_KEY or not BINANCE_API_SECRET:
 # ── SOCKS5 代理 ────────────────────────────────────────────────────────────────
 PROXY_URL = os.environ.get("PROXY_URL", "")  # socks5://user:pass@host:port
 PROXIES   = {"http": PROXY_URL, "https": PROXY_URL}
+# 备用代理：clawby_adapter 主代理(BINANCE_PROXY)连接失败时切换重试一次；为空则不启用
+PROXY_URL_BACKUP = os.environ.get("PROXY_URL_BACKUP", "")
 BINANCE_BASE_URL   = "https://fapi.binance.com"
 BINANCE_WS_URL     = "wss://fstream.binance.com"
 

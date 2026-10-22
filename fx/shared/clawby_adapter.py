@@ -80,6 +80,33 @@ CACHE_TTL    = 15 * 60   # 15 分钟
 import os as _os
 _PROXY_URL = _os.environ.get("BINANCE_PROXY", "")
 _PROXIES   = ({"http": _PROXY_URL, "https": _PROXY_URL} if _PROXY_URL else {})
+# 备用代理（主代理连接失败时切换一次；为空不切换）
+try:
+    from config import PROXY_URL_BACKUP as _PROXY_URL_BACKUP
+except Exception:
+    _PROXY_URL_BACKUP = _os.environ.get("PROXY_URL_BACKUP", "")
+_PROXIES_BACKUP = ({"http": _PROXY_URL_BACKUP, "https": _PROXY_URL_BACKUP} if _PROXY_URL_BACKUP else {})
+
+# 视为「连接失败」的异常：连不上 / 代理错误 / 连接超时（ConnectTimeout 是 ConnectionError 子类）。
+# HTTP 状态码错误与读取超时(ReadTimeout)不切换。
+_CONNECT_ERRORS = (requests.exceptions.ConnectionError,)
+
+
+def _request(method: str, url: str, **kw):
+    """统一请求入口：每次先走主代理；连接失败且配置了备用 → 用备用重试一次。
+    备用也失败 → 记 WARNING 并抛原异常（调用方原有失败处理不变）。不粘滞在备用代理。"""
+    kw.pop("proxies", None)
+    try:
+        return requests.request(method, url, proxies=_PROXIES, **kw)
+    except _CONNECT_ERRORS as e_main:
+        if not _PROXIES_BACKUP:
+            raise
+        logger.info(f"[proxy] 主代理连接失败，切换备用代理重试: {type(e_main).__name__}")
+        try:
+            return requests.request(method, url, proxies=_PROXIES_BACKUP, **kw)
+        except _CONNECT_ERRORS as e_bak:
+            logger.warning(f"[proxy] 主备代理均连接失败 {url}: 主={type(e_main).__name__} 备={e_bak}")
+            raise
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 健康监控（Clawby 专用）
@@ -343,8 +370,8 @@ def cg_get(path: str, params: dict = None, timeout: int = 12) -> "list | dict | 
     url = f"{CG_BASE_URL}/{path.lstrip('/')}"
     for attempt in range(2):
         try:
-            r = requests.get(url, params=params or {}, headers=CG_HEADERS,
-                             timeout=timeout, proxies=_PROXIES)
+            r = _request("GET", url, params=params or {}, headers=CG_HEADERS,
+                         timeout=timeout)
         except requests.exceptions.RequestException as e:
             logger.warning(f"[cg_get] {path} 请求异常: {e}")
             return None
@@ -406,12 +433,12 @@ def clawby_relay(name: str, params: dict = None, timeout: int = 15,
     for attempt in range(_max_retries + 1):
         _wait_clawby_rate_limit()
         try:
-            r = requests.post(
+            r = _request(
+                "POST",
                 CLAWBY_BASE_URL,
                 headers=CLAWBY_HEADERS,
                 json=payload,
                 timeout=timeout,
-                proxies=_PROXIES,
             )
         except requests.exceptions.Timeout:
             _cb_record("fail_timeout")
@@ -721,7 +748,7 @@ def get_liq_coin_list(exchange: str = "Binance") -> list:
 FAPI_BASE = "https://fapi.binance.com"
 
 def _bn_get(path: str, params: dict = None, timeout: int = 8):
-    r = requests.get(f"{FAPI_BASE}{path}", params=params or {}, timeout=timeout, proxies=_PROXIES)
+    r = _request("GET", f"{FAPI_BASE}{path}", params=params or {}, timeout=timeout)
     r.raise_for_status()
     return r.json()
 
@@ -1181,8 +1208,8 @@ def get_lsr_signal(symbol: str, mode: str = "trader") -> dict | None:
 
     url = f"{CG_BASE_URL}/api/lsr/signal/{base}"
     try:
-        r = requests.get(url, params={"mode": mode}, headers=CG_HEADERS,
-                         timeout=12, proxies=_PROXIES)
+        r = _request("GET", url, params={"mode": mode}, headers=CG_HEADERS,
+                     timeout=12)
     except requests.exceptions.RequestException as e:
         logger.warning(f"[cg_lsr] {base} 请求异常: {e}")
         return None
@@ -1439,12 +1466,12 @@ def get_market_funding_sentiment() -> dict:
 
 def test_connection() -> dict:
     try:
-        r = requests.post(
+        r = _request(
+            "POST",
             CLAWBY_BASE_URL,
             headers=CLAWBY_HEADERS,
             json={"name": "futures_liquidation_coin_list", "params": {"exchange": "Binance"}},
             timeout=15,
-            proxies=_PROXIES,
         )
         if r.status_code == 401:
             return {"ok": False, "message": "401 未授权 — key 无效或套餐过期", "credits": {}}
