@@ -623,8 +623,35 @@ _24H_SEC = 86_400
 _15M_SEC = 900
 
 
+# ── OI 内存读缓存（TTL 30s）──────────────────────────────────────────────────
+#   trigger_detector 每轮对 ~200 个标的各调一次 _load_oi_cache，原先每次都读盘 + JSON 解析；
+#   现在只缓存读路径：写路径（update_oi / update_all_oi）绕开缓存读文件，写完同步更新缓存。
+#   写入顺序：先换 _oi_mem_cache 再写 _oi_mem_ts，无锁读端不会拿到"新时间戳 + 旧数据"。
+_oi_mem_cache: dict | None = None
+_oi_mem_ts: float = 0.0
+_OI_MEM_TTL = 30.0   # 秒
+
+
 def _load_oi_cache() -> dict:
-    return _read_json(_OI_FILE, {})
+    """无锁快路径；缓存过期才拿 _locks["oi"] 读盘。
+    注意：_locks["oi"] 是不可重入的 Lock，已持有它的调用方必须用 _load_oi_cache_locked，否则会死锁。
+    返回的是共享 dict，调用方只读不改。"""
+    cached = _oi_mem_cache
+    if cached is not None and time.time() - _oi_mem_ts < _OI_MEM_TTL:
+        return cached
+    with _locks["oi"]:
+        return _load_oi_cache_locked()
+
+
+def _load_oi_cache_locked() -> dict:
+    """调用方须已持有 _locks["oi"]。缓存未过期直接返回，否则读盘并刷新缓存。"""
+    global _oi_mem_cache, _oi_mem_ts
+    if _oi_mem_cache is not None and time.time() - _oi_mem_ts < _OI_MEM_TTL:
+        return _oi_mem_cache
+    data = _read_json(_OI_FILE, {})
+    _oi_mem_cache = data
+    _oi_mem_ts = time.time()
+    return data
 
 
 def _save_oi(d: dict) -> None:
@@ -652,20 +679,24 @@ def _prune_oi_series(series: list, now_ms: int) -> list:
 
 
 def update_oi(symbol: str, oi: float) -> None:
+    global _oi_mem_cache, _oi_mem_ts
     now = int(time.time() * 1000)
     with _locks["oi"]:
-        d = _load_oi_cache()
+        d = _read_json(_OI_FILE, {})   # 写路径绕开缓存，读最新文件内容
         series = d.get(symbol, [])
         series.append({"timestamp": now, "oi": float(oi)})
         d[symbol] = _prune_oi_series(series, now)
         _save_oi(d)
+        _oi_mem_cache = d              # 同步缓存（先数据后时间戳）
+        _oi_mem_ts = time.time()
 
 
 def update_all_oi(oi_data: dict) -> None:
     """批量更新所有标的 OI"""
+    global _oi_mem_cache, _oi_mem_ts
     now = int(time.time() * 1000)
     with _locks["oi"]:
-        d = _load_oi_cache()
+        d = _read_json(_OI_FILE, {})   # 写路径绕开缓存，读最新文件内容
         for symbol, oi_val in oi_data.items():
             if oi_val is None or oi_val <= 0:
                 continue
@@ -680,10 +711,12 @@ def update_all_oi(oi_data: dict) -> None:
             else:
                 d.pop(symbol, None)
         _save_oi(d)
+        _oi_mem_cache = d              # 同步缓存（先数据后时间戳）
+        _oi_mem_ts = time.time()
 
 
 def _get_oi_at(symbol: str, target_ts_ms: int, max_err_ms: int) -> float | None:
-    d      = _load_oi_cache()
+    d      = _load_oi_cache_locked()   # 仅由持有 _locks["oi"] 的函数调用
     series = d.get(symbol)
     if not series or len(series) < 2:
         return None
@@ -696,7 +729,7 @@ def _get_oi_at(symbol: str, target_ts_ms: int, max_err_ms: int) -> float | None:
 def get_oi_24h_ago(symbol: str) -> float | None:
     now = int(time.time() * 1000)
     with _locks["oi"]:
-        d = _load_oi_cache()
+        d = _load_oi_cache_locked()
         series = d.get(symbol)
         if not series or len(series) < 2:
             return None
