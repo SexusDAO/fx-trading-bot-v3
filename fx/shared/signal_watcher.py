@@ -2133,6 +2133,7 @@ class SignalWatcher:
                     new_sig = dict(entry.signal)
                     new_sig['pre_entry_price'] = new_entry_p
                     # 计算新 sl/tp
+                    liq_long = None   # [R-03] 供下方入场区间复用，避免重复拉取
                     try:
                         from shared.calc_sl_tp import calc_sl_tp as _cst
                         liq_long = await loop.run_in_executor(
@@ -2149,11 +2150,13 @@ class SignalWatcher:
                     except Exception as _pe:
                         logger.debug(f'[recheck] {sym} 重算 sl_tp 失败: {_pe}')
 
-                    liq_long_r = await loop.run_in_executor(
-                        None, lambda: get_liq_zones_cached(sym, 'LONG', mark_mp, range_='24h')
-                    )
+                    # [R-03] 复用上面已拉取的 liq_long；仅当上面在拉取前就异常（liq_long 仍为 None）时才补拉
+                    if liq_long is None:
+                        liq_long = await loop.run_in_executor(
+                            None, lambda: get_liq_zones_cached(sym, 'LONG', mark_mp, range_='24h')
+                        )
                     e_low, e_high, e_p = compute_entry_range(
-                        new_sig, mark_mp, liq_long=liq_long_r, liq_short=liq_short
+                        new_sig, mark_mp, liq_long=liq_long, liq_short=liq_short
                     )
                     expire_sec = _PULLBACK_EXP_MIN * 60
                     expire_ts  = time.time() + expire_sec

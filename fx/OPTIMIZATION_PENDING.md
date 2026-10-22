@@ -129,6 +129,47 @@
 - **依赖**：需要实盘胜率数据
 - **状态**：暂缓（策略本身已关闭）
 
+
+## [R-01] _check_sl_breach 在价格回调中同步读持仓文件
+- **来源**：代码审阅（`shared/signal_watcher.py` `_check_sl_breach`，与 P-02 同类）
+- **问题**：`on_price_update` 回调中每 30s 同步调用一次 `state.get_all_positions()`（读文件），文件 IO 抖动时直接阻塞主事件循环
+- **方案**：改为后台定时刷新持仓缓存，价格回调链路里只读内存，不做文件 IO
+- **涉及文件**：`shared/signal_watcher.py`
+- **依赖**：无（可与 P-02 剩余部分一起做）
+- **状态**：待实现
+
+## [R-02] on_price_update 中 `if False` 块内约 100 行 BTC 保护逻辑永远不执行
+- **来源**：代码审阅（`shared/signal_watcher.py` `on_price_update`，`if False and symbol == "BTCUSDT":`，标注"[v2-5] 已由 btc_guard 接管"）
+- **问题**：块内含 `_adjust_sl_tp_once`、TP 可达性检查、SL 踩空平仓等约 100 行逻辑，永远不会进入；旧代码保留，维护者容易误以为这些保护仍生效
+- **方案**：确认 btc_guard 已覆盖对应能力后，整体删除该 `if False` 块
+- **涉及文件**：`shared/signal_watcher.py`
+- **依赖**：删除前先确认 btc_guard 覆盖范围（尤其 SL 踩空平仓、TP 可达性检查）
+- **状态**：待实现
+
+## [R-03] _recheck_one 清算区位移检查重复拉取 liq_long
+- **来源**：代码审阅（`shared/signal_watcher.py` `_recheck_one` B 段）
+- **问题**：重算止损止盈时已拉取 `liq_long`，计算入场区间前又以 `liq_long_r` 重复拉取同一数据，多一次无意义 IO
+- **方案**：复用第一次拉取结果；仅当第一次拉取前就异常（变量仍为 None）时才补拉
+- **涉及文件**：`shared/signal_watcher.py`
+- **依赖**：无
+- **状态**：已修复
+
+## [R-04] main.py 的 tracemalloc 与看门狗线程"临时诊断"一直未删
+- **来源**：代码审阅（`main.py`：`tracemalloc.start(10)`、`_loop_mem_snapshot`（每 1200s）、事件循环看门狗线程）
+- **问题**：标注"临时诊断，定位后删除"但一直保留；tracemalloc 有持续性能开销。内存问题根因已定位（主动扫描 + hub 接收队列堆积）
+- **方案**：删除 `tracemalloc.start`、`_loop_mem_snapshot` 任务及看门狗线程，或改为 DEBUG 开关条件启动
+- **涉及文件**：`main.py`
+- **依赖**：确认线上稳定（hub `max_queue` 256→32、触发器驱动上线后内存不再增长）
+- **状态**：待实现（确认线上稳定后再删）
+
+## [R-05] _btc_guard_check_legacy 是死代码
+- **来源**：代码审阅（`shared/signal_watcher.py` `_btc_guard_check_legacy`，注释"保留不再调用"）
+- **问题**：约 50 行旧 BTC 保护实现，全仓库无任何调用
+- **方案**：直接删除
+- **涉及文件**：`shared/signal_watcher.py`
+- **依赖**：无
+- **状态**：待实现（低优先级）
+
 ---
 
 ## 二、已有开关但默认关闭的优化（暂缓）
