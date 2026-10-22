@@ -49,10 +49,16 @@ def _watchdog_thread_fn():
         time.sleep(0.5)
         lag = time.monotonic() - _loop_heartbeat_ts
         if lag > 2.0 and time.monotonic() - last_dump > 10.0:
-            buf = io.StringIO()
-            faulthandler.dump_traceback(file=buf, all_threads=True)
+            # faulthandler 需要真实文件描述符，StringIO 没有 fileno() 会直接抛异常
+            try:
+                _dump_path = Path(__file__).parent / "logs" / "watchdog_stack.txt"
+                with open(_dump_path, "w") as _f:
+                    faulthandler.dump_traceback(file=_f, all_threads=True)
+                _stack = _dump_path.read_text()
+            except Exception as _fe:
+                _stack = f"堆栈获取失败: {_fe}"
             logger.error(
-                f"[watchdog] 事件循环阻塞 {lag:.1f}s，线程堆栈:\n{buf.getvalue()}"
+                f"[watchdog] 事件循环阻塞 {lag:.1f}s，线程堆栈:\n{_stack}"
             )
             last_dump = time.monotonic()
 
