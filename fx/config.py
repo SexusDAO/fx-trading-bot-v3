@@ -290,6 +290,10 @@ MARGIN_BUFFER = 1.1   # 保证金需求 × 1.1 留手续费空间
 ENABLE_USDC_PAIRS = False  # 是否扫描 USDC 保证金交易对（False 时只认 USDT）
 
 # ── 流动性 Gate（v3.57）──────────────────────────────────────────────────────
+# ── liq_cache 磁盘快照 ──────────────────────────────────────────────────────
+LIQ_CACHE_SNAPSHOT_TTL_HOURS = 6                                  # 快照文件超过此时长不加载
+LIQ_CACHE_SNAPSHOT_PATH      = "logs/liq_cache_snapshot.json"   # 相对 fx/ 目录
+
 LIQUIDITY_GATE_MIN_U      = 3_000    # 最小深度硬底 3000U（相对化后降低，OI×0.1% 为动态主阈值）
 LIQUIDITY_GATE_DEPTH_MULT = 5        # 深度需 >= 名义仓位 × 5（[hp-2] 起执行层改用 LIQ_DEPTH_NOTIONAL_MULT）
 LIQ_DEPTH_NOTIONAL_MULT   = 3        # [hp-2] 深度需 >= 实际仓位名义价值 × 3

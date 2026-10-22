@@ -11,9 +11,12 @@ get_liq_zones_cached() 是 judges / calc_sl_tp 的唯一调用入口。
 from __future__ import annotations
 
 import concurrent.futures
+import json
 import logging
+import os
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger("fx.liq_cache")
@@ -334,6 +337,87 @@ def prefetch_liq_cache(symbols: list) -> None:
 
 _bg_stop = threading.Event()
 _bg_thread = None
+_snap_thread = None
+_SNAPSHOT_INTERVAL = 600.0   # 运行期每 10 分钟写一次快照
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 磁盘快照
+# ─────────────────────────────────────────────────────────────────────────────
+def _snapshot_cfg() -> tuple:
+    try:
+        from config import LIQ_CACHE_SNAPSHOT_TTL_HOURS as _ttl, LIQ_CACHE_SNAPSHOT_PATH as _p
+    except Exception:
+        _ttl, _p = 6, "logs/liq_cache_snapshot.json"
+    path = Path(_p)
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parent.parent / path
+    return path, float(_ttl) * 3600
+
+
+def save_snapshot(path=None) -> bool:
+    """锁内复制缓存，锁外写临时文件再原子替换。格式 {key: {"data": 条目, "ts": 条目原 ts}}。"""
+    p = Path(path) if path else _snapshot_cfg()[0]
+    with _CACHE_LOCK:
+        snap = {k: {"data": dict(v), "ts": (v or {}).get("ts", 0)} for k, v in _CACHE.items() if v}
+    if not snap:
+        return False
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_name(p.name + ".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(snap, f, ensure_ascii=False)
+        os.replace(tmp, p)
+        logger.debug(f"[liq_cache] 快照已写入 {len(snap)} 条 → {p}")
+        return True
+    except Exception as e:
+        logger.warning(f"[liq_cache] 快照写入失败: {e}")
+        return False
+
+
+def load_snapshot(path=None, max_age_sec=None) -> int:
+    """启动时加载快照：文件时间超过 TTL 或不存在返回 0；加载失败记 WARNING 返回 0。
+    加载的条目 ts 改为当前时间（加载后 15 分钟内视为有效），src_level 保留原值。返回加载条数。"""
+    cfg_path, cfg_ttl = _snapshot_cfg()
+    p = Path(path) if path else cfg_path
+    ttl = cfg_ttl if max_age_sec is None else max_age_sec
+    if not p.exists():
+        return 0
+    try:
+        age = time.time() - p.stat().st_mtime
+        if age > ttl:
+            logger.info(f"[liq_cache] 快照已过期({age / 3600:.1f}h > {ttl / 3600:.0f}h)，正常预热")
+            return 0
+        with open(p, encoding="utf-8") as f:
+            snap = json.load(f)
+        now = time.time()
+        loaded = {}
+        for k, rec in (snap or {}).items():
+            data = dict((rec or {}).get("data") or {})
+            if not data or ":" not in str(k):
+                continue
+            data["ts"] = now
+            loaded[str(k)] = data
+        if not loaded:
+            logger.warning("[liq_cache] 快照为空或格式不符，正常预热")
+            return 0
+        with _CACHE_LOCK:
+            for k, v in loaded.items():
+                _CACHE[k] = v
+            _evict_oldest_locked()
+        logger.info(f"[liq_cache] 已从快照加载 {len(loaded)} 条（文件 {age / 60:.0f} 分钟前），跳过首轮预热")
+        return len(loaded)
+    except Exception as e:
+        logger.warning(f"[liq_cache] 快照加载失败，正常预热: {e}")
+        return 0
+
+
+def _snapshot_loop() -> None:
+    while not _bg_stop.wait(_SNAPSHOT_INTERVAL):
+        try:
+            save_snapshot()
+        except Exception as e:
+            logger.warning(f"[liq_cache] 定时快照异常: {e}")
 
 
 def start_bg_refresh(symbols_fn) -> None:
@@ -346,18 +430,25 @@ def start_bg_refresh(symbols_fn) -> None:
         def _loop():
             global _bg_started
             try:
+                # 启动时先尝试加载快照：成功则跳过首轮预热
+                _skip_first = load_snapshot() > 0
                 while not _bg_stop.is_set():
-                    try:
-                        syms = symbols_fn() or []
-                        if syms and not _bg_stop.is_set():
-                            prefetch_liq_cache(syms)
-                    except Exception as e:
-                        logger.warning(f"[liq_cache] bg_refresh 异常: {e}")
+                    if _skip_first:
+                        _skip_first = False
+                    else:
+                        try:
+                            syms = symbols_fn() or []
+                            if syms and not _bg_stop.is_set():
+                                prefetch_liq_cache(syms)
+                                save_snapshot()          # 预热完成后写快照
+                        except Exception as e:
+                            logger.warning(f"[liq_cache] bg_refresh 异常: {e}")
                     if _bg_stop.wait(_CACHE_TTL):
                         break
             finally:
                 with _bg_lock:
                     _bg_started = False
+        global _snap_thread
         _bg_thread = threading.Thread(target=_loop, name="liq-cache-bg", daemon=True)
         _bg_started = True
         try:
@@ -366,6 +457,12 @@ def start_bg_refresh(symbols_fn) -> None:
             _bg_started = False
             _bg_thread = None
             raise
+        try:
+            _snap_thread = threading.Thread(target=_snapshot_loop, name="liq-cache-snap", daemon=True)
+            _snap_thread.start()
+        except Exception as e:
+            _snap_thread = None
+            logger.warning(f"[liq_cache] 快照线程启动失败: {e}")
     logger.info("[liq_cache] 后台刷新线程已启动")
 
 
@@ -374,8 +471,11 @@ def stop_bg_refresh(timeout: float = 5.0) -> bool:
     _bg_stop.set()
     with _bg_lock:
         thread = _bg_thread
+        snap_t = _snap_thread
     if thread and thread is not threading.current_thread():
         thread.join(timeout=max(0.0, timeout))
+    if snap_t and snap_t is not threading.current_thread():
+        snap_t.join(timeout=1.0)
     stopped = thread is None or not thread.is_alive()
     if not stopped:
         logger.warning("[liq_cache] 后台刷新仍有在途请求，停止等待超时")
