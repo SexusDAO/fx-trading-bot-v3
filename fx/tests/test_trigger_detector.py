@@ -307,6 +307,9 @@ def test_breakout_by_closed_1h_close(env):
 
 def test_funding_arb_window_scales_with_period(env):
     e = env
+    # 派发模式下 _enqueue_dispatch 会 mark_analyzing 占位，同步 poll_once 时派发 worker 不运行、占位不清除，
+    #   后续触发被 is_analyzing 压制；本用例只测触发判定，关闭占位
+    e["det"].mark_analyzing = lambda s: None
     now_ms = int(T0 * 1000)
     e["hub"].set("AAAUSDT", None, funding=0.0, nft=now_ms + 3_600_000)
     e["det"].poll_once()
@@ -323,6 +326,9 @@ def test_funding_arb_window_scales_with_period(env):
 
 def test_funding_arb_8h_window_and_interval(env):
     e = env
+    # 派发模式下 _enqueue_dispatch 会 mark_analyzing 占位，同步 poll_once 时派发 worker 不运行、占位不清除，
+    #   后续触发被 is_analyzing 压制；本用例只测触发判定，关闭占位
+    e["det"].mark_analyzing = lambda s: None
     e["hub"].set("AAAUSDT", None, funding=0.0, nft=int((T0 + 2 * 3600) * 1000))
     e["det"].poll_once()
     e["hub"].mp["AAAUSDT"]["lastFundingRate"] = 0.0008
@@ -421,6 +427,9 @@ def test_ema_trend_short_branch(env):
 
 def test_ema_trend_inner_retrigger_on_1h_close(env):
     e = env
+    # 派发模式下 _enqueue_dispatch 会 mark_analyzing 占位，同步 poll_once 时派发 worker 不运行、占位不清除，
+    #   后续触发被 is_analyzing 压制；本用例只测触发判定，关闭占位
+    e["det"].mark_analyzing = lambda s: None
     c4 = [80.0 + i * 0.4 for i in range(100)]
     now_ms = e["clk"].t * 1000
     e["hub"].set("AAAUSDT", flat(c=c4[-2]), k4h=_rows(c4, H4, now_ms), price=c4[-2], chg24=1.0)
@@ -685,7 +694,11 @@ def test_reconcile_oi_counted_separately(env, caplog):
 
 
 def test_disabled_by_default():
+    """v3.91 起触发器默认开启（函数名沿用）。"""
     import config
-    assert config.TRIGGER_DETECTOR_ENABLED is False
+    assert config.TRIGGER_DETECTOR_ENABLED is True
     td._default = None
-    assert td.create() is None
+    try:
+        assert td.create() is not None
+    finally:
+        td._default = None

@@ -352,4 +352,4 @@ def test_dispatch_timeout_does_not_block(det_env, monkeypatch):
 def test_scan_interval_passive_switch():
     src = (Path(__file__).parent.parent / "main.py").read_text(encoding="utf-8")
     assert 'getattr(_cfg_ps, "TRIGGER_DETECTOR_ENABLED", False) and getattr(_cfg_ps, "TRIGGER_DISPATCH_ENABLED", False)' in src
-    assert config.SCAN_INTERVAL_PASSIVE == 1800 and config.TRIGGER_DISPATCH_ENABLED is False
+    assert config.SCAN_INTERVAL_PASSIVE == 900 and config.TRIGGER_DISPATCH_ENABLED is True

@@ -870,7 +870,7 @@ class TriggerDetector:
             import scanner as _sc
             fn = _sc.dispatch_trigger_analysis
         return fn(symbol, tk, mp, kl, signal_watcher=self._watcher,
-                  max_ctx_age=float(_cfg("SCAN_INTERVAL_PASSIVE", 1800)))
+                  max_ctx_age=float(_cfg("TRIGGER_CTX_MAX_AGE", 1800)))
 
     def _dispatch_done(self, rec, result, strategy, err):
         key = result if result in self.dispatch_stats else "error"

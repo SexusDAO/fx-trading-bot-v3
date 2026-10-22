@@ -592,7 +592,7 @@ class MarketDataHub:
             first = False
             try:
                 async with websockets.connect(
-                    self._market_url, ping_interval=PING_INTERVAL, ping_timeout=10, proxy=_PROXY, max_queue=256,
+                    self._market_url, ping_interval=PING_INTERVAL, ping_timeout=10, proxy=_PROXY, max_queue=32,
                 ) as ws:
                     self._shards[idx].connected = True
                     delay = RECONNECT_BASE
