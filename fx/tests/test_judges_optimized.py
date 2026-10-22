@@ -138,13 +138,22 @@ def test_9_btc_crash_blocks_range_bounce():
 
 
 # ═══ 【6】ema_trend SHORT 对称参数 ═══
-def _ema_short(rsi_4h):
+def _ema_short(rsi_4h, chg24=-2.0):
     ind = _ind(price=48500, atr=700, rsi_1h=55, rsi_4h=rsi_4h, ema20_4h=48500, ema50_4h=50000)
     ind["vol24_usd"] = 50e6
     with patch("shared.coinglass_api.get_liq_zones", return_value=[]):
         return J.judge_ema_trend(_trending_k1h(50000, n=60, direction="down"),
                                  _trending_k1h(52000, n=60, direction="down"), _flat_k1h(48500, n=20),
-                                 ind, chg24=-2.0, funding=0.0)
+                                 ind, chg24=chg24, funding=0.0)
+
+
+def _ema_long(chg24):
+    ind = _ind(price=51500, atr=700, rsi_1h=55, rsi_4h=55, ema20_4h=51500, ema50_4h=50000)
+    ind["vol24_usd"] = 50e6
+    with patch("shared.coinglass_api.get_liq_zones", return_value=[]):
+        return J.judge_ema_trend(_trending_k1h(50000, n=60, direction="up"),
+                                 _trending_k1h(48000, n=60, direction="up"), _flat_k1h(51500, n=20),
+                                 ind, chg24=chg24, funding=0.0)
 
 
 def test_10_ema_trend_short_rsi4h_60_rejected():
@@ -155,3 +164,24 @@ def test_10_ema_trend_short_rsi4h_60_rejected():
 def test_11_ema_trend_short_rsi4h_48_passes_gate():
     ok, out = _ema_short(48)
     assert "4H RSI" not in _rr(out)
+
+
+def test_12_ema_trend_short_chg24_plus10_rejected():
+    ok, out = _ema_short(48, chg24=10.0)
+    assert ok is False and "chg24=10.0%" in _rr(out) and "> 8.0%" in _rr(out)
+
+
+def test_13_ema_trend_short_chg24_plus6_passes_gate():
+    ok, out = _ema_short(48, chg24=6.0)
+    assert "chg24" not in _rr(out)
+
+
+def test_14_ema_trend_long_chg24_unaffected_by_short_params():
+    # LONG 仍用 config 的 -8%~+12%
+    assert (config.EMA_TREND_CHG24_MIN, config.EMA_TREND_CHG24_MAX) == (-8.0, 12.0)
+    ok, out = _ema_long(10.0)          # +10%：SHORT 会拒，LONG 不拒
+    assert "chg24" not in _rr(out)
+    ok, out = _ema_long(-10.0)         # -10%：SHORT 不拒，LONG 拒（< -8%）
+    assert ok is False and "chg24=-10.0%" in _rr(out) and "< -8.0%" in _rr(out)
+    ok, out = _ema_long(13.0)          # +13%：超过 LONG 上限 12%
+    assert ok is False and "> 12.0%" in _rr(out)
