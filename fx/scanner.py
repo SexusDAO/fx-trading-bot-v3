@@ -2920,8 +2920,10 @@ def _filter_and_register_signals(
                         _range = "24h" if mode in ("reversal","funding_arb") else                                  "7d"  if mode == "breakout" else "3d"
                         params = _calc_sl_tp(
                             signal=sig, mark_price=mark_p, atr=atr_v,
-                            liq_zones={"long":  _liq_zones(sym,"LONG", mark_p, range_=_range),
-                                       "short": _liq_zones(sym,"SHORT",mark_p, range_=_range)},
+                            liq_zones={"long":  _liq_zones(sym,"LONG", mark_p, range_=_range,
+                                                           fetch_if_missing=False),
+                                       "short": _liq_zones(sym,"SHORT",mark_p, range_=_range,
+                                                           fetch_if_missing=False)},
                             k1h=k1h, ema20=ema20,
                         )
                         if "error" not in params:
@@ -2957,8 +2959,8 @@ def _filter_and_register_signals(
                     _liq_l = _liq_r = None
                     if mode == "breakout":
                         try:
-                            _liq_l = _liq_zones(sym, "LONG",  mark_p, range_="7d")
-                            _liq_r = _liq_zones(sym, "SHORT", mark_p, range_="7d")
+                            _liq_l = _liq_zones(sym, "LONG",  mark_p, range_="7d", fetch_if_missing=False)
+                            _liq_r = _liq_zones(sym, "SHORT", mark_p, range_="7d", fetch_if_missing=False)
                         except Exception:
                             pass  # 失败降级，compute_entry_range 内部处理
 

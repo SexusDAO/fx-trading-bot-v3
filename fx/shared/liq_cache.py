@@ -244,7 +244,8 @@ def _fetch_dedup(symbol: str, price: float, range_: str, key: str) -> dict:
 
 def get_liq_zones_cached(symbol: str, direction: str,
                           current_price: float = 0.0,
-                          range_: str = "3d") -> list:
+                          range_: str = "3d",
+                          fetch_if_missing: bool = True) -> list:
     """
     返回指定方向的清算区列表。
 
@@ -254,11 +255,17 @@ def get_liq_zones_cached(symbol: str, direction: str,
     - 这保证每次调用都能拿到最新清算图，不再因"缓存未预热"导致降级
     - 仓位维护场景（patrol/adjust_sl_tp）调用此函数时同样受益，
       若缓存已过期则自动刷新，确保止损动态跟随最新清算图结构
+    - fetch_if_missing=False：只读缓存；未命中或已过期直接返回 []，不查价格、不发 HTTP
+      （信号注册阶段用，避免冷缓存时逐信号同步拉清算图卡住）
     """
     cache_key = f"{symbol}:{range_}"
     with _CACHE_LOCK:
         entry = _CACHE.get(cache_key)
         stale = (entry is None) or (time.time() - entry.get("ts", 0) > _CACHE_TTL)
+
+    if stale and not fetch_if_missing:
+        logger.debug(f"[liq_cache] {symbol}:{range_} 缓存未命中，fetch_if_missing=False，返回空")
+        return []
 
     if stale:
         # 缓存过期或为空：实时拉取，而非直接返回空（v3.64 关键修改）
