@@ -362,8 +362,9 @@ async def _loop_mem_snapshot(interval_sec: int = 1200) -> None:
             
             # 仅在异常时输出详细诊断
             if rss_mb > 1500 or task_count > 50:
-                snapshot = tracemalloc.take_snapshot()
-                top_stats = snapshot.statistics('lineno')
+                loop = asyncio.get_running_loop()
+                snapshot = await loop.run_in_executor(None, tracemalloc.take_snapshot)
+                top_stats = await loop.run_in_executor(None, snapshot.statistics, 'lineno')
                 lines = ["[mem] TOP15 内存分配:"]
                 for stat in top_stats[:15]:
                     size_mib = stat.size / 1024 / 1024
