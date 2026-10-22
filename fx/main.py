@@ -733,7 +733,7 @@ async def main() -> None:
     signal_watcher.register_to_ws(ws)
     await signal_watcher.start_gc()           # 后台 GC
     await signal_watcher.start_polling(1.5)   # REST 轮询（1.5s间隔，与 WS 互补）
-    await signal_watcher.start_recheck(900)   # 每15min 复核 pending 挂单指标
+    await signal_watcher.start_recheck(60)   # 每60s 复核 pending 挂单指标
     await signal_watcher.start_btc_guard(300) # 每5min 检查 BTC 大跌护卫
     logger.info("[main] SignalWatcher 初始化完成（WS + REST + recheck + btc_guard）")
 

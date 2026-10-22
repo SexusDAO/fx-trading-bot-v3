@@ -719,6 +719,13 @@ class TriggerDetector:
 
     # ── 过滤 / 令牌桶 / 输出 ─────────────────────────────────────────────
     def _suppressed(self, sym, strat, direction) -> bool:
+        # [v2-5] 与 signal_watcher 共用 btc_guard 状态
+        try:
+            from shared import btc_guard as _bg
+            if not _bg.is_allowed(direction, strat):
+                return True
+        except Exception:
+            pass
         code = None
         if self.is_analyzing(sym):
             code = "suppressed:analyzing"
