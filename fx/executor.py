@@ -1677,7 +1677,7 @@ async def _execute_async(signal: dict, ws_listener: Any = None) -> bool:
     logger.info(
         f"[executor] {symbol} 止损定仓: 余额={total_bal:.0f}U × {_RISK_PCT*100:.0f}% "
         f"÷ SL={_sl_dist_pct*100:.1f}% × mult={_strength_mult:.2f}"
-        f"({'arb直用cap' if _is_arb else f'score={_score}'} cap={_cap}) = {notional:.0f}U"
+        f"({'arb直用cap' if _is_arb else f'score={_score}'} cap={_cap if _cap is not None else 'N/A'}) = {notional:.0f}U"
     )
 
     # ── Vol Regime 仓位调节（BTC/ETH 适用，山寨自动返回 1.0）─────────────────
