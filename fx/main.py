@@ -424,6 +424,7 @@ async def _sync_positions_on_startup() -> None:
     3. 检查有持仓但缺 tp1/tp2 挂单的仓位，自动补挂
     4. 推送对齐摘要到 Jarvis
     """
+    loop = asyncio.get_running_loop()   # 同步 REST 调用统一走线程池，避免 WS 重连时阻塞事件循环
     import math
     import time as _time
 
@@ -457,7 +458,7 @@ async def _sync_positions_on_startup() -> None:
 
     try:
         # ── 拉取真实持仓 ──────────────────────────────────────────────────────
-        pos_risk = _bapi.get_position()  # 走 binance_api 封装：_retry + Session + key 轮询
+        pos_risk = await loop.run_in_executor(None, _bapi.get_position)  # 走 binance_api 封装：_retry + Session + key 轮询
         # HEDGE 模式：多单 positionSide=LONG，空单 positionSide=SHORT，两者都要对齐
         # 用 (symbol, positionSide) 作为 key，避免同一标的多空各一条记录时互相覆盖
         real = {(p["symbol"], p["positionSide"]): p for p in pos_risk
@@ -465,7 +466,7 @@ async def _sync_positions_on_startup() -> None:
                 and abs(float(p.get("positionAmt", 0))) > 0}
 
         # ── 拉取开放挂单（普通限价单：TP）──────────────────────────────────────
-        open_orders = _bapi.get_open_orders()  # 走 binance_api 封装
+        open_orders = await loop.run_in_executor(None, _bapi.get_open_orders)  # 走 binance_api 封装
         live_ids = {int(o["orderId"]) for o in open_orders}
         order_by_sym = {}
         for o in open_orders:
@@ -473,7 +474,7 @@ async def _sync_positions_on_startup() -> None:
 
         # ── v3.56: 拉取 Algo 止损单（SL），检查 SL 是否仍在交易所 ──────────────
         try:
-            _algo_orders = _bapi.get_algo_open_orders() or []
+            _algo_orders = await loop.run_in_executor(None, _bapi.get_algo_open_orders) or []
         except Exception as _ae:
             logger.warning(f"[startup_sync] 拉取 algo 止损单失败: {_ae}")
             _algo_orders = []
@@ -563,7 +564,7 @@ async def _sync_positions_on_startup() -> None:
 
             logger.info(f"[startup_sync] {sym}: tp1_alive={tp1_alive} tp2_alive={tp2_alive} single_tp={single_tp_mode}，开始补挂")
             try:
-                klines = _bapi.get_klines(sym, "1h", 22)
+                klines = await loop.run_in_executor(None, _bapi.get_klines, sym, "1h", 22)
                 now_ms = _time.time() * 1000
                 closed = [k for k in klines if float(k[6]) < now_ms]
                 trs = [max(float(closed[i][2]) - float(closed[i][3]),
