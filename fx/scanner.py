@@ -3125,6 +3125,24 @@ def _filter_and_register_signals(
                                 )
                                 entry_low = adjusted_low
 
+                    # [P-02] 在子线程预取 add_signal 所需的网络数据，主事件循环里不再发请求
+                    _pl = {"mark_price": mark_p}
+                    try:
+                        _pl["order_book"] = api.get_order_book(sym, limit=20)
+                    except Exception as _pe:
+                        _pl["order_book"] = None
+                        logger.debug(f"[scanner] {sym} 预取盘口失败: {_pe}")
+                    try:
+                        _pl["positions"] = api.get_position(sym) or []
+                    except Exception as _pe:
+                        _pl["positions"] = []
+                        logger.debug(f"[scanner] {sym} 预取持仓失败: {_pe}")
+                    try:
+                        _pl["open_orders"] = api.get_open_orders(sym) or []
+                    except Exception as _pe:
+                        _pl["open_orders"] = []
+                        logger.debug(f"[scanner] {sym} 预取挂单失败: {_pe}")
+                    sig["_preloaded"] = _pl
                     prepared.append((sig, entry_low, entry_high, entry_p, expire_ts))
                 except Exception as e:
                     logger.warning(f"[scanner] {sym} 预算失败: {e}")
@@ -3240,7 +3258,7 @@ def _filter_and_register_signals(
                 if main_loop and main_loop.is_running():
                     fut = _asyncio.run_coroutine_threadsafe(_do_register(), main_loop)
                     try:
-                        fut.result(timeout=15)  # add_signal 是内存写，正常 <1s。如果 _trigger 持锁超过 15s 才会超时
+                        fut.result(timeout=15)  # 网络 IO 已在子线程预取，add_signal 应为纯内存操作
                     except Exception as _timeout_err:
                         _batch_syms = [s["symbol"] for s, *_ in prepared]
                         logger.warning(

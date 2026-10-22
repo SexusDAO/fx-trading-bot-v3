@@ -537,10 +537,20 @@ class SignalWatcher:
             except ImportError:
                 _pf_mult = 2
             _loop_d = asyncio.get_running_loop()
-            _mp_d = float((await _loop_d.run_in_executor(None, lambda: _get_hub_or_rest(symbol, "mark")) or {})
-                          .get("markPrice", 0) or 0)
+            # [P-02] 优先用 scanner 子线程预取的数据；没有才在线程池里现查（向后兼容）
+            _pre = signal.get("_preloaded") if isinstance(signal.get("_preloaded"), dict) else None
+            if _pre is not None and _pre.get("mark_price"):
+                _mp_d = float(_pre.get("mark_price") or 0)
+            else:
+                _mp_d = float((await _loop_d.run_in_executor(None, lambda: _get_hub_or_rest(symbol, "mark")) or {})
+                              .get("markPrice", 0) or 0)
             if _mp_d > 0:
-                _ob = await _loop_d.run_in_executor(None, lambda: _bapi_d.get_order_book(symbol, limit=20)) or {}
+                if _pre is not None and "order_book" in _pre:
+                    _ob = _pre.get("order_book")
+                    if _ob is None:
+                        raise RuntimeError("预取盘口失败")   # 与现查失败一致：放行
+                else:
+                    _ob = await _loop_d.run_in_executor(None, lambda: _bapi_d.get_order_book(symbol, limit=20)) or {}
                 _dep = _book_depth_u(_ob, _dir0, _mp_d)
                 _need = _signal_notional(signal) * _pf_mult
                 if _dep < _need:
@@ -564,16 +574,24 @@ class SignalWatcher:
         finally:
             _slock.release()
 
-    async def _exchange_conflict(self, symbol: str, own_order_id) -> Optional[str]:
-        """[v2-3] 查交易所真实持仓/挂单；排除本系统登记的挂单。返回冲突原因或 None。"""
+    async def _exchange_conflict(self, symbol: str, own_order_id, preloaded: Optional[dict] = None) -> Optional[str]:
+        """[v2-3] 查交易所真实持仓/挂单；排除本系统登记的挂单。返回冲突原因或 None。
+        [P-02] preloaded 含 positions/open_orders 时直接使用，不再发请求。"""
         from shared import binance_api as _api
         loop = asyncio.get_running_loop()
+        _pre = preloaded if isinstance(preloaded, dict) else {}
         try:
-            pos = await loop.run_in_executor(None, lambda: _api.get_position(symbol)) or []
+            if "positions" in _pre:
+                pos = _pre.get("positions") or []
+            else:
+                pos = await loop.run_in_executor(None, lambda: _api.get_position(symbol)) or []
             for p in pos:
                 if abs(float(p.get("positionAmt", 0) or 0)) > 0:
                     return "交易所已有持仓"
-            orders = await loop.run_in_executor(None, lambda: _api.get_open_orders(symbol)) or []
+            if "open_orders" in _pre:
+                orders = _pre.get("open_orders") or []
+            else:
+                orders = await loop.run_in_executor(None, lambda: _api.get_open_orders(symbol)) or []
             own = {int(e.limit_order_id) for e in self._watched.values() if e.limit_order_id}
             if own_order_id:
                 own.add(int(own_order_id))
@@ -595,6 +613,10 @@ class SignalWatcher:
         # [v2-4] 同标的已有挂单：同方向高 8 分替换；反方向默认拒绝，高 20 分撤旧挂新
         _cur = self._watched.get(symbol)
         _replace_old = None
+        # [P-01] 去掉下单持锁后：旧条目已触发（正在下单，limit_order_id 可能尚未返回）时拒绝替换，防止重复挂单
+        if replace and _cur is not None and _cur.triggered:
+            logger.warning(f"[signal_watcher] {symbol} 替换被拒：旧信号正在下单中，跳过本次替换")
+            return
         if _cur and not replace and not _cur.triggered and not _cur.is_expired():
             if _cur.cancel_state != "none":
                 logger.info(f"[signal_watcher] {symbol} 旧挂单撤单状态={_cur.cancel_state}，不下新单")
@@ -618,7 +640,8 @@ class SignalWatcher:
                 else:
                     logger.info(f"[signal_watcher] {symbol} 新分{_new_sc:.0f} ≤ 旧分{_old_sc:.0f}+8，丢弃新信号")
                 return
-        _conf = await self._exchange_conflict(symbol, _replace_old.limit_order_id if _replace_old else None)
+        _conf = await self._exchange_conflict(symbol, _replace_old.limit_order_id if _replace_old else None,
+                                              signal.get("_preloaded"))
         if _conf:
             logger.info(f"[signal_watcher] {symbol} {_conf}，跳过注册")
             return
@@ -639,6 +662,10 @@ class SignalWatcher:
         _evict_cancel = []   # [v3.89 撤单检查] 被驱逐条目的待撤订单（锁内登记，锁外执行）
         async with self._lock:
             existing = self._watched.get(symbol)
+            # [P-01] 冲突检查/撤单等 await 期间旧条目可能已触发，锁内再查一次
+            if replace and existing is not None and existing.triggered:
+                logger.warning(f"[signal_watcher] {symbol} 替换被拒：旧信号正在下单中，跳过本次替换")
+                return
             if existing and not replace and not existing.triggered and not existing.is_expired():
                 logger.info(
                     f"[signal_watcher] {symbol} 已在监控队列，跳过重复注册 (mode={existing.mode})"
@@ -1276,10 +1303,9 @@ class SignalWatcher:
                     logger.debug(f"[signal_watcher] {symbol} 强平意图查询失败，降级直接入场: {_le}")
 
             if not _skip:
-                # [v2-3] 下单与注册共用 symbol 锁
-                _tl = self._sym_locks.setdefault(symbol, asyncio.Lock())
-                async with _tl:
-                    await entry.on_trigger(entry.signal)
+                # [P-01] 下单时不持标的注册锁：注册锁只保护 add_signal 的"检查并写入监控队列"，
+                #   否则下单期间同标的替换信号等锁 5s 超时被丢弃；finally 中按条目身份 pop，不会删掉替换进来的新条目
+                await entry.on_trigger(entry.signal)
         except _PreOrderError as _pe:
             # [v3.89 #102] 下单前失败：交易所确认没有订单，复位触发标记保留条目，等下一次价格触发重试
             _keep_entry = True
